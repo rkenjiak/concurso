@@ -94,7 +94,7 @@ export default async function ConcursoPage({ params }: PageProps<"/concursos/[id
       </header>
 
       <Tabs defaultValue="geral" className="gap-4">
-        <TabsList className="w-full justify-start overflow-x-auto sm:w-fit">
+        <TabsList className="w-full sm:w-fit">
           <TabsTrigger value="geral">Visão geral</TabsTrigger>
           <TabsTrigger value="eventos">Eventos ({pendentes})</TabsTrigger>
           <TabsTrigger value="links">Links ({links.length})</TabsTrigger>

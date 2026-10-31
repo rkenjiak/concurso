@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { AlterarStatus } from "@/components/concurso/alterar-status";
 import { BadgeStatus } from "@/components/concurso/badge-status";
 import { BotaoExcluirConcurso } from "@/components/concurso/botao-excluir-concurso";
+import { LinksConcurso } from "@/components/concurso/links-concurso";
 import { ListaTags } from "@/components/concurso/lista-tags";
 import { Markdown } from "@/components/concurso/markdown";
 import { TimelineStatus } from "@/components/concurso/timeline-status";
@@ -17,6 +18,7 @@ import { idSchema } from "@/lib/schemas/comum";
 import { getDb } from "@/server/db/client";
 import { obterConcurso } from "@/server/queries/concursos";
 import { obterOpcoesStatus } from "@/server/queries/historico";
+import { listarLinks } from "@/server/queries/links";
 
 async function carregar(params: Promise<{ id: string }>) {
   const id = idSchema.safeParse((await params).id);
@@ -46,7 +48,10 @@ const numero = (n: number | null) => (n == null ? "—" : n.toLocaleString("pt-B
 
 export default async function ConcursoPage({ params }: PageProps<"/concursos/[id]">) {
   const c = await carregar(params);
-  const { historico, opcoes } = await obterOpcoesStatus(getDb(), c.id, c.status);
+  const [{ historico, opcoes }, links] = await Promise.all([
+    obterOpcoesStatus(getDb(), c.id, c.status),
+    listarLinks(getDb(), c.id),
+  ]);
   const local = [c.cidade, c.uf].filter(Boolean).join(" / ");
 
   return (
@@ -87,6 +92,7 @@ export default async function ConcursoPage({ params }: PageProps<"/concursos/[id
       <Tabs defaultValue="geral" className="gap-4">
         <TabsList className="w-full sm:w-fit">
           <TabsTrigger value="geral">Visão geral</TabsTrigger>
+          <TabsTrigger value="links">Links ({links.length})</TabsTrigger>
           <TabsTrigger value="historico">Histórico</TabsTrigger>
         </TabsList>
 
@@ -130,6 +136,20 @@ export default async function ConcursoPage({ params }: PageProps<"/concursos/[id
               ) : (
                 <p className="text-muted-foreground text-sm">Sem observações.</p>
               )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="links">
+          <Card>
+            <CardHeader>
+              <CardTitle>Links e documentos</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <LinksConcurso
+                concursoId={c.id}
+                links={links.map(({ id, tipo, rotulo, url }) => ({ id, tipo, rotulo, url }))}
+              />
             </CardContent>
           </Card>
         </TabsContent>

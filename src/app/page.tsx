@@ -1,10 +1,29 @@
-export default function Home() {
+import type { Metadata } from "next";
+import { CabecalhoPagina } from "@/components/layout/cabecalho-pagina";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+
+export const metadata: Metadata = { title: "Dashboard" };
+
+export default function DashboardPage() {
   return (
-    <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-2 p-6">
-      <h1 className="font-semibold text-2xl">Concursos</h1>
-      <p className="text-neutral-600 dark:text-neutral-400">
-        Controle pessoal de concursos públicos — em construção.
-      </p>
-    </main>
+    <div className="space-y-6">
+      <CabecalhoPagina titulo="Dashboard" descricao="O que vem a seguir nos seus concursos." />
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Próximos prazos</CardTitle>
+            <CardDescription>Vencidos, hoje e próximos 30 dias.</CardDescription>
+          </CardHeader>
+          <CardContent className="text-muted-foreground">Em breve.</CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Concursos por status</CardTitle>
+            <CardDescription>Contagem por etapa do pipeline.</CardDescription>
+          </CardHeader>
+          <CardContent className="text-muted-foreground">Em breve.</CardContent>
+        </Card>
+      </div>
+    </div>
   );
 }

@@ -9,6 +9,7 @@ import { EventosConcurso } from "@/components/concurso/eventos-concurso";
 import { LinksConcurso } from "@/components/concurso/links-concurso";
 import { ListaTags } from "@/components/concurso/lista-tags";
 import { Markdown } from "@/components/concurso/markdown";
+import { ResultadosConcurso } from "@/components/concurso/resultados-concurso";
 import { TimelineStatus } from "@/components/concurso/timeline-status";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,6 +22,7 @@ import { obterConcurso } from "@/server/queries/concursos";
 import { listarEventos } from "@/server/queries/eventos";
 import { obterOpcoesStatus } from "@/server/queries/historico";
 import { listarLinks } from "@/server/queries/links";
+import { listarResultadosFase } from "@/server/queries/resultados";
 
 async function carregar(params: Promise<{ id: string }>) {
   const id = idSchema.safeParse((await params).id);
@@ -50,10 +52,11 @@ const numero = (n: number | null) => (n == null ? "—" : n.toLocaleString("pt-B
 
 export default async function ConcursoPage({ params }: PageProps<"/concursos/[id]">) {
   const c = await carregar(params);
-  const [{ historico, opcoes }, links, eventos] = await Promise.all([
+  const [{ historico, opcoes }, links, eventos, resultados] = await Promise.all([
     obterOpcoesStatus(getDb(), c.id, c.status),
     listarLinks(getDb(), c.id),
     listarEventos(getDb(), c.id),
+    listarResultadosFase(getDb(), c.id),
   ]);
   const pendentes = eventos.filter((e) => !e.concluido).length;
   const local = [c.cidade, c.uf].filter(Boolean).join(" / ");
@@ -94,10 +97,11 @@ export default async function ConcursoPage({ params }: PageProps<"/concursos/[id
       </header>
 
       <Tabs defaultValue="geral" className="gap-4">
-        <TabsList className="w-full sm:w-fit">
+        <TabsList className="w-full justify-start overflow-x-auto sm:w-fit">
           <TabsTrigger value="geral">Visão geral</TabsTrigger>
           <TabsTrigger value="eventos">Eventos ({pendentes})</TabsTrigger>
           <TabsTrigger value="links">Links ({links.length})</TabsTrigger>
+          <TabsTrigger value="resultados">Resultados ({resultados.length})</TabsTrigger>
           <TabsTrigger value="historico">Histórico</TabsTrigger>
         </TabsList>
 
@@ -179,6 +183,46 @@ export default async function ConcursoPage({ params }: PageProps<"/concursos/[id
               <LinksConcurso
                 concursoId={c.id}
                 links={links.map(({ id, tipo, rotulo, url }) => ({ id, tipo, rotulo, url }))}
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="resultados">
+          <Card>
+            <CardHeader>
+              <CardTitle>Resultados por fase</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ResultadosConcurso
+                concursoId={c.id}
+                resultados={resultados.map(
+                  ({
+                    id,
+                    fase,
+                    descricao,
+                    nota,
+                    notaMaxima,
+                    notaCorte,
+                    classificacaoGeral,
+                    classificacaoCotas,
+                    listaCotas,
+                    situacao,
+                    observacao,
+                  }) => ({
+                    id,
+                    fase,
+                    descricao,
+                    nota,
+                    notaMaxima,
+                    notaCorte,
+                    classificacaoGeral,
+                    classificacaoCotas,
+                    listaCotas,
+                    situacao,
+                    observacao,
+                  }),
+                )}
               />
             </CardContent>
           </Card>

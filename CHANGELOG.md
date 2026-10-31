@@ -7,6 +7,12 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 
 ## [Unreleased]
 
+### Adicionado
+
+- Rótulos pt-BR de todos os enums do domínio e lista de UFs (`domain/labels.ts`).
+- Regras de transição de status (`domain/status.ts`): trilha principal com saltos, resultados revisáveis,
+  terminais, suspensão com retomada do status anterior e desfazer a última mudança, com testes.
+
 ## [0.1.0] - 2026-10-31
 
 ### Adicionado

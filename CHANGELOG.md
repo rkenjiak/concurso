@@ -7,6 +7,13 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 
 ## [Unreleased]
 
+### Adicionado
+
+- Eventos do concurso (RF04): aba "Eventos" no detalhe com adicionar, editar e excluir eventos (tipo,
+  título opcional, data, hora opcional, local, observação, concluído), ordenados por data (sem hora
+  primeiro, depois por hora), e marcar/desmarcar concluído direto na lista; `concluido_em` registrado
+  na conclusão. Validação Zod compartilhada entre cliente e servidor.
+
 ### Corrigido
 
 - Campo de tags do formulário de concurso: Enter volta a adicionar a tag digitada (o popup nativo do

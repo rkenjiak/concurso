@@ -30,6 +30,17 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
   ver no dashboard; busca sem acento e filtro por status; exportar/excluir/importar backup (inclui
   versão desconhecida); e, em um projeto separado com `APP_PASSWORD`, login, senha errada, 401 nas
   APIs, cookie de sessão e logout. Script `pnpm e2e` e job `e2e` no CI (com cache do Chromium).
+- Deploy (§9, RNF08): `Dockerfile` multi-stage com saída `standalone` do Next (`NEXT_OUTPUT=standalone`),
+  Node 24, usuário sem privilégios, banco SQLite em volume (`/app/data`), `HEALTHCHECK` e
+  migrações ao iniciar (`MIGRATE_ON_START=true`), além de `.dockerignore` que exclui dados, backups
+  e `.env`; job `docker` no CI constrói a imagem e testa o health check, o 401 sem sessão e a
+  recusa de iniciar sem senha. Instruções para Vercel + Turso (sem `vercel.json`; migrações no build via
+  `DATABASE_URL`/`DATABASE_AUTH_TOKEN`).
+- `pnpm db:backup`: cópia consistente do banco local com `VACUUM INTO` em
+  `backups/concurso-AAAAMMDD-HHmm.db`, mantendo as últimas N (`--manter=N` ou `BACKUP_KEEP`, padrão
+  10); recusa bancos remotos com orientação para o Turso.
+- README reescrito: o que é, início rápido, variáveis de ambiente, autenticação, backup e
+  restauração, deploy na Vercel + Turso e com Docker, scripts e Gitflow.
 - Health check `GET /api/health` (público; 200 se o banco responde, 503 caso contrário).
 
 ### Alterado

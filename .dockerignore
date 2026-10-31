@@ -1,0 +1,24 @@
+# Nunca enviar dados pessoais, segredos ou artefatos locais para o contexto do build.
+.git
+.github
+.next
+node_modules
+coverage
+test-results
+playwright-report
+data
+backups
+e2e/.tmp
+*.db
+*.db-*
+.env*
+!.env.example
+.vercel
+.vscode
+.idea
+*.log
+Dockerfile
+.dockerignore
+docs
+README.md
+CHANGELOG.md

@@ -2,31 +2,121 @@
 
 # concurso
 
-App pessoal para cadastrar e acompanhar concursos públicos — do "radar" até a posse.
-Documentação: [requisitos](docs/REQUISITOS.md) · [arquitetura](docs/ARQUITETURA.md) · [changelog](CHANGELOG.md).
+App pessoal para cadastrar e acompanhar concursos públicos — do "radar" até a posse: dados do
+edital, status com histórico, datas importantes (inscrição, boleto, provas, recursos), dashboard de
+próximos prazos, busca e filtros, resultados por fase, validade do concurso e backup/restauração.
 
-## Requisitos
+Feito para **um usuário**: roda localmente com um comando (SQLite em arquivo) e, se quiser, pode ser
+hospedado de graça (Vercel + Turso) ou em um container Docker, com login por senha.
 
-- Node.js 24 LTS ou superior (veja `.nvmrc`)
-- pnpm (versão em `packageManager` no `package.json`)
+Documentação: [requisitos](docs/REQUISITOS.md) · [arquitetura](docs/ARQUITETURA.md) ·
+[changelog](CHANGELOG.md).
 
-## Como rodar
+## Início rápido
+
+Requisitos: Node.js 24 LTS ou superior (veja `.nvmrc`) e pnpm (versão em `packageManager` no
+`package.json`; ex.: `npm i -g pnpm` ou `corepack enable`).
 
 ```bash
-pnpm install
-cp .env.example .env.local   # opcional: os padrões funcionam localmente
-pnpm dev                     # http://localhost:3000
+pnpm install && pnpm dev     # http://localhost:3000
 ```
 
-O banco local fica em `data/concurso.db` (fora do Git). Para usar o Turso, defina
-`DATABASE_URL=libsql://…` e `DATABASE_AUTH_TOKEN` no `.env.local`.
+O `pnpm dev` aplica as migrações pendentes e cria o banco em `data/concurso.db` (fora do Git). Para
+ter dados de exemplo fictícios: `pnpm db:seed`.
 
-Uso diário em modo produção local:
+Uso diário em modo produção local (sem senha, só nesta máquina):
 
 ```bash
 pnpm build
-pnpm start
+ALLOW_NO_AUTH=true pnpm start   # ou defina ALLOW_NO_AUTH=true no .env.local
 ```
+
+Em produção o app **recusa iniciar sem `APP_PASSWORD`**, a menos que `ALLOW_NO_AUTH=true` — veja
+[Autenticação](#autenticação).
+
+## Variáveis de ambiente
+
+Copie `.env.example` para `.env.local` e ajuste. Nada é obrigatório para rodar localmente.
+
+| Variável | Padrão | Uso |
+|---|---|---|
+| `DATABASE_URL` | `file:./data/concurso.db` | Banco libSQL: arquivo SQLite local ou `libsql://<banco>.turso.io` |
+| `DATABASE_AUTH_TOKEN` | — | Token do Turso (só com `libsql://`) |
+| `APP_PASSWORD` | — | Liga o login por senha única; sem ela, a autenticação fica desligada |
+| `AUTH_SECRET` | — | Segredo (≥ 32 bytes) que assina a sessão; obrigatório com `APP_PASSWORD` |
+| `ALLOW_NO_AUTH` | `false` | `true` permite rodar em produção sem senha (uso local, sem exposição) |
+| `MIGRATE_ON_START` | `false` | `true` aplica as migrações ao iniciar o servidor (já ligado na imagem Docker) |
+| `BACKUP_KEEP` | `10` | Quantos backups o `pnpm db:backup` mantém |
+
+## Autenticação
+
+- **Sem `APP_PASSWORD`**: sem login (uso local).
+- **Com `APP_PASSWORD` e `AUTH_SECRET`**: todas as páginas e APIs exigem login (exceto `/login` e
+  `/api/health`). A sessão fica em um cookie JWT assinado (`httpOnly`, `SameSite=Lax`, `Secure` em
+  produção) válido por 30 dias; "Sair" fica em **Configurações**. Após 5 senhas erradas, novas
+  tentativas do mesmo cliente esperam cada vez mais.
+- Gere o segredo com `openssl rand -base64 32` (ou
+  `node -e "console.log(crypto.randomBytes(32).toString('base64'))"`). Trocar o `AUTH_SECRET`
+  encerra todas as sessões.
+- Em produção (`NODE_ENV=production`) o servidor não inicia sem `APP_PASSWORD`, salvo
+  `ALLOW_NO_AUTH=true`, nem com `AUTH_SECRET` curto.
+- Hospedado, use sempre HTTPS (o cookie de sessão é `Secure` em produção; `localhost` é exceção
+  nos navegadores).
+
+## Backup e restauração
+
+**Export/import JSON (qualquer banco).** Em **Configurações**: "Baixar backup (JSON)" gera um
+arquivo versionado com todos os dados (concursos, tags, links, eventos, histórico, resultados);
+"Baixar concursos (CSV)" gera uma planilha (separador `;`). "Importar…" restaura um backup JSON
+**substituindo todos os dados** (com confirmação; tudo ou nada). Também serve para migrar entre
+local ↔ hospedado.
+
+**Cópia do arquivo SQLite (banco local).**
+
+```bash
+pnpm db:backup               # backups/concurso-AAAAMMDD-HHmm.db (mantém os 10 mais recentes)
+pnpm db:backup --manter=30   # ou BACKUP_KEEP=30
+```
+
+Usa `VACUUM INTO` (cópia consistente mesmo com o app aberto). A pasta `backups/` fica fora do Git —
+dados pessoais nunca vão para o repositório. Para restaurar: pare o app e copie o arquivo do backup
+para `data/concurso.db` (ou o caminho de `DATABASE_URL`).
+
+No Docker o banco fica no volume: com o container parado, `docker cp concurso:/app/data/concurso.db .`
+copia o arquivo (e o caminho inverso restaura); ou use o export JSON. No Turso, use o point-in-time
+restore do serviço e o export JSON periódico.
+
+## Deploy
+
+### Vercel + Turso (recomendado, gratuito)
+
+1. Crie um banco no [Turso](https://turso.tech) e gere um token:
+   `turso db create concurso`, `turso db show concurso --url`, `turso db tokens create concurso`.
+2. Importe o repositório na [Vercel](https://vercel.com) (framework Next.js; sem `vercel.json`).
+3. Em *Settings → Environment Variables* defina `DATABASE_URL` (`libsql://…`),
+   `DATABASE_AUTH_TOKEN`, `APP_PASSWORD`, `AUTH_SECRET` e `ENABLE_EXPERIMENTAL_COREPACK=1` (para a
+   Vercel usar a versão do pnpm do `packageManager`). Em *Settings → General*, Node.js 24.
+4. Faça o deploy. O `pnpm build` aplica as migrações no Turso antes do `next build` (as variáveis
+   do banco precisam estar disponíveis no build).
+
+Nunca use `DATABASE_URL=file:` na Vercel: o sistema de arquivos é efêmero.
+
+### Docker (VPS, Fly.io…)
+
+O `Dockerfile` gera uma imagem `standalone` (Node 24, usuário sem privilégios) com o banco SQLite em
+um volume em `/app/data`; as migrações rodam ao iniciar (`MIGRATE_ON_START=true`).
+
+```bash
+docker build -t concurso .
+docker run -d --name concurso -p 3000:3000 \
+  -v concurso-dados:/app/data \
+  -e APP_PASSWORD='sua-senha' \
+  -e AUTH_SECRET="$(openssl rand -base64 32)" \
+  concurso
+```
+
+Coloque um proxy com HTTPS na frente (Caddy, Traefik, Fly.io…). A imagem tem `HEALTHCHECK` em
+`/api/health`. Para usar o Turso no container, passe `DATABASE_URL`/`DATABASE_AUTH_TOKEN`.
 
 ## Scripts
 
@@ -38,14 +128,22 @@ pnpm start
 | `pnpm format` | aplica formatação e correções seguras (Biome) |
 | `pnpm typecheck` | checagem de tipos (`tsc --noEmit`) |
 | `pnpm test` | testes unitários/integração (Vitest, em `TZ=UTC`) |
+| `pnpm e2e` | build + testes e2e (Playwright/Chromium, bancos temporários) |
 | `pnpm db:migrate` | aplica migrações pendentes no banco de `DATABASE_URL` |
 | `pnpm db:generate` | gera nova migração a partir de `src/server/db/schema.ts` |
 | `pnpm db:seed` | insere concursos fictícios se o banco estiver vazio |
+| `pnpm db:backup` | cópia do banco local em `backups/` (mantém as últimas N) |
 | `pnpm db:studio` | abre o Drizzle Studio |
 
-## Fluxo de trabalho
+Antes do primeiro `pnpm e2e`, instale o navegador: `pnpm exec playwright install chromium`.
 
-Gitflow: `feature/*` a partir de `develop` com PR de volta para `develop`; `release/*` e `hotfix/*`
-são as únicas branches que entram em `master`. Commits no estilo Conventional Commits.
+## Fluxo de trabalho (Gitflow)
+
+- `master`: só versões liberadas (tags `vX.Y.Z`); `develop`: integração.
+- `feature/<nome>` a partir de `develop`, com PR de volta para `develop`.
+- `release/X.Y.Z` a partir de `develop` (versão no `package.json` + `CHANGELOG.md`), PR para
+  `master`, tag e merge de volta em `develop`; `hotfix/<nome>` a partir de `master`.
+- PRs exigem CI verde (Biome, tipos, testes, build, e2e e imagem Docker). Commits no estilo
+  Conventional Commits; mudanças registradas em `CHANGELOG.md` (seção `Unreleased`).
 
 Created in [T3 Code](https://t3.codes).

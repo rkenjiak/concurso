@@ -11,8 +11,10 @@ import {
   type Status,
   UF,
 } from "@/domain/enums";
+import { VALIDADE_MESES_MAX, VALIDADE_MESES_MIN } from "@/domain/validade";
 import { centavosParaEntrada } from "../format";
 import {
+  dataOpcional,
   enumOpcional,
   inteiroOpcional,
   moedaOpcional,
@@ -21,7 +23,24 @@ import {
   textoOpcional,
 } from "./comum";
 
-export const concursoSchema = z.object({
+/** Prazo de validade em meses (1–24) digitado como texto; vazio → `null`. */
+const validadeMeses = z
+  .string()
+  .trim()
+  .transform((v, ctx) => {
+    if (v === "") return null;
+    const n = Number(v);
+    if (!/^\d+$/.test(v) || n < VALIDADE_MESES_MIN || n > VALIDADE_MESES_MAX) {
+      ctx.addIssue({
+        code: "custom",
+        message: `Informe de ${VALIDADE_MESES_MIN} a ${VALIDADE_MESES_MAX} meses.`,
+      });
+      return z.NEVER;
+    }
+    return n;
+  });
+
+const camposConcurso = z.object({
   orgao: textoObrigatorio("Informe o nome ou órgão.", 200),
   cargo: textoObrigatorio("Informe o cargo ou área.", 200),
   banca: textoOpcional(100),
@@ -38,10 +57,36 @@ export const concursoSchema = z.object({
   status: z.enum(STATUS, { error: "Selecione o status." }),
   observacoes: textoOpcional(20_000),
   tags: tagsSchema,
+  // Validade (RF05, §4.3)
+  homologacaoData: dataOpcional,
+  validadeMeses,
+  validadeProrrogada: z.boolean(),
+  validadeFimManual: dataOpcional,
 });
 
+/** O fim manual da validade não pode ser anterior à homologação. */
+function validarValidade(
+  d: { homologacaoData: string | null; validadeFimManual: string | null },
+  ctx: z.RefinementCtx,
+) {
+  if (d.homologacaoData && d.validadeFimManual && d.validadeFimManual < d.homologacaoData) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["validadeFimManual"],
+      message: "O fim da validade não pode ser anterior à homologação.",
+    });
+  }
+}
+
+export const concursoSchema = camposConcurso.superRefine(validarValidade);
+
 /** Na edição o status não muda pelo formulário (RF03: usa a troca de status com histórico). */
-export const concursoEdicaoSchema = concursoSchema.omit({ status: true });
+export const concursoEdicaoSchema = camposConcurso
+  .omit({ status: true })
+  .superRefine(validarValidade);
+
+/** Nomes dos campos do formulário (para mapear erros do servidor). */
+export const CAMPOS_CONCURSO = Object.keys(camposConcurso.shape);
 
 /** Valores crus do formulário (strings, como digitados). */
 export type ConcursoFormValores = z.input<typeof concursoSchema>;
@@ -66,6 +111,10 @@ export const VALORES_INICIAIS_CONCURSO: ConcursoFormValores = {
   status: "PREVISTO",
   observacoes: "",
   tags: [],
+  homologacaoData: "",
+  validadeMeses: "",
+  validadeProrrogada: false,
+  validadeFimManual: "",
 };
 
 /** Campos do concurso persistido usados para preencher o formulário de edição. */
@@ -86,9 +135,13 @@ export interface ConcursoParaFormulario {
   status: Status;
   observacoes: string | null;
   tags?: readonly string[];
+  homologacaoData?: string | null;
+  validadeMeses?: number | null;
+  validadeProrrogada?: boolean;
+  validadeFimManual?: string | null;
 }
 
-const texto = (v: string | number | null) => (v == null ? "" : String(v));
+const texto = (v: string | number | null | undefined) => (v == null ? "" : String(v));
 
 /** Concurso do banco → valores do formulário. */
 export function valoresDoConcurso(c: ConcursoParaFormulario): ConcursoFormValores {
@@ -109,5 +162,9 @@ export function valoresDoConcurso(c: ConcursoParaFormulario): ConcursoFormValore
     status: c.status,
     observacoes: texto(c.observacoes),
     tags: [...(c.tags ?? [])],
+    homologacaoData: texto(c.homologacaoData),
+    validadeMeses: texto(c.validadeMeses),
+    validadeProrrogada: c.validadeProrrogada ?? false,
+    validadeFimManual: texto(c.validadeFimManual),
   };
 }

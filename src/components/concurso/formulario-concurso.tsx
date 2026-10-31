@@ -19,7 +19,8 @@ import {
   ROTULO_STATUS,
   ROTULO_UF,
 } from "@/domain/labels";
-import { type ConcursoFormValores, concursoSchema } from "@/lib/schemas/concurso";
+import { VALIDADE_MESES_MAX, VALIDADE_MESES_MIN } from "@/domain/validade";
+import { CAMPOS_CONCURSO, type ConcursoFormValores, concursoSchema } from "@/lib/schemas/concurso";
 import { atualizarConcurso, criarConcurso } from "@/server/actions/concursos";
 import { ariaCampo, Campo } from "./campo";
 import { CampoMoeda } from "./campo-moeda";
@@ -33,7 +34,7 @@ interface FormularioConcursoProps {
   tagsExistentes?: readonly string[];
 }
 
-const CAMPOS = new Set<string>(Object.keys(concursoSchema.shape));
+const CAMPOS = new Set<string>(CAMPOS_CONCURSO);
 
 export function FormularioConcurso({
   valoresIniciais,
@@ -285,6 +286,61 @@ export function FormularioConcurso({
             />
             <Label htmlFor="possuiCadastroReserva">Possui cadastro de reserva</Label>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Validade do concurso</CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-4 sm:grid-cols-2">
+          <Campo id="homologacaoData" rotulo="Data da homologação" erro={erro("homologacaoData")}>
+            <Input
+              {...ariaCampo("homologacaoData", erro("homologacaoData"))}
+              type="date"
+              {...register("homologacaoData")}
+            />
+          </Campo>
+          <Campo
+            id="validadeMeses"
+            rotulo="Validade (meses)"
+            dica={`De ${VALIDADE_MESES_MIN} a ${VALIDADE_MESES_MAX} meses, conforme o edital.`}
+            erro={erro("validadeMeses")}
+          >
+            <Input
+              {...ariaCampo("validadeMeses", erro("validadeMeses"), "dica")}
+              inputMode="numeric"
+              placeholder="Ex.: 24"
+              {...register("validadeMeses")}
+            />
+          </Campo>
+          <div className="flex items-center gap-2 sm:col-span-2">
+            <Controller
+              control={control}
+              name="validadeProrrogada"
+              render={({ field }) => (
+                <Checkbox
+                  id="validadeProrrogada"
+                  ref={field.ref}
+                  checked={field.value}
+                  onCheckedChange={(v) => field.onChange(v === true)}
+                />
+              )}
+            />
+            <Label htmlFor="validadeProrrogada">Validade prorrogada (por igual período)</Label>
+          </div>
+          <Campo
+            id="validadeFimManual"
+            rotulo="Fim da validade (manual)"
+            dica="Opcional: substitui o cálculo se o edital dispuser diferente."
+            erro={erro("validadeFimManual")}
+          >
+            <Input
+              {...ariaCampo("validadeFimManual", erro("validadeFimManual"), "dica")}
+              type="date"
+              {...register("validadeFimManual")}
+            />
+          </Campo>
         </CardContent>
       </Card>
 

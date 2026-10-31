@@ -19,6 +19,14 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
   excluir o resultado de cada fase (fase, descrição, nota, nota máxima, nota de corte, classificação
   geral e nas cotas com a lista, situação e observação). Notas aceitam vírgula ou ponto (até 3 casas)
   e não podem passar da nota máxima; validação Zod compartilhada entre cliente e servidor.
+- Validade do concurso (§4.3, `domain/validade.ts`): fim = homologação + N meses (1–24), somando o
+  mesmo período a partir do primeiro fim quando prorrogada, com data manual que sobrescreve o
+  cálculo; meses somados com ajuste ao fim do mês e anos bissextos; situação vigente, vencendo
+  (≤ 90 dias) ou expirada, com `hoje` injetado e cobertura total. Campos de homologação, meses,
+  prorrogação e fim manual no formulário do concurso; card de validade no detalhe com dias
+  restantes ou há quantos dias expirou, e alerta quando faltam 90 dias ou menos.
+- Dashboard passa a exibir o fim da validade calculado como prazo (quando não há evento "Validade
+  do concurso" explícito).
 
 ## [0.3.0] - 2026-10-31
 

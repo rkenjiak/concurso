@@ -11,12 +11,14 @@ import { ListaTags } from "@/components/concurso/lista-tags";
 import { Markdown } from "@/components/concurso/markdown";
 import { ResultadosConcurso } from "@/components/concurso/resultados-concurso";
 import { TimelineStatus } from "@/components/concurso/timeline-status";
+import { ValidadeConcurso } from "@/components/concurso/validade-concurso";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ROTULO_ESCOLARIDADE, ROTULO_ESFERA } from "@/domain/labels";
 import { formatarBRL, formatarDataInstante } from "@/lib/format";
 import { idSchema } from "@/lib/schemas/comum";
+import { hojeSP } from "@/lib/tz";
 import { getDb } from "@/server/db/client";
 import { obterConcurso } from "@/server/queries/concursos";
 import { listarEventos } from "@/server/queries/eventos";
@@ -132,6 +134,15 @@ export default async function ConcursoPage({ params }: PageProps<"/concursos/[id
                       : "Não"}
                 </Item>
               </dl>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Validade do concurso</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ValidadeConcurso dados={c} hoje={hojeSP()} />
             </CardContent>
           </Card>
 

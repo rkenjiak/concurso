@@ -25,6 +25,10 @@ function colunas(dados: ConcursoEdicaoDados) {
     possuiCadastroReserva: dados.possuiCadastroReserva,
     vagasCotas: dados.vagasCotas,
     observacoes: dados.observacoes,
+    homologacaoData: dados.homologacaoData,
+    validadeMeses: dados.validadeMeses,
+    validadeProrrogada: dados.validadeProrrogada,
+    validadeFimManual: dados.validadeFimManual,
     buscaNormalizada: montarBuscaNormalizada(dados),
   };
 }

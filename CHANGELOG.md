@@ -7,6 +7,17 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 
 ## [Unreleased]
 
+### Corrigido
+
+- Campo de tags do formulário de concurso: Enter volta a adicionar a tag digitada (o popup nativo do
+  `<datalist>` absorvia a tecla). As sugestões agora são uma lista própria (combobox acessível, com
+  setas, Enter e Esc), filtrada sem acento, e há um botão para adicionar a tag; digitar um texto
+  igual a uma tag existente não a adiciona mais antes do Enter.
+
+### Alterado
+
+- Dependabot ignora atualizações semver-major de `typescript` e `@types/node`.
+
 ## [0.2.0] - 2026-10-31
 
 ### Adicionado

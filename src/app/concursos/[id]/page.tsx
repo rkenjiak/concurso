@@ -2,17 +2,21 @@ import { ArrowLeft, Pencil } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { AlterarStatus } from "@/components/concurso/alterar-status";
 import { BadgeStatus } from "@/components/concurso/badge-status";
 import { BotaoExcluirConcurso } from "@/components/concurso/botao-excluir-concurso";
 import { ListaTags } from "@/components/concurso/lista-tags";
 import { Markdown } from "@/components/concurso/markdown";
+import { TimelineStatus } from "@/components/concurso/timeline-status";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ROTULO_ESCOLARIDADE, ROTULO_ESFERA } from "@/domain/labels";
 import { formatarBRL, formatarDataInstante } from "@/lib/format";
 import { idSchema } from "@/lib/schemas/comum";
 import { getDb } from "@/server/db/client";
 import { obterConcurso } from "@/server/queries/concursos";
+import { obterOpcoesStatus } from "@/server/queries/historico";
 
 async function carregar(params: Promise<{ id: string }>) {
   const id = idSchema.safeParse((await params).id);
@@ -42,6 +46,7 @@ const numero = (n: number | null) => (n == null ? "—" : n.toLocaleString("pt-B
 
 export default async function ConcursoPage({ params }: PageProps<"/concursos/[id]">) {
   const c = await carregar(params);
+  const { historico, opcoes } = await obterOpcoesStatus(getDb(), c.id, c.status);
   const local = [c.cidade, c.uf].filter(Boolean).join(" / ");
 
   return (
@@ -79,47 +84,80 @@ export default async function ConcursoPage({ params }: PageProps<"/concursos/[id
         </div>
       </header>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Visão geral</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <dl className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-            <Item rotulo="Banca">{c.banca ?? "—"}</Item>
-            <Item rotulo="Esfera">{c.esfera ? ROTULO_ESFERA[c.esfera] : "—"}</Item>
-            <Item rotulo="Local">{local || "—"}</Item>
-            <Item rotulo="Escolaridade">
-              {c.escolaridade ? ROTULO_ESCOLARIDADE[c.escolaridade] : "—"}
-            </Item>
-            <Item rotulo="Remuneração inicial">{formatarBRL(c.remuneracaoCentavos)}</Item>
-            <Item rotulo="Taxa de inscrição">{formatarBRL(c.taxaInscricaoCentavos)}</Item>
-            <Item rotulo="Vagas (ampla)">{numero(c.vagasAmpla)}</Item>
-            <Item rotulo="Vagas (cotas)">{numero(c.vagasCotas)}</Item>
-            <Item rotulo="Cadastro de reserva">
-              {c.possuiCadastroReserva
-                ? c.vagasCadastroReserva != null
-                  ? `Sim (${numero(c.vagasCadastroReserva)})`
-                  : "Sim"
-                : c.vagasCadastroReserva != null
-                  ? numero(c.vagasCadastroReserva)
-                  : "Não"}
-            </Item>
-          </dl>
-        </CardContent>
-      </Card>
+      <Tabs defaultValue="geral" className="gap-4">
+        <TabsList className="w-full sm:w-fit">
+          <TabsTrigger value="geral">Visão geral</TabsTrigger>
+          <TabsTrigger value="historico">Histórico</TabsTrigger>
+        </TabsList>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Observações</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {c.observacoes ? (
-            <Markdown>{c.observacoes}</Markdown>
-          ) : (
-            <p className="text-muted-foreground text-sm">Sem observações.</p>
-          )}
-        </CardContent>
-      </Card>
+        <TabsContent value="geral" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Visão geral</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <dl className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+                <Item rotulo="Banca">{c.banca ?? "—"}</Item>
+                <Item rotulo="Esfera">{c.esfera ? ROTULO_ESFERA[c.esfera] : "—"}</Item>
+                <Item rotulo="Local">{local || "—"}</Item>
+                <Item rotulo="Escolaridade">
+                  {c.escolaridade ? ROTULO_ESCOLARIDADE[c.escolaridade] : "—"}
+                </Item>
+                <Item rotulo="Remuneração inicial">{formatarBRL(c.remuneracaoCentavos)}</Item>
+                <Item rotulo="Taxa de inscrição">{formatarBRL(c.taxaInscricaoCentavos)}</Item>
+                <Item rotulo="Vagas (ampla)">{numero(c.vagasAmpla)}</Item>
+                <Item rotulo="Vagas (cotas)">{numero(c.vagasCotas)}</Item>
+                <Item rotulo="Cadastro de reserva">
+                  {c.possuiCadastroReserva
+                    ? c.vagasCadastroReserva != null
+                      ? `Sim (${numero(c.vagasCadastroReserva)})`
+                      : "Sim"
+                    : c.vagasCadastroReserva != null
+                      ? numero(c.vagasCadastroReserva)
+                      : "Não"}
+                </Item>
+              </dl>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Observações</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {c.observacoes ? (
+                <Markdown>{c.observacoes}</Markdown>
+              ) : (
+                <p className="text-muted-foreground text-sm">Sem observações.</p>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="historico" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Status</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <AlterarStatus
+                concursoId={c.id}
+                atual={c.status}
+                transicoes={opcoes.transicoes}
+                desfazerPara={opcoes.desfazerPara}
+              />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Histórico de status</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <TimelineStatus historico={historico} />
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

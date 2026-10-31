@@ -87,3 +87,27 @@ export function formatarDataHora(instante: Date | number | null | undefined): st
   if (instante == null) return SEM_VALOR;
   return dataHoraSPFmt.format(instante).replace(",", "");
 }
+
+const numeroEntradaFmt = new Intl.NumberFormat("pt-BR", {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
+/** Centavos → texto do campo de moeda ("1.234,56", sem "R$"). `null` → "". */
+export function centavosParaEntrada(centavos: number | null | undefined): string {
+  if (centavos == null || !Number.isFinite(centavos)) return "";
+  return numeroEntradaFmt.format(centavos / 100);
+}
+
+/** Máximo de dígitos aceitos pela máscara (R$ 9.999.999.999.999,99). */
+const MAX_DIGITOS_MOEDA = 15;
+
+/**
+ * Máscara de digitação de moeda: considera só os dígitos, preenchendo da direita para a esquerda
+ * (estilo caixa eletrônico). "123456" → "1.234,56"; "" → "".
+ */
+export function mascararBRL(texto: string): string {
+  const digitos = texto.replace(/\D/g, "").replace(/^0+/, "").slice(0, MAX_DIGITOS_MOEDA);
+  if (digitos === "") return texto.replace(/\D/g, "") === "" ? "" : "0,00";
+  return centavosParaEntrada(Number(digitos));
+}

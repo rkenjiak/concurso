@@ -16,6 +16,7 @@ import {
   enumOpcional,
   inteiroOpcional,
   moedaOpcional,
+  tagsSchema,
   textoObrigatorio,
   textoOpcional,
 } from "./comum";
@@ -36,6 +37,7 @@ export const concursoSchema = z.object({
   vagasCotas: inteiroOpcional(),
   status: z.enum(STATUS, { error: "Selecione o status." }),
   observacoes: textoOpcional(20_000),
+  tags: tagsSchema,
 });
 
 /** Na edição o status não muda pelo formulário (RF03: usa a troca de status com histórico). */
@@ -63,6 +65,7 @@ export const VALORES_INICIAIS_CONCURSO: ConcursoFormValores = {
   vagasCotas: "",
   status: "PREVISTO",
   observacoes: "",
+  tags: [],
 };
 
 /** Campos do concurso persistido usados para preencher o formulário de edição. */
@@ -82,6 +85,7 @@ export interface ConcursoParaFormulario {
   vagasCotas: number | null;
   status: Status;
   observacoes: string | null;
+  tags?: readonly string[];
 }
 
 const texto = (v: string | number | null) => (v == null ? "" : String(v));
@@ -104,5 +108,6 @@ export function valoresDoConcurso(c: ConcursoParaFormulario): ConcursoFormValore
     vagasCotas: texto(c.vagasCotas),
     status: c.status,
     observacoes: texto(c.observacoes),
+    tags: [...(c.tags ?? [])],
   };
 }

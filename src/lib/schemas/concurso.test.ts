@@ -25,6 +25,7 @@ describe("concursoSchema", () => {
       possuiCadastroReserva: true,
       status: "INSCRITO",
       observacoes: "**nota**",
+      tags: [" Prioridade", "prioridade"],
     });
     expect(r).toEqual({
       orgao: "TRF 3ª Região",
@@ -42,6 +43,7 @@ describe("concursoSchema", () => {
       vagasCotas: 3,
       status: "INSCRITO",
       observacoes: "**nota**",
+      tags: ["prioridade"],
     });
   });
 

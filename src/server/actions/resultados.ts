@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { idSchema } from "@/lib/schemas/comum";
 import { resultadoFaseSchema } from "@/lib/schemas/resultado-fase";
+import { verificarAcesso } from "../auth/acesso";
 import { getDb } from "../db/client";
 import * as repo from "../repositories/resultados";
 import { executar, falha, falhaValidacao, type ResultadoAcao, sucesso } from "./resultado";
@@ -15,6 +16,8 @@ export async function salvarResultadoFase(
   resultadoIdBruto: unknown,
   entrada: unknown,
 ): Promise<ResultadoAcao<{ id: number }>> {
+  const negado = await verificarAcesso();
+  if (negado) return negado;
   const concursoId = idSchema.safeParse(concursoIdBruto);
   if (!concursoId.success) return falha("Concurso não encontrado.");
   const resultadoId = resultadoIdBruto == null ? null : idSchema.safeParse(resultadoIdBruto);
@@ -39,6 +42,8 @@ export async function excluirResultadoFase(
   concursoIdBruto: unknown,
   resultadoIdBruto: unknown,
 ): Promise<ResultadoAcao> {
+  const negado = await verificarAcesso();
+  if (negado) return negado;
   const concursoId = idSchema.safeParse(concursoIdBruto);
   const resultadoId = idSchema.safeParse(resultadoIdBruto);
   if (!concursoId.success || !resultadoId.success) return falha(INVALIDO);

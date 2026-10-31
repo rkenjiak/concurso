@@ -18,6 +18,19 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
   mensagens que indicam o campo com problema, rejeita versões desconhecidas e substitui todos os
   dados em uma única transação (tudo ou nada) após confirmação explícita; a busca normalizada é
   recalculada. Teste de ida e volta (exportar → importar → dados idênticos).
+- Autenticação opcional por senha única (§7.1, RNF06): desligada sem `APP_PASSWORD`; com ela,
+  página `/login`, sessão em cookie JWT assinado com `AUTH_SECRET` (`jose`, HS256, `httpOnly`,
+  `SameSite=Lax`, `secure` em produção, 30 dias), senha comparada em tempo constante, atraso
+  progressivo após 5 falhas por cliente e "Sair" em Configurações. `proxy.ts` protege todas as
+  rotas exceto `/login`, `/api/health` e arquivos estáticos (APIs respondem 401), e todas as Server
+  Actions e Route Handlers checam a sessão de novo. Em produção sem `APP_PASSWORD` o app recusa
+  iniciar, salvo `ALLOW_NO_AUTH=true`; `AUTH_SECRET` com menos de 32 bytes também impede o início.
+- Health check `GET /api/health` (público; 200 se o banco responde, 503 caso contrário).
+
+### Alterado
+
+- Páginas do app movidas para o grupo de rotas `(app)` (com a navegação); a raiz só define
+  `<html>`/`<body>`, permitindo a tela de login sem navegação. URLs inalteradas.
 
 ## [0.4.0] - 2026-10-31
 

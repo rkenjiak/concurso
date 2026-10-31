@@ -44,7 +44,36 @@ describe("concursoSchema", () => {
       status: "INSCRITO",
       observacoes: "**nota**",
       tags: ["prioridade"],
+      homologacaoData: null,
+      validadeMeses: null,
+      validadeProrrogada: false,
+      validadeFimManual: null,
     });
+  });
+
+  it("lê os campos de validade", () => {
+    const r = concursoSchema.parse({
+      ...base,
+      homologacaoData: "2026-03-15",
+      validadeMeses: " 24 ",
+      validadeProrrogada: true,
+      validadeFimManual: "2028-03-15",
+    });
+    expect(r).toMatchObject({
+      homologacaoData: "2026-03-15",
+      validadeMeses: 24,
+      validadeProrrogada: true,
+      validadeFimManual: "2028-03-15",
+    });
+  });
+
+  it("fim manual não pode ser anterior à homologação (criação e edição)", () => {
+    const entrada = { ...base, homologacaoData: "2026-03-15", validadeFimManual: "2026-03-14" };
+    for (const schema of [concursoSchema, concursoEdicaoSchema]) {
+      const r = schema.safeParse(entrada);
+      expect(r.error?.issues.map((i) => i.path)).toEqual([["validadeFimManual"]]);
+    }
+    expect(concursoSchema.safeParse({ ...entrada, homologacaoData: "" }).success).toBe(true);
   });
 
   it("campos opcionais vazios viram null", () => {
@@ -72,6 +101,11 @@ describe("concursoSchema", () => {
     ["esfera", "GALACTICA", "Esfera inválida."],
     ["uf", "XX", "UF inválida."],
     ["status", "INEXISTENTE", "Selecione o status."],
+    ["homologacaoData", "2026-02-30", "Data inválida."],
+    ["validadeFimManual", "15/03/2026", "Data inválida."],
+    ["validadeMeses", "0", "Informe de 1 a 24 meses."],
+    ["validadeMeses", "25", "Informe de 1 a 24 meses."],
+    ["validadeMeses", "1,5", "Informe de 1 a 24 meses."],
   ])("rejeita %s = %j", (campo, valor, mensagem) => {
     const r = concursoSchema.safeParse({ ...base, [campo]: valor });
     expect(r.success).toBe(false);
@@ -122,5 +156,41 @@ describe("valoresDoConcurso", () => {
     const dados = concursoSchema.parse(valores);
     expect(dados.remuneracao).toBe(123_456);
     expect(dados.vagasAmpla).toBe(0);
+    expect(dados).toMatchObject({ homologacaoData: null, validadeMeses: null });
+  });
+
+  it("converte os campos de validade (ida e volta)", () => {
+    const valores = valoresDoConcurso({
+      ...VALORES_INICIAIS_CONCURSO,
+      orgao: "TRF",
+      cargo: "Analista",
+      banca: null,
+      esfera: null,
+      uf: null,
+      cidade: null,
+      escolaridade: null,
+      remuneracaoCentavos: null,
+      taxaInscricaoCentavos: null,
+      vagasAmpla: null,
+      vagasCadastroReserva: null,
+      vagasCotas: null,
+      observacoes: null,
+      homologacaoData: "2026-03-15",
+      validadeMeses: 12,
+      validadeProrrogada: true,
+      validadeFimManual: null,
+    });
+    expect(valores).toMatchObject({
+      homologacaoData: "2026-03-15",
+      validadeMeses: "12",
+      validadeProrrogada: true,
+      validadeFimManual: "",
+    });
+    expect(concursoSchema.parse(valores)).toMatchObject({
+      homologacaoData: "2026-03-15",
+      validadeMeses: 12,
+      validadeProrrogada: true,
+      validadeFimManual: null,
+    });
   });
 });

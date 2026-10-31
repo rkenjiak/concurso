@@ -4,8 +4,9 @@
  * cliente (react-hook-form) e no servidor (Server Actions).
  */
 import { z } from "zod";
-import { parseBRL } from "../format";
+import { parseBRL, parseDecimal } from "../format";
 import { normalizarTag } from "../normalize";
+import { ehDataISO } from "../tz";
 
 /** Texto obrigatório (trim) com limite de tamanho. */
 export function textoObrigatorio(mensagem: string, max: number) {
@@ -60,6 +61,32 @@ export function inteiroOpcional(max = 1_000_000) {
       return Number(v);
     });
 }
+
+/** Número decimal não negativo digitado ("72,5" ou "72.5"), até `max`; vazio → `null`. */
+export function decimalOpcional(max = 100_000) {
+  return z
+    .string()
+    .trim()
+    .transform((v, ctx) => {
+      if (v === "") return null;
+      const n = parseDecimal(v);
+      if (n === null || n > max) {
+        ctx.addIssue({
+          code: "custom",
+          message: `Informe um número entre 0 e ${max} (até 3 casas decimais).`,
+        });
+        return z.NEVER;
+      }
+      return n;
+    });
+}
+
+/** Data de calendário opcional (`<input type="date">`, `YYYY-MM-DD`); vazio → `null`. */
+export const dataOpcional = z
+  .string()
+  .trim()
+  .refine((v) => v === "" || ehDataISO(v), "Data inválida.")
+  .transform((v) => (v === "" ? null : v));
 
 /** ID numérico positivo (parâmetros de rota e de ações). */
 export const idSchema = z.coerce.number().int().positive();

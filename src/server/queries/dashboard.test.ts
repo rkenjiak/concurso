@@ -76,6 +76,56 @@ describe("obterDashboard", () => {
     ]);
   });
 
+  it("inclui o fim da validade calculado como pseudo-evento", async () => {
+    const comValidade = (orgao: string, parcial: Record<string, unknown>) =>
+      criarConcurso(
+        db,
+        concursoSchema.parse({
+          ...VALORES_INICIAIS_CONCURSO,
+          orgao,
+          cargo: "Analista",
+          status: "CLASSIFICADO",
+          ...parcial,
+        }),
+      );
+    // 2025-11-20 + 12 meses = 2026-11-20 (em 20 dias).
+    const calc = await comValidade("Calculada", {
+      homologacaoData: "2025-11-20",
+      validadeMeses: "12",
+    });
+    // Prorrogada: 2024-11-10 + 12 + 12 = 2026-11-10.
+    const prorrogada = await comValidade("Prorrogada", {
+      homologacaoData: "2024-11-10",
+      validadeMeses: "12",
+      validadeProrrogada: true,
+    });
+    const manual = await comValidade("Manual", {
+      homologacaoData: "2020-01-01",
+      validadeMeses: "24",
+      validadeFimManual: HOJE,
+    });
+    await comValidade("Fora da janela", { homologacaoData: "2026-10-01", validadeMeses: "24" });
+    await comValidade("Sem homologação", { validadeMeses: "24" });
+    const comEvento = await comValidade("Com evento", {
+      homologacaoData: "2025-11-15",
+      validadeMeses: "12",
+    });
+    await novoEvento(comEvento, { tipo: "VALIDADE", data: "2026-11-25" });
+
+    const d = await obterDashboard(db, HOJE);
+    expect(d.prazos.hoje.map((p) => [p.concurso.id, p.tipo, p.derivado])).toEqual([
+      [manual, "VALIDADE", true],
+    ]);
+    expect(
+      d.prazos.proximos.map((p) => [p.concurso.orgao, p.data, p.derivado, p.concurso.validadeFim]),
+    ).toEqual([
+      ["Prorrogada", "2026-11-10", true, "2026-11-10"],
+      ["Calculada", "2026-11-20", true, "2026-11-20"],
+      ["Com evento", "2026-11-25", false, "2026-11-15"],
+    ]);
+    expect(d.prazos.proximos.slice(0, 2).map((p) => p.concurso.id)).toEqual([prorrogada, calc]);
+  });
+
   it("respeita a janela informada", async () => {
     const id = await novoConcurso("TRF", "INSCRITO");
     await novoEvento(id, { data: "2026-11-10" });
@@ -101,8 +151,10 @@ describe("listarConcursos com filtro de status", () => {
   it("filtra pelo status informado", async () => {
     await novoConcurso("A", "INSCRITO");
     await novoConcurso("B", "PREVISTO");
-    expect((await listarConcursos(db, { status: "PREVISTO" })).map((c) => c.orgao)).toEqual(["B"]);
-    expect(await listarConcursos(db, { status: "NOMEADO" })).toEqual([]);
-    expect(await listarConcursos(db, { status: null })).toHaveLength(2);
+    expect((await listarConcursos(db, { status: ["PREVISTO"] })).map((c) => c.orgao)).toEqual([
+      "B",
+    ]);
+    expect(await listarConcursos(db, { status: ["NOMEADO"] })).toEqual([]);
+    expect(await listarConcursos(db, { status: [] })).toHaveLength(2);
   });
 });

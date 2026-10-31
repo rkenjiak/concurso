@@ -1,8 +1,10 @@
-/** Leituras de concurso (RF01). */
-import { desc, eq } from "drizzle-orm";
-import type { Status } from "@/domain/enums";
+/** Leituras de concurso (RF01, RF07). */
+import { and, asc, desc, eq, gte, inArray, lte, type SQL, sql } from "drizzle-orm";
+import { normalizarTexto } from "@/lib/normalize";
+import { FILTROS_VAZIOS, type FiltrosConcursos } from "@/lib/schemas/filtros-concursos";
+import { type DataISO, hojeSP } from "@/lib/tz";
 import type { Db } from "../db/client";
-import { type Concurso, concurso } from "../db/schema";
+import { type Concurso, concurso, evento } from "../db/schema";
 import { tagsPorConcurso } from "./tags";
 
 export type ConcursoResumo = Pick<
@@ -17,19 +19,76 @@ export type ConcursoResumo = Pick<
   | "status"
   | "remuneracaoCentavos"
   | "createdAt"
-> & { tags: string[] };
+> & {
+  tags: string[];
+  /** Menor data `>= hoje` entre os eventos não concluídos (§4.2), ou `null`. */
+  proximaData: DataISO | null;
+};
 
 export type ConcursoDetalhe = Concurso & { tags: string[] };
 
-export interface FiltrosConcursos {
-  status?: Status | null;
+/** Escapa `%`, `_` e `!` para uso em `LIKE ... ESCAPE '!'`. */
+function escaparLike(texto: string): string {
+  return texto.replace(/[!%_]/g, (c) => `!${c}`);
 }
 
-/** Lista simples, mais recentes primeiro, opcionalmente filtrada por status. */
+/**
+ * Condições da busca/filtros. A busca textual exige que cada termo (normalizado, sem acento)
+ * apareça em `busca_normalizada` (órgão + cargo + banca + tags).
+ */
+function condicoes(filtros: FiltrosConcursos): SQL | undefined {
+  const termos = filtros.busca ? normalizarTexto(filtros.busca).split(" ").filter(Boolean) : [];
+  return and(
+    ...termos.map(
+      (t) => sql`${concurso.buscaNormalizada} like ${`%${escaparLike(t)}%`} escape '!'`,
+    ),
+    filtros.status.length > 0 ? inArray(concurso.status, filtros.status) : undefined,
+    filtros.esfera ? eq(concurso.esfera, filtros.esfera) : undefined,
+    filtros.uf ? eq(concurso.uf, filtros.uf) : undefined,
+    filtros.escolaridade ? eq(concurso.escolaridade, filtros.escolaridade) : undefined,
+    filtros.remuneracaoMin !== null
+      ? gte(concurso.remuneracaoCentavos, filtros.remuneracaoMin)
+      : undefined,
+    filtros.remuneracaoMax !== null
+      ? lte(concurso.remuneracaoCentavos, filtros.remuneracaoMax)
+      : undefined,
+  );
+}
+
+/**
+ * Lista com busca, filtros e ordenação (RF07). `hoje` (America/Sao_Paulo) define a próxima data.
+ * Ordenações: próxima data (asc, sem data por último), remuneração (desc, sem valor por último),
+ * cadastro (mais recentes primeiro) e nome (órgão e cargo sem acento/maiúsculas, via a busca
+ * normalizada, que começa por eles). Empates: mais recentes primeiro.
+ */
 export async function listarConcursos(
   db: Db,
-  filtros: FiltrosConcursos = {},
+  filtrosParciais: Partial<FiltrosConcursos> = {},
+  hoje: DataISO = hojeSP(),
 ): Promise<ConcursoResumo[]> {
+  const filtros = { ...FILTROS_VAZIOS, ...filtrosParciais };
+  const proximas = db
+    .select({
+      concursoId: evento.concursoId,
+      data: sql<DataISO>`min(${evento.data})`.as("proxima_data"),
+    })
+    .from(evento)
+    .where(and(eq(evento.concluido, false), gte(evento.data, hoje)))
+    .groupBy(evento.concursoId)
+    .as("proximas");
+  const proximaData = proximas.data;
+  const desempate = [desc(concurso.createdAt), desc(concurso.id)];
+  const ordem: Record<FiltrosConcursos["ordem"], SQL[]> = {
+    proxima_data: [sql`${proximaData} is null`, asc(proximaData), ...desempate],
+    remuneracao: [
+      sql`${concurso.remuneracaoCentavos} is null`,
+      desc(concurso.remuneracaoCentavos),
+      ...desempate,
+    ],
+    cadastro: desempate,
+    nome: [asc(concurso.buscaNormalizada), ...desempate],
+  };
+
   const linhas = await db
     .select({
       id: concurso.id,
@@ -42,10 +101,12 @@ export async function listarConcursos(
       status: concurso.status,
       remuneracaoCentavos: concurso.remuneracaoCentavos,
       createdAt: concurso.createdAt,
+      proximaData,
     })
     .from(concurso)
-    .where(filtros.status ? eq(concurso.status, filtros.status) : undefined)
-    .orderBy(desc(concurso.createdAt), desc(concurso.id));
+    .leftJoin(proximas, eq(proximas.concursoId, concurso.id))
+    .where(condicoes(filtros))
+    .orderBy(...ordem[filtros.ordem]);
   const tags = await tagsPorConcurso(
     db,
     linhas.map((l) => l.id),

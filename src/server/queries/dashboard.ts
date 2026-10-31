@@ -7,6 +7,7 @@ import {
   proximosPrazos,
   totalPrazos,
 } from "@/domain/prazos";
+import { calcularValidadeFim } from "@/domain/validade";
 import { type DataISO, somarDias } from "@/lib/tz";
 import type { Db } from "../db/client";
 import { concurso, evento } from "../db/schema";
@@ -16,7 +17,7 @@ export interface ConcursoDoPrazo {
   orgao: string;
   cargo: string;
   status: Status;
-  /** Fim da validade (§4.3) — calculado a partir do M3; por ora sempre `null`. */
+  /** Fim da validade (§4.3), calculado a partir dos dados do concurso; `null` se indefinida. */
   validadeFim: DataISO | null;
 }
 
@@ -74,6 +75,10 @@ export async function obterDashboard(
         orgao: concurso.orgao,
         cargo: concurso.cargo,
         status: concurso.status,
+        homologacaoData: concurso.homologacaoData,
+        validadeMeses: concurso.validadeMeses,
+        validadeProrrogada: concurso.validadeProrrogada,
+        validadeFimManual: concurso.validadeFimManual,
       })
       .from(concurso),
     db
@@ -96,7 +101,17 @@ export async function obterDashboard(
   ]);
   const prazos = proximosPrazos(
     eventos,
-    concursos.map((c) => ({ ...c, validadeFim: null })),
+    concursos.map(
+      ({ homologacaoData, validadeMeses, validadeProrrogada, validadeFimManual, ...c }) => ({
+        ...c,
+        validadeFim: calcularValidadeFim({
+          homologacaoData,
+          validadeMeses,
+          validadeProrrogada,
+          validadeFimManual,
+        }),
+      }),
+    ),
     hoje,
     janelaDias,
   );

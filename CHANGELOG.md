@@ -13,6 +13,11 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
   título opcional, data, hora opcional, local, observação, concluído), ordenados por data (sem hora
   primeiro, depois por hora), e marcar/desmarcar concluído direto na lista; `concluido_em` registrado
   na conclusão. Validação Zod compartilhada entre cliente e servidor.
+- Cálculo de próximos prazos (`domain/prazos.ts`, §4.2): agrupa eventos não concluídos de concursos
+  ativos em vencidos (só tipos críticos), hoje e próximos N dias (padrão 30); criticidade por tipo
+  (alta ≤ 3 dias, média ≤ 7), ordenação por data/hora/criticidade, pseudo-evento de validade a partir
+  do fim de validade informado, `proximaData` e texto relativo ("em 3 dias"); `hoje` sempre injetado
+  e testes unitários exaustivos.
 
 ### Corrigido
 

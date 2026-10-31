@@ -5,6 +5,7 @@
  */
 import { z } from "zod";
 import { parseBRL } from "../format";
+import { normalizarTag } from "../normalize";
 
 /** Texto obrigatório (trim) com limite de tamanho. */
 export function textoObrigatorio(mensagem: string, max: number) {
@@ -62,3 +63,19 @@ export function inteiroOpcional(max = 1_000_000) {
 
 /** ID numérico positivo (parâmetros de rota e de ações). */
 export const idSchema = z.coerce.number().int().positive();
+
+export const MAX_TAGS = 20;
+export const MAX_TAMANHO_TAG = 40;
+
+/**
+ * Tags livres: normalizadas (trim + minúsculas), sem vazias nem repetidas. Os erros ficam no
+ * caminho `tags` (não por item), para exibição única no formulário.
+ */
+export const tagsSchema = z
+  .array(z.string(), { error: "Tags inválidas." })
+  .transform((tags) => [...new Set(tags.map(normalizarTag).filter((t) => t !== ""))])
+  .refine((tags) => tags.length <= MAX_TAGS, `Use no máximo ${MAX_TAGS} tags.`)
+  .refine(
+    (tags) => tags.every((t) => t.length <= MAX_TAMANHO_TAG),
+    `Cada tag pode ter até ${MAX_TAMANHO_TAG} caracteres.`,
+  );

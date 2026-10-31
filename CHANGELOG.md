@@ -16,6 +16,8 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
   cliente e servidor, máscara de moeda BRL, lista em `/concursos`, detalhe em `/concursos/[id]` com
   observações em markdown (sem HTML bruto) e exclusão com confirmação; `busca_normalizada` mantida
   a cada gravação e status inicial registrado no histórico.
+- Tags livres nos concursos (RF01): criação e reaproveitamento com sugestões no formulário, remoção,
+  exibição como badges na lista e no detalhe, inclusão na busca normalizada e limpeza de tags órfãs.
 
 ## [0.1.0] - 2026-10-31
 

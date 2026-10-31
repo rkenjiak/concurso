@@ -6,13 +6,17 @@ import { idSchema } from "@/lib/schemas/comum";
 import { valoresDoConcurso } from "@/lib/schemas/concurso";
 import { getDb } from "@/server/db/client";
 import { obterConcurso } from "@/server/queries/concursos";
+import { listarTags } from "@/server/queries/tags";
 
 export const metadata: Metadata = { title: "Editar concurso" };
 
 export default async function EditarConcursoPage({ params }: PageProps<"/concursos/[id]/editar">) {
   const id = idSchema.safeParse((await params).id);
   if (!id.success) notFound();
-  const concurso = await obterConcurso(getDb(), id.data);
+  const [concurso, tags] = await Promise.all([
+    obterConcurso(getDb(), id.data),
+    listarTags(getDb()),
+  ]);
   if (!concurso) notFound();
 
   return (
@@ -21,7 +25,11 @@ export default async function EditarConcursoPage({ params }: PageProps<"/concurs
         titulo="Editar concurso"
         descricao={`${concurso.orgao} — ${concurso.cargo}`}
       />
-      <FormularioConcurso valoresIniciais={valoresDoConcurso(concurso)} concursoId={concurso.id} />
+      <FormularioConcurso
+        valoresIniciais={valoresDoConcurso(concurso)}
+        concursoId={concurso.id}
+        tagsExistentes={tags}
+      />
     </div>
   );
 }

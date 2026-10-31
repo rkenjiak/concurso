@@ -4,6 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BadgeStatus } from "@/components/concurso/badge-status";
 import { BotaoExcluirConcurso } from "@/components/concurso/botao-excluir-concurso";
+import { ListaTags } from "@/components/concurso/lista-tags";
 import { Markdown } from "@/components/concurso/markdown";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -62,6 +63,9 @@ export default async function ConcursoPage({ params }: PageProps<"/concursos/[id
             <span className="text-muted-foreground text-xs">
               desde {formatarDataInstante(c.statusDesde)}
             </span>
+          </div>
+          <div className="pt-1">
+            <ListaTags tags={c.tags} />
           </div>
         </div>
         <div className="flex gap-2">

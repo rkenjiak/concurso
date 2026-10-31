@@ -3,7 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { Controller, type FieldPath, useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -23,16 +23,23 @@ import { type ConcursoFormValores, concursoSchema } from "@/lib/schemas/concurso
 import { atualizarConcurso, criarConcurso } from "@/server/actions/concursos";
 import { ariaCampo, Campo } from "./campo";
 import { CampoMoeda } from "./campo-moeda";
+import { CampoTags } from "./campo-tags";
 
 interface FormularioConcursoProps {
   valoresIniciais: ConcursoFormValores;
   /** Ausente = criação; presente = edição do concurso com esse ID. */
   concursoId?: number;
+  /** Tags existentes para sugestão. */
+  tagsExistentes?: readonly string[];
 }
 
 const CAMPOS = new Set<string>(Object.keys(concursoSchema.shape));
 
-export function FormularioConcurso({ valoresIniciais, concursoId }: FormularioConcursoProps) {
+export function FormularioConcurso({
+  valoresIniciais,
+  concursoId,
+  tagsExistentes = [],
+}: FormularioConcursoProps) {
   const router = useRouter();
   const editando = concursoId !== undefined;
   const [erroGeral, setErroGeral] = useState<string | null>(null);
@@ -49,7 +56,7 @@ export function FormularioConcurso({ valoresIniciais, concursoId }: FormularioCo
     defaultValues: valoresIniciais,
   });
 
-  const erro = (campo: FieldPath<ConcursoFormValores>) => errors[campo]?.message;
+  const erro = (campo: keyof ConcursoFormValores) => errors[campo]?.message;
 
   const enviar = handleSubmit(() => {
     setErroGeral(null);
@@ -66,7 +73,7 @@ export function FormularioConcurso({ valoresIniciais, concursoId }: FormularioCo
       }
       for (const [campo, mensagens] of Object.entries(r.erros)) {
         if (CAMPOS.has(campo) && mensagens?.[0]) {
-          setError(campo as FieldPath<ConcursoFormValores>, { message: mensagens[0] });
+          setError(campo as keyof ConcursoFormValores, { message: mensagens[0] });
         }
       }
       setErroGeral(r.erros._form?.[0] ?? "Verifique os campos destacados.");
@@ -124,6 +131,26 @@ export function FormularioConcurso({ valoresIniciais, concursoId }: FormularioCo
               </NativeSelect>
             </Campo>
           )}
+          <Campo
+            id="tags"
+            rotulo="Tags"
+            dica="Ex.: prioridade, tribunais. Reaproveite tags existentes pelas sugestões."
+            erro={erro("tags")}
+            className="sm:col-span-2"
+          >
+            <Controller
+              control={control}
+              name="tags"
+              render={({ field }) => (
+                <CampoTags
+                  {...ariaCampo("tags", erro("tags"), "dica")}
+                  value={field.value}
+                  onChange={field.onChange}
+                  sugestoes={tagsExistentes}
+                />
+              )}
+            />
+          </Campo>
         </CardContent>
       </Card>
 

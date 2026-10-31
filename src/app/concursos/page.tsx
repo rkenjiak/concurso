@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { connection } from "next/server";
 import { BadgeStatus } from "@/components/concurso/badge-status";
+import { ListaTags } from "@/components/concurso/lista-tags";
 import { CabecalhoPagina } from "@/components/layout/cabecalho-pagina";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -66,6 +67,11 @@ export default async function ConcursosPage() {
                   </div>
                   {detalhes.length > 0 ? (
                     <p className="mt-2 text-muted-foreground text-xs">{detalhes.join(" · ")}</p>
+                  ) : null}
+                  {c.tags.length > 0 ? (
+                    <div className="mt-2">
+                      <ListaTags tags={c.tags} />
+                    </div>
                   ) : null}
                 </Link>
               </li>

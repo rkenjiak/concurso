@@ -2,6 +2,7 @@
 import { desc, eq } from "drizzle-orm";
 import type { Db } from "../db/client";
 import { type Concurso, concurso } from "../db/schema";
+import { tagsPorConcurso } from "./tags";
 
 export type ConcursoResumo = Pick<
   Concurso,
@@ -15,11 +16,13 @@ export type ConcursoResumo = Pick<
   | "status"
   | "remuneracaoCentavos"
   | "createdAt"
->;
+> & { tags: string[] };
+
+export type ConcursoDetalhe = Concurso & { tags: string[] };
 
 /** Lista simples, mais recentes primeiro. */
 export async function listarConcursos(db: Db): Promise<ConcursoResumo[]> {
-  return db
+  const linhas = await db
     .select({
       id: concurso.id,
       orgao: concurso.orgao,
@@ -34,9 +37,16 @@ export async function listarConcursos(db: Db): Promise<ConcursoResumo[]> {
     })
     .from(concurso)
     .orderBy(desc(concurso.createdAt), desc(concurso.id));
+  const tags = await tagsPorConcurso(
+    db,
+    linhas.map((l) => l.id),
+  );
+  return linhas.map((l) => ({ ...l, tags: tags.get(l.id) ?? [] }));
 }
 
-export async function obterConcurso(db: Db, id: number): Promise<Concurso | null> {
+export async function obterConcurso(db: Db, id: number): Promise<ConcursoDetalhe | null> {
   const [linha] = await db.select().from(concurso).where(eq(concurso.id, id));
-  return linha ?? null;
+  if (!linha) return null;
+  const tags = await tagsPorConcurso(db, [id]);
+  return { ...linha, tags: tags.get(id) ?? [] };
 }

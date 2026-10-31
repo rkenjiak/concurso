@@ -25,6 +25,11 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
   rotas exceto `/login`, `/api/health` e arquivos estáticos (APIs respondem 401), e todas as Server
   Actions e Route Handlers checam a sessão de novo. Em produção sem `APP_PASSWORD` o app recusa
   iniciar, salvo `ALLOW_NO_AUTH=true`; `AUTH_SECRET` com menos de 32 bytes também impede o início.
+- Testes e2e com Playwright (Chromium) contra o build de produção, cada servidor com um banco
+  SQLite temporário recriado a cada execução: cadastrar concurso → mudar status → adicionar evento →
+  ver no dashboard; busca sem acento e filtro por status; exportar/excluir/importar backup (inclui
+  versão desconhecida); e, em um projeto separado com `APP_PASSWORD`, login, senha errada, 401 nas
+  APIs, cookie de sessão e logout. Script `pnpm e2e` e job `e2e` no CI (com cache do Chromium).
 - Health check `GET /api/health` (público; 200 se o banco responde, 503 caso contrário).
 
 ### Alterado

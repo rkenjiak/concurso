@@ -2,22 +2,31 @@
   "name": "concurso",
   "version": "0.0.0",
   "private": true,
+  "type": "module",
   "description": "App pessoal para cadastrar e acompanhar concursos públicos",
   "engines": {
     "node": ">=24"
   },
   "packageManager": "pnpm@12.16.1",
   "scripts": {
+    "predev": "pnpm db:migrate",
     "dev": "next dev",
+    "prebuild": "pnpm db:migrate",
     "build": "next build",
     "start": "next start",
     "lint": "biome ci .",
     "format": "biome check --write .",
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "tsx scripts/migrate.ts",
+    "db:seed": "tsx scripts/seed.ts",
+    "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
+    "@libsql/client": "^0.18.0",
+    "drizzle-orm": "^0.45.4",
     "next": "16.4.3",
     "react": "19.3.0",
     "react-dom": "19.3.0"
@@ -29,7 +38,9 @@
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitest/coverage-v8": "^4.1.12",
+    "drizzle-kit": "^0.31.11",
     "tailwindcss": "^4.3.3",
+    "tsx": "^4.23.15",
     "typescript": "^6.0.3",
     "vitest": "^4.1.12"
   }

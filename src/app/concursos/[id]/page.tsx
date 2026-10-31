@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { AlterarStatus } from "@/components/concurso/alterar-status";
 import { BadgeStatus } from "@/components/concurso/badge-status";
 import { BotaoExcluirConcurso } from "@/components/concurso/botao-excluir-concurso";
+import { EventosConcurso } from "@/components/concurso/eventos-concurso";
 import { LinksConcurso } from "@/components/concurso/links-concurso";
 import { ListaTags } from "@/components/concurso/lista-tags";
 import { Markdown } from "@/components/concurso/markdown";
@@ -17,6 +18,7 @@ import { formatarBRL, formatarDataInstante } from "@/lib/format";
 import { idSchema } from "@/lib/schemas/comum";
 import { getDb } from "@/server/db/client";
 import { obterConcurso } from "@/server/queries/concursos";
+import { listarEventos } from "@/server/queries/eventos";
 import { obterOpcoesStatus } from "@/server/queries/historico";
 import { listarLinks } from "@/server/queries/links";
 
@@ -48,10 +50,12 @@ const numero = (n: number | null) => (n == null ? "—" : n.toLocaleString("pt-B
 
 export default async function ConcursoPage({ params }: PageProps<"/concursos/[id]">) {
   const c = await carregar(params);
-  const [{ historico, opcoes }, links] = await Promise.all([
+  const [{ historico, opcoes }, links, eventos] = await Promise.all([
     obterOpcoesStatus(getDb(), c.id, c.status),
     listarLinks(getDb(), c.id),
+    listarEventos(getDb(), c.id),
   ]);
+  const pendentes = eventos.filter((e) => !e.concluido).length;
   const local = [c.cidade, c.uf].filter(Boolean).join(" / ");
 
   return (
@@ -92,6 +96,7 @@ export default async function ConcursoPage({ params }: PageProps<"/concursos/[id
       <Tabs defaultValue="geral" className="gap-4">
         <TabsList className="w-full sm:w-fit">
           <TabsTrigger value="geral">Visão geral</TabsTrigger>
+          <TabsTrigger value="eventos">Eventos ({pendentes})</TabsTrigger>
           <TabsTrigger value="links">Links ({links.length})</TabsTrigger>
           <TabsTrigger value="historico">Histórico</TabsTrigger>
         </TabsList>
@@ -136,6 +141,31 @@ export default async function ConcursoPage({ params }: PageProps<"/concursos/[id
               ) : (
                 <p className="text-muted-foreground text-sm">Sem observações.</p>
               )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="eventos">
+          <Card>
+            <CardHeader>
+              <CardTitle>Datas e eventos</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <EventosConcurso
+                concursoId={c.id}
+                eventos={eventos.map(
+                  ({ id, tipo, titulo, data, hora, local, observacao, concluido }) => ({
+                    id,
+                    tipo,
+                    titulo,
+                    data,
+                    hora,
+                    local,
+                    observacao,
+                    concluido,
+                  }),
+                )}
+              />
             </CardContent>
           </Card>
         </TabsContent>

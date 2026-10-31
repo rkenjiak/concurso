@@ -1,22 +1,26 @@
-import { Plus } from "lucide-react";
+import { Plus, X } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { connection } from "next/server";
+import { z } from "zod";
 import { BadgeStatus } from "@/components/concurso/badge-status";
 import { ListaTags } from "@/components/concurso/lista-tags";
 import { CabecalhoPagina } from "@/components/layout/cabecalho-pagina";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { ROTULO_ESFERA } from "@/domain/labels";
+import { STATUS } from "@/domain/enums";
+import { ROTULO_ESFERA, ROTULO_STATUS } from "@/domain/labels";
 import { formatarBRL } from "@/lib/format";
 import { getDb } from "@/server/db/client";
 import { listarConcursos } from "@/server/queries/concursos";
 
 export const metadata: Metadata = { title: "Concursos" };
 
-export default async function ConcursosPage() {
+export default async function ConcursosPage({ searchParams }: PageProps<"/concursos">) {
   await connection();
-  const concursos = await listarConcursos(getDb());
+  const filtro = z.enum(STATUS).safeParse((await searchParams).status);
+  const status = filtro.success ? filtro.data : null;
+  const concursos = await listarConcursos(getDb(), { status });
 
   return (
     <div className="space-y-6">
@@ -32,7 +36,28 @@ export default async function ConcursosPage() {
           </Button>
         }
       />
-      {concursos.length === 0 ? (
+      {status ? (
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <span className="text-muted-foreground">Filtrando por status:</span>
+          <Button asChild variant="secondary" size="sm">
+            <Link href="/concursos" aria-label={`Remover filtro ${ROTULO_STATUS[status]}`}>
+              {ROTULO_STATUS[status]}
+              <X aria-hidden />
+            </Link>
+          </Button>
+        </div>
+      ) : null}
+      {concursos.length === 0 && status ? (
+        <Card>
+          <CardContent className="py-10 text-center text-muted-foreground">
+            Nenhum concurso com status “{ROTULO_STATUS[status]}”.{" "}
+            <Link href="/concursos" className="text-primary underline underline-offset-4">
+              Ver todos
+            </Link>
+            .
+          </CardContent>
+        </Card>
+      ) : concursos.length === 0 ? (
         <Card>
           <CardContent className="py-10 text-center text-muted-foreground">
             Nenhum concurso cadastrado ainda.{" "}

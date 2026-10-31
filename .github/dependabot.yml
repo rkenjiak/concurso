@@ -11,6 +11,12 @@ updates:
     groups:
       dependencias:
         update-types: [minor, patch]
+    ignore:
+      # Mantemos TypeScript 6.x e os tipos do Node 24 (versão do runtime em .nvmrc).
+      - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
     directory: /

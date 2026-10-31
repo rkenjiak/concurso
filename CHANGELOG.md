@@ -7,6 +7,36 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-31
+
+### Adicionado
+
+- Eventos do concurso (RF04): aba "Eventos" no detalhe com adicionar, editar e excluir eventos (tipo,
+  título opcional, data, hora opcional, local, observação, concluído), ordenados por data (sem hora
+  primeiro, depois por hora), e marcar/desmarcar concluído direto na lista; `concluido_em` registrado
+  na conclusão. Validação Zod compartilhada entre cliente e servidor.
+- Cálculo de próximos prazos (`domain/prazos.ts`, §4.2): agrupa eventos não concluídos de concursos
+  ativos em vencidos (só tipos críticos), hoje e próximos N dias (padrão 30); criticidade por tipo
+  (alta ≤ 3 dias, média ≤ 7), ordenação por data/hora/criticidade, pseudo-evento de validade a partir
+  do fim de validade informado, `proximaData` e texto relativo ("em 3 dias"); `hoje` sempre injetado
+  e testes unitários exaustivos.
+- Dashboard (RF06) na página inicial: próximos prazos agrupados em vencidos, hoje e próximos 30 dias
+  (data de hoje em America/Sao_Paulo), com destaque visual de prazos críticos (urgente ≤ 3 dias, esta
+  semana ≤ 7), hora, local e link para o concurso; contagem de concursos por status em cards que
+  levam à lista filtrada; estados vazios orientando o cadastro de concursos e eventos.
+- Lista de concursos aceita filtro por status via `?status=` (com atalho para remover o filtro).
+
+### Corrigido
+
+- Campo de tags do formulário de concurso: Enter volta a adicionar a tag digitada (o popup nativo do
+  `<datalist>` absorvia a tecla). As sugestões agora são uma lista própria (combobox acessível, com
+  setas, Enter e Esc), filtrada sem acento, e há um botão para adicionar a tag; digitar um texto
+  igual a uma tag existente não a adiciona mais antes do Enter.
+
+### Alterado
+
+- Dependabot ignora atualizações semver-major de `typescript` e `@types/node`.
+
 ## [0.2.0] - 2026-10-31
 
 ### Adicionado

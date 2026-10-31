@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { idSchema } from "@/lib/schemas/comum";
 import { linkSchema, ordemLinksSchema } from "@/lib/schemas/link";
+import { verificarAcesso } from "../auth/acesso";
 import { getDb } from "../db/client";
 import * as repo from "../repositories/links";
 import { executar, falha, falhaValidacao, type ResultadoAcao, sucesso } from "./resultado";
@@ -15,6 +16,8 @@ export async function salvarLink(
   linkIdBruto: unknown,
   entrada: unknown,
 ): Promise<ResultadoAcao<{ id: number }>> {
+  const negado = await verificarAcesso();
+  if (negado) return negado;
   const concursoId = idSchema.safeParse(concursoIdBruto);
   if (!concursoId.success) return falha("Concurso não encontrado.");
   const linkId = linkIdBruto == null ? null : idSchema.safeParse(linkIdBruto);
@@ -39,6 +42,8 @@ export async function excluirLink(
   concursoIdBruto: unknown,
   linkIdBruto: unknown,
 ): Promise<ResultadoAcao> {
+  const negado = await verificarAcesso();
+  if (negado) return negado;
   const concursoId = idSchema.safeParse(concursoIdBruto);
   const linkId = idSchema.safeParse(linkIdBruto);
   if (!concursoId.success || !linkId.success) return falha(INVALIDO);
@@ -53,6 +58,8 @@ export async function reordenarLinks(
   concursoIdBruto: unknown,
   idsBrutos: unknown,
 ): Promise<ResultadoAcao> {
+  const negado = await verificarAcesso();
+  if (negado) return negado;
   const concursoId = idSchema.safeParse(concursoIdBruto);
   if (!concursoId.success) return falha("Concurso não encontrado.");
   const ids = ordemLinksSchema.safeParse(idsBrutos);

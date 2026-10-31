@@ -7,6 +7,49 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-10-31
+
+### Adicionado
+
+- Exportação e importação de dados (RF09) em `/configuracoes`: backup JSON versionado
+  (`schemaVersion` 1) com todas as tabelas — concursos, tags, links, eventos, histórico de status,
+  resultados por fase e anexos —, preservando IDs e instantes em ISO 8601 (`GET
+  /api/export?formato=json`), e CSV dos concursos para planilhas (`;`, BOM UTF-8, valores em reais
+  e rótulos em pt-BR, com proteção contra fórmulas; `?formato=csv`). Importação (`POST
+  /api/import`) valida o arquivo com Zod (formato, versão, campos e referências entre tabelas) com
+  mensagens que indicam o campo com problema, rejeita versões desconhecidas e substitui todos os
+  dados em uma única transação (tudo ou nada) após confirmação explícita; a busca normalizada é
+  recalculada. Teste de ida e volta (exportar → importar → dados idênticos).
+- Autenticação opcional por senha única (§7.1, RNF06): desligada sem `APP_PASSWORD`; com ela,
+  página `/login`, sessão em cookie JWT assinado com `AUTH_SECRET` (`jose`, HS256, `httpOnly`,
+  `SameSite=Lax`, `secure` em produção, 30 dias), senha comparada em tempo constante, atraso
+  progressivo após 5 falhas por cliente e "Sair" em Configurações. `proxy.ts` protege todas as
+  rotas exceto `/login`, `/api/health` e arquivos estáticos (APIs respondem 401), e todas as Server
+  Actions e Route Handlers checam a sessão de novo. Em produção sem `APP_PASSWORD` o app recusa
+  iniciar, salvo `ALLOW_NO_AUTH=true`; `AUTH_SECRET` com menos de 32 bytes também impede o início.
+- Testes e2e com Playwright (Chromium) contra o build de produção, cada servidor com um banco
+  SQLite temporário recriado a cada execução: cadastrar concurso → mudar status → adicionar evento →
+  ver no dashboard; busca sem acento e filtro por status; exportar/excluir/importar backup (inclui
+  versão desconhecida); e, em um projeto separado com `APP_PASSWORD`, login, senha errada, 401 nas
+  APIs, cookie de sessão e logout. Script `pnpm e2e` e job `e2e` no CI (com cache do Chromium).
+- Deploy (§9, RNF08): `Dockerfile` multi-stage com saída `standalone` do Next (`NEXT_OUTPUT=standalone`),
+  Node 24, usuário sem privilégios, banco SQLite em volume (`/app/data`), `HEALTHCHECK` e
+  migrações ao iniciar (`MIGRATE_ON_START=true`), além de `.dockerignore` que exclui dados, backups
+  e `.env`; job `docker` no CI constrói a imagem e testa o health check, o 401 sem sessão e a
+  recusa de iniciar sem senha. Instruções para Vercel + Turso (sem `vercel.json`; migrações no build via
+  `DATABASE_URL`/`DATABASE_AUTH_TOKEN`).
+- `pnpm db:backup`: cópia consistente do banco local com `VACUUM INTO` em
+  `backups/concurso-AAAAMMDD-HHmm.db`, mantendo as últimas N (`--manter=N` ou `BACKUP_KEEP`, padrão
+  10); recusa bancos remotos com orientação para o Turso.
+- README reescrito: o que é, início rápido, variáveis de ambiente, autenticação, backup e
+  restauração, deploy na Vercel + Turso e com Docker, scripts e Gitflow.
+- Health check `GET /api/health` (público; 200 se o banco responde, 503 caso contrário).
+
+### Alterado
+
+- Páginas do app movidas para o grupo de rotas `(app)` (com a navegação); a raiz só define
+  `<html>`/`<body>`, permitindo a tela de login sem navegação. URLs inalteradas.
+
 ## [0.4.0] - 2026-10-31
 
 ### Adicionado

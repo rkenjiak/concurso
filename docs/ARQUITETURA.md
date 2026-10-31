@@ -34,7 +34,7 @@ Prisma também traz engine/binário extra e é mais pesado que Drizzle para SQLi
 
 ```mermaid
 flowchart LR
-  U[Navegador<br/>desktop / celular] -->|HTTPS| MW[middleware.ts<br/>auth opcional]
+  U[Navegador<br/>desktop / celular] -->|HTTPS| MW[proxy.ts<br/>auth opcional]
   MW --> RSC[Server Components<br/>páginas / leitura]
   MW --> SA[Server Actions<br/>mutações]
   MW --> RH[Route Handlers<br/>export/import, .ics, health]
@@ -275,7 +275,7 @@ Retorno padronizado `{ ok: true, data } | { ok: false, erros }`.
 │   │   ├── actions/                # Server Actions
 │   │   └── auth/                   # sessão, senha
 │   ├── lib/                        # format.ts (BRL, datas), tz.ts, normalize.ts, schemas zod
-│   └── middleware.ts
+│   └── proxy.ts
 ├── biome.json  drizzle.config.ts  next.config.ts  vitest.config.ts  playwright.config.ts
 ├── .env.example  .nvmrc  CHANGELOG.md  package.json
 ```
@@ -288,7 +288,7 @@ Retorno padronizado `{ ok: true, data } | { ok: false, erros }`.
 - **Local (padrão):** sem `APP_PASSWORD` definido → auth desligada, app escuta só em `localhost`.
 - **Hospedado:** definir `APP_PASSWORD` e `AUTH_SECRET` (≥ 32 bytes). Login com senha única comparada
   em tempo constante; sessão em cookie **JWT assinado** (`jose`), `httpOnly`, `secure`, `SameSite=Lax`,
-  30 dias. `middleware.ts` protege tudo exceto `/login` e `/api/health`; Server Actions revalidam a
+  30 dias. `proxy.ts` (antigo `middleware.ts` no Next 16) protege tudo exceto `/login` e `/api/health`; Server Actions revalidam a
   sessão (defesa em profundidade). Atraso progressivo após falhas de login.
 - Em produção (`NODE_ENV=production`) sem `APP_PASSWORD`, o app **recusa iniciar** salvo
   `ALLOW_NO_AUTH=true` explícito — evita expor dados por esquecimento.
@@ -355,7 +355,7 @@ pnpm dev        # aplica migrações pendentes (predev) e sobe em http://localho
 | Opção | Custo | Quando |
 |---|---|---|
 | **Vercel (Hobby) + Turso (free)** — recomendada | R$ 0 | Zero manutenção; `DATABASE_URL=libsql://…` + `DATABASE_AUTH_TOKEN`. Migrações rodadas no build. |
-| Docker (imagem `standalone`) em VPS/Fly.io com volume para `data/` | ~US$ 2–5/mês | Se quiser anexos em disco local ou evitar serviço de banco externo. |
+| Docker (imagem `standalone`, `Dockerfile` na raiz) em VPS/Fly.io com volume para `data/`; migrações ao iniciar (`MIGRATE_ON_START=true`) | ~US$ 2–5/mês | Se quiser anexos em disco local ou evitar serviço de banco externo. |
 
 O mesmo código atende ambas: só muda `DATABASE_URL` (`file:./data/concurso.db` vs `libsql://…`).
 
@@ -390,7 +390,7 @@ Cada item = uma branch `feature/*` a partir de `develop`; cada milestone fecha c
 
 | # | Questão | Padrão proposto | Impacto na arquitetura |
 |---|---|---|---|
-| 1 | Local ou hospedado? | **Local-first**, com hospedagem opcional pronta (Vercel+Turso). Auth ligada por variável de ambiente; produção sem senha bloqueada por padrão. | Nenhum retrabalho: driver libSQL e middleware de auth já previstos. |
+| 1 | Local ou hospedado? | **Local-first**, com hospedagem opcional pronta (Vercel+Turso). Auth ligada por variável de ambiente; produção sem senha bloqueada por padrão. | Nenhum retrabalho: driver libSQL e proxy de auth já previstos. |
 | 2 | Anexos no MVP? | **Não** — só links no MVP (edital costuma estar em URL pública). Anexos no M7 com interface `Storage` (`disco local` / Vercel Blob ou Cloudflare R2), limite 10 MB, só PDF/imagem. | Tabela `anexo` já desenhada; backup passa a incluir arquivos. |
 | 3 | E-mail desde o início? | **Não.** Primeiro o feed **.ics assinável** (M6): o Google/Apple Calendar notifica no celular de graça. E-mail depois, se necessário: Resend + cron (Vercel Cron ou GitHub Actions `schedule`) com resumo diário. | E-mail exige app hospedado e segredo extra; .ics funciona até local (download manual). |
 

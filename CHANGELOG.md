@@ -18,6 +18,9 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
   a cada gravação e status inicial registrado no histórico.
 - Tags livres nos concursos (RF01): criação e reaproveitamento com sugestões no formulário, remoção,
   exibição como badges na lista e no detalhe, inclusão na busca normalizada e limpeza de tags órfãs.
+- Histórico de status (RF03): troca de status no detalhe do concurso limitada às transições
+  permitidas, com observação opcional, desfazer a última mudança e linha do tempo; histórico e status
+  atual gravados na mesma transação. Detalhe do concurso organizado em abas.
 
 ## [0.1.0] - 2026-10-31
 

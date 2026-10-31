@@ -97,6 +97,35 @@ jobs:
             test-results/
           retention-days: 7
 
+  docker:
+    name: Imagem Docker
+    needs: check
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build da imagem
+        run: docker build -t concurso:ci .
+
+      - name: Smoke test (health check e recusa sem senha)
+        run: |
+          codigo=0
+          timeout 60 docker run --rm concurso:ci || codigo=$?
+          if [ "$codigo" != 1 ]; then
+            echo "::error::Sem APP_PASSWORD o container deveria sair com código 1 (saiu com $codigo)."
+            exit 1
+          fi
+          docker run -d --name concurso -p 3000:3000 \
+            -e APP_PASSWORD=senha-ci -e AUTH_SECRET=segredo-somente-para-o-ci-0123456789 concurso:ci
+          for i in $(seq 1 30); do curl -fsS http://localhost:3000/api/health && break; sleep 1; done
+          curl -fsS http://localhost:3000/api/health
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/api/export)" = 401
+
+      - name: Logs do container
+        if: failure()
+        run: docker logs concurso || true
+
   branch-policy:
     name: Política de branches (master)
     if: github.event_name == 'pull_request' && github.base_ref == 'master'

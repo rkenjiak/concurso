@@ -355,7 +355,7 @@ pnpm dev        # aplica migrações pendentes (predev) e sobe em http://localho
 | Opção | Custo | Quando |
 |---|---|---|
 | **Vercel (Hobby) + Turso (free)** — recomendada | R$ 0 | Zero manutenção; `DATABASE_URL=libsql://…` + `DATABASE_AUTH_TOKEN`. Migrações rodadas no build. |
-| Docker (imagem `standalone`) em VPS/Fly.io com volume para `data/` | ~US$ 2–5/mês | Se quiser anexos em disco local ou evitar serviço de banco externo. |
+| Docker (imagem `standalone`, `Dockerfile` na raiz) em VPS/Fly.io com volume para `data/`; migrações ao iniciar (`MIGRATE_ON_START=true`) | ~US$ 2–5/mês | Se quiser anexos em disco local ou evitar serviço de banco externo. |
 
 O mesmo código atende ambas: só muda `DATABASE_URL` (`file:./data/concurso.db` vs `libsql://…`).
 

@@ -65,3 +65,8 @@ export function diasEntre(de: DataISO, ate: DataISO): number {
     parse(exigirDataISO(de), "yyyy-MM-dd", ref),
   );
 }
+
+/** Carimbo `AAAAMMDD-HHmm` de um instante no fuso de São Paulo (nomes de arquivo de backup). */
+export function carimboSP(instante: Date | number = Date.now()): string {
+  return format(agoraSP(instante), "yyyyMMdd-HHmm");
+}

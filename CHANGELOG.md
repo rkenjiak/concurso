@@ -7,6 +7,18 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 
 ## [Unreleased]
 
+### Adicionado
+
+- Exportação e importação de dados (RF09) em `/configuracoes`: backup JSON versionado
+  (`schemaVersion` 1) com todas as tabelas — concursos, tags, links, eventos, histórico de status,
+  resultados por fase e anexos —, preservando IDs e instantes em ISO 8601 (`GET
+  /api/export?formato=json`), e CSV dos concursos para planilhas (`;`, BOM UTF-8, valores em reais
+  e rótulos em pt-BR, com proteção contra fórmulas; `?formato=csv`). Importação (`POST
+  /api/import`) valida o arquivo com Zod (formato, versão, campos e referências entre tabelas) com
+  mensagens que indicam o campo com problema, rejeita versões desconhecidas e substitui todos os
+  dados em uma única transação (tudo ou nada) após confirmação explícita; a busca normalizada é
+  recalculada. Teste de ida e volta (exportar → importar → dados idênticos).
+
 ## [0.4.0] - 2026-10-31
 
 ### Adicionado

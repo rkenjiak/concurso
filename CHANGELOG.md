@@ -7,6 +7,15 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 
 ## [Unreleased]
 
+### Adicionado
+
+- Busca, filtros e ordenação na lista de concursos (RF07): busca sem acento/maiúsculas por órgão,
+  cargo, banca e tags (todos os termos, em qualquer ordem); filtros por status (vários), esfera, UF,
+  escolaridade e faixa de remuneração (em reais); ordenação por próxima data (sem data por último),
+  maior remuneração, cadastro mais recente ou nome. Estado na URL (compartilhável, inclusive os
+  links de contagem por status do dashboard), validado com Zod; "Limpar filtros", contagem de
+  resultados, estado vazio próprio e próxima data exibida em cada concurso.
+
 ## [0.3.0] - 2026-10-31
 
 ### Adicionado

@@ -101,8 +101,10 @@ describe("listarConcursos com filtro de status", () => {
   it("filtra pelo status informado", async () => {
     await novoConcurso("A", "INSCRITO");
     await novoConcurso("B", "PREVISTO");
-    expect((await listarConcursos(db, { status: "PREVISTO" })).map((c) => c.orgao)).toEqual(["B"]);
-    expect(await listarConcursos(db, { status: "NOMEADO" })).toEqual([]);
-    expect(await listarConcursos(db, { status: null })).toHaveLength(2);
+    expect((await listarConcursos(db, { status: ["PREVISTO"] })).map((c) => c.orgao)).toEqual([
+      "B",
+    ]);
+    expect(await listarConcursos(db, { status: ["NOMEADO"] })).toEqual([]);
+    expect(await listarConcursos(db, { status: [] })).toHaveLength(2);
   });
 });

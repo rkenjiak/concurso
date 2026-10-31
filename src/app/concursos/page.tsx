@@ -1,16 +1,22 @@
-import { Plus, X } from "lucide-react";
+import { CalendarDays, Plus } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { connection } from "next/server";
-import { z } from "zod";
 import { BadgeStatus } from "@/components/concurso/badge-status";
+import { FiltrosConcursosForm } from "@/components/concurso/filtros-concursos";
 import { ListaTags } from "@/components/concurso/lista-tags";
 import { CabecalhoPagina } from "@/components/layout/cabecalho-pagina";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { STATUS } from "@/domain/enums";
-import { ROTULO_ESFERA, ROTULO_STATUS } from "@/domain/labels";
-import { formatarBRL } from "@/lib/format";
+import { ROTULO_ESFERA } from "@/domain/labels";
+import { formatarBRL, formatarData } from "@/lib/format";
+import {
+  FILTROS_VAZIOS,
+  filtrosParaBusca,
+  lerFiltrosConcursos,
+  temFiltros,
+} from "@/lib/schemas/filtros-concursos";
+import { hojeSP } from "@/lib/tz";
 import { getDb } from "@/server/db/client";
 import { listarConcursos } from "@/server/queries/concursos";
 
@@ -18,9 +24,11 @@ export const metadata: Metadata = { title: "Concursos" };
 
 export default async function ConcursosPage({ searchParams }: PageProps<"/concursos">) {
   await connection();
-  const filtro = z.enum(STATUS).safeParse((await searchParams).status);
-  const status = filtro.success ? filtro.data : null;
-  const concursos = await listarConcursos(getDb(), { status });
+  const filtros = lerFiltrosConcursos(await searchParams);
+  const busca = filtrosParaBusca(filtros);
+  const filtrando = temFiltros(filtros);
+  const concursos = await listarConcursos(getDb(), filtros, hojeSP());
+  const limpar = `/concursos${filtrosParaBusca({ ...FILTROS_VAZIOS, ordem: filtros.ordem })}`;
 
   return (
     <div className="space-y-6">
@@ -36,23 +44,20 @@ export default async function ConcursosPage({ searchParams }: PageProps<"/concur
           </Button>
         }
       />
-      {status ? (
-        <div className="flex flex-wrap items-center gap-2 text-sm">
-          <span className="text-muted-foreground">Filtrando por status:</span>
-          <Button asChild variant="secondary" size="sm">
-            <Link href="/concursos" aria-label={`Remover filtro ${ROTULO_STATUS[status]}`}>
-              {ROTULO_STATUS[status]}
-              <X aria-hidden />
-            </Link>
-          </Button>
-        </div>
+      <FiltrosConcursosForm key={busca} filtros={filtros} />
+      {filtrando ? (
+        <p className="text-muted-foreground text-sm" aria-live="polite">
+          {concursos.length === 1
+            ? "1 concurso encontrado."
+            : `${concursos.length} concursos encontrados.`}
+        </p>
       ) : null}
-      {concursos.length === 0 && status ? (
+      {concursos.length === 0 && filtrando ? (
         <Card>
           <CardContent className="py-10 text-center text-muted-foreground">
-            Nenhum concurso com status “{ROTULO_STATUS[status]}”.{" "}
-            <Link href="/concursos" className="text-primary underline underline-offset-4">
-              Ver todos
+            Nenhum concurso encontrado com esses filtros.{" "}
+            <Link href={limpar} className="text-primary underline underline-offset-4">
+              Limpar filtros
             </Link>
             .
           </CardContent>
@@ -92,6 +97,12 @@ export default async function ConcursosPage({ searchParams }: PageProps<"/concur
                   </div>
                   {detalhes.length > 0 ? (
                     <p className="mt-2 text-muted-foreground text-xs">{detalhes.join(" · ")}</p>
+                  ) : null}
+                  {c.proximaData ? (
+                    <p className="mt-1 inline-flex items-center gap-1 text-muted-foreground text-xs">
+                      <CalendarDays className="size-3.5" aria-hidden />
+                      Próxima data: {formatarData(c.proximaData)}
+                    </p>
                   ) : null}
                   {c.tags.length > 0 ? (
                     <div className="mt-2">

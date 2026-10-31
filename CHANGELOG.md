@@ -21,6 +21,8 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 - Histórico de status (RF03): troca de status no detalhe do concurso limitada às transições
   permitidas, com observação opcional, desfazer a última mudança e linha do tempo; histórico e status
   atual gravados na mesma transação. Detalhe do concurso organizado em abas.
+- Links do concurso (RF02): adicionar, editar, excluir e reordenar links com rótulo, tipo e URL
+  validada (apenas `http`/`https`), abertos em nova aba com `rel="noopener noreferrer"`.
 
 ## [0.1.0] - 2026-10-31
 

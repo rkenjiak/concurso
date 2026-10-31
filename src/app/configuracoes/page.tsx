@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ExportarImportar } from "@/components/configuracoes/exportar-importar";
 import { CabecalhoPagina } from "@/components/layout/cabecalho-pagina";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -13,7 +14,9 @@ export default function ConfiguracoesPage() {
           <CardTitle>Exportar e importar</CardTitle>
           <CardDescription>Backup completo em JSON/CSV e restauração.</CardDescription>
         </CardHeader>
-        <CardContent className="text-muted-foreground">Em breve.</CardContent>
+        <CardContent>
+          <ExportarImportar />
+        </CardContent>
       </Card>
     </div>
   );

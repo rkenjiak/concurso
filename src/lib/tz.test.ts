@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dataSP, diasEntre, ehDataISO, hojeSP, instanteSP, somarDias } from "./tz";
+import { carimboSP, dataSP, diasEntre, ehDataISO, hojeSP, instanteSP, somarDias } from "./tz";
 
 describe("hojeSP", () => {
   it("usa o calendário de São Paulo, não o UTC", () => {
@@ -68,5 +68,12 @@ describe("somarDias / diasEntre", () => {
   it("rejeita datas inválidas", () => {
     expect(() => somarDias("31/12/2026", 1)).toThrow(RangeError);
     expect(() => diasEntre("2026-01-01", "x")).toThrow(RangeError);
+  });
+});
+
+describe("carimboSP", () => {
+  it("formata o instante no horário de Brasília", () => {
+    expect(carimboSP(new Date("2026-01-02T02:05:00Z"))).toBe("20260101-2305");
+    expect(carimboSP(new Date("2026-10-31T15:00:00Z"))).toBe("20261031-1200");
   });
 });

@@ -15,6 +15,10 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
   maior remuneração, cadastro mais recente ou nome. Estado na URL (compartilhável, inclusive os
   links de contagem por status do dashboard), validado com Zod; "Limpar filtros", contagem de
   resultados, estado vazio próprio e próxima data exibida em cada concurso.
+- Resultados por fase (RF05): aba "Resultados" no detalhe do concurso para adicionar, editar e
+  excluir o resultado de cada fase (fase, descrição, nota, nota máxima, nota de corte, classificação
+  geral e nas cotas com a lista, situação e observação). Notas aceitam vírgula ou ponto (até 3 casas)
+  e não podem passar da nota máxima; validação Zod compartilhada entre cliente e servidor.
 
 ## [0.3.0] - 2026-10-31
 

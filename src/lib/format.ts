@@ -111,3 +111,37 @@ export function mascararBRL(texto: string): string {
   if (digitos === "") return texto.replace(/\D/g, "") === "" ? "" : "0,00";
   return centavosParaEntrada(Number(digitos));
 }
+
+/** Casas decimais aceitas em notas (ex.: 72,125). */
+export const MAX_CASAS_NOTA = 3;
+
+const notaFmt = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: MAX_CASAS_NOTA });
+const notaEntradaFmt = new Intl.NumberFormat("pt-BR", {
+  maximumFractionDigits: MAX_CASAS_NOTA,
+  useGrouping: false,
+});
+
+/** Nota → "72,5" / "1.234,125". `null` → "—". */
+export function formatarNota(nota: number | null | undefined): string {
+  if (nota == null || !Number.isFinite(nota)) return SEM_VALOR;
+  return notaFmt.format(nota);
+}
+
+/** Nota → texto do campo ("72,5", sem separador de milhar). `null` → "". */
+export function notaParaEntrada(nota: number | null | undefined): string {
+  if (nota == null || !Number.isFinite(nota)) return "";
+  return notaEntradaFmt.format(nota);
+}
+
+/**
+ * Número decimal não negativo digitado ("72,5", "72.5", "80") → `number`. Até
+ * {@link MAX_CASAS_NOTA} casas decimais. Vazio ou inválido → `null`.
+ */
+export function parseDecimal(texto: string | null | undefined): number | null {
+  if (texto == null) return null;
+  const limpo = texto.trim();
+  const m = /^(\d+)(?:[.,](\d{1,3}))?$/.exec(limpo);
+  if (!m) return null;
+  const valor = Number(`${m[1]}.${m[2] ?? "0"}`);
+  return Number.isFinite(valor) ? valor : null;
+}

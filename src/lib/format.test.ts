@@ -5,8 +5,11 @@ import {
   formatarData,
   formatarDataHora,
   formatarDataInstante,
+  formatarNota,
   mascararBRL,
+  notaParaEntrada,
   parseBRL,
+  parseDecimal,
 } from "./format";
 
 /** Intl usa espaço não separável entre "R$" e o número. */
@@ -136,5 +139,31 @@ describe("mascararBRL", () => {
 
   it("resultado é aceito por parseBRL", () => {
     expect(parseBRL(mascararBRL("1400000"))).toBe(1400000);
+  });
+});
+
+describe("notas", () => {
+  it("formatarNota", () => {
+    expect(formatarNota(72.5)).toBe("72,5");
+    expect(formatarNota(1234.125)).toBe("1.234,125");
+    expect(formatarNota(80)).toBe("80");
+    expect(formatarNota(null)).toBe("—");
+    expect(formatarNota(Number.NaN)).toBe("—");
+  });
+
+  it("notaParaEntrada", () => {
+    expect(notaParaEntrada(1234.5)).toBe("1234,5");
+    expect(notaParaEntrada(0)).toBe("0");
+    expect(notaParaEntrada(undefined)).toBe("");
+  });
+
+  it("parseDecimal", () => {
+    expect(parseDecimal("72,5")).toBe(72.5);
+    expect(parseDecimal(" 72.125 ")).toBe(72.125);
+    expect(parseDecimal("80")).toBe(80);
+    expect(parseDecimal("0")).toBe(0);
+    for (const invalido of [null, undefined, "", "-1", "7,1234", "1.234,5", "abc", "1,"]) {
+      expect(parseDecimal(invalido)).toBeNull();
+    }
   });
 });

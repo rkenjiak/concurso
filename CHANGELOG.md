@@ -18,6 +18,11 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
   (alta ≤ 3 dias, média ≤ 7), ordenação por data/hora/criticidade, pseudo-evento de validade a partir
   do fim de validade informado, `proximaData` e texto relativo ("em 3 dias"); `hoje` sempre injetado
   e testes unitários exaustivos.
+- Dashboard (RF06) na página inicial: próximos prazos agrupados em vencidos, hoje e próximos 30 dias
+  (data de hoje em America/Sao_Paulo), com destaque visual de prazos críticos (urgente ≤ 3 dias, esta
+  semana ≤ 7), hora, local e link para o concurso; contagem de concursos por status em cards que
+  levam à lista filtrada; estados vazios orientando o cadastro de concursos e eventos.
+- Lista de concursos aceita filtro por status via `?status=` (com atalho para remover o filtro).
 
 ### Corrigido
 

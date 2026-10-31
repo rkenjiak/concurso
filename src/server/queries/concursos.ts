@@ -1,5 +1,6 @@
 /** Leituras de concurso (RF01). */
 import { desc, eq } from "drizzle-orm";
+import type { Status } from "@/domain/enums";
 import type { Db } from "../db/client";
 import { type Concurso, concurso } from "../db/schema";
 import { tagsPorConcurso } from "./tags";
@@ -20,8 +21,15 @@ export type ConcursoResumo = Pick<
 
 export type ConcursoDetalhe = Concurso & { tags: string[] };
 
-/** Lista simples, mais recentes primeiro. */
-export async function listarConcursos(db: Db): Promise<ConcursoResumo[]> {
+export interface FiltrosConcursos {
+  status?: Status | null;
+}
+
+/** Lista simples, mais recentes primeiro, opcionalmente filtrada por status. */
+export async function listarConcursos(
+  db: Db,
+  filtros: FiltrosConcursos = {},
+): Promise<ConcursoResumo[]> {
   const linhas = await db
     .select({
       id: concurso.id,
@@ -36,6 +44,7 @@ export async function listarConcursos(db: Db): Promise<ConcursoResumo[]> {
       createdAt: concurso.createdAt,
     })
     .from(concurso)
+    .where(filtros.status ? eq(concurso.status, filtros.status) : undefined)
     .orderBy(desc(concurso.createdAt), desc(concurso.id));
   const tags = await tagsPorConcurso(
     db,

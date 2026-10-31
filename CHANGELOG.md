@@ -7,6 +7,8 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-31
+
 ### Adicionado
 
 - Rótulos pt-BR de todos os enums do domínio e lista de UFs (`domain/labels.ts`).

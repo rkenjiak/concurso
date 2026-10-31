@@ -12,6 +12,10 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 - Rótulos pt-BR de todos os enums do domínio e lista de UFs (`domain/labels.ts`).
 - Regras de transição de status (`domain/status.ts`): trilha principal com saltos, resultados revisáveis,
   terminais, suspensão com retomada do status anterior e desfazer a última mudança, com testes.
+- Cadastro de concursos (RF01): formulário de criação/edição com validação Zod compartilhada entre
+  cliente e servidor, máscara de moeda BRL, lista em `/concursos`, detalhe em `/concursos/[id]` com
+  observações em markdown (sem HTML bruto) e exclusão com confirmação; `busca_normalizada` mantida
+  a cada gravação e status inicial registrado no histórico.
 
 ## [0.1.0] - 2026-10-31
 

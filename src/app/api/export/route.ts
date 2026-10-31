@@ -3,6 +3,7 @@
  * (padrão) ou o CSV dos concursos.
  */
 import { carimboSP } from "@/lib/tz";
+import { respostaNaoAutorizada } from "@/server/auth/acesso";
 import { getDb } from "@/server/db/client";
 import { exportarConcursosCsv, exportarDados } from "@/server/queries/exportacao";
 
@@ -17,6 +18,8 @@ function anexo(corpo: string, tipo: string, nome: string): Response {
 }
 
 export async function GET(request: Request): Promise<Response> {
+  const negado = await respostaNaoAutorizada();
+  if (negado) return negado;
   const formato = new URL(request.url).searchParams.get("formato") ?? "json";
   const agora = new Date();
   const db = getDb();

@@ -9,12 +9,15 @@ import { revalidatePath } from "next/cache";
 import { ErroDominio } from "@/domain/erros";
 import { CONFIRMACAO_IMPORTACAO, TAMANHO_MAX_BACKUP, validarBackup } from "@/lib/schemas/backup";
 import { falha, sucesso } from "@/server/actions/resultado";
+import { respostaNaoAutorizada } from "@/server/auth/acesso";
 import { getDb } from "@/server/db/client";
 import { substituirTudo } from "@/server/repositories/importacao";
 
 const erro = (mensagem: string, status = 400) => Response.json(falha(mensagem), { status });
 
 export async function POST(request: Request): Promise<Response> {
+  const negado = await respostaNaoAutorizada();
+  if (negado) return negado;
   let form: FormData;
   try {
     form = await request.formData();

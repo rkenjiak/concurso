@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { idSchema } from "@/lib/schemas/comum";
 import { concluidoSchema, eventoSchema } from "@/lib/schemas/evento";
+import { verificarAcesso } from "../auth/acesso";
 import { getDb } from "../db/client";
 import * as repo from "../repositories/eventos";
 import { executar, falha, falhaValidacao, type ResultadoAcao, sucesso } from "./resultado";
@@ -20,6 +21,8 @@ export async function salvarEvento(
   eventoIdBruto: unknown,
   entrada: unknown,
 ): Promise<ResultadoAcao<{ id: number }>> {
+  const negado = await verificarAcesso();
+  if (negado) return negado;
   const concursoId = idSchema.safeParse(concursoIdBruto);
   if (!concursoId.success) return falha("Concurso não encontrado.");
   const eventoId = eventoIdBruto == null ? null : idSchema.safeParse(eventoIdBruto);
@@ -44,6 +47,8 @@ export async function excluirEvento(
   concursoIdBruto: unknown,
   eventoIdBruto: unknown,
 ): Promise<ResultadoAcao> {
+  const negado = await verificarAcesso();
+  if (negado) return negado;
   const concursoId = idSchema.safeParse(concursoIdBruto);
   const eventoId = idSchema.safeParse(eventoIdBruto);
   if (!concursoId.success || !eventoId.success) return falha(INVALIDO);
@@ -60,6 +65,8 @@ export async function alternarConcluido(
   eventoIdBruto: unknown,
   concluidoBruto: unknown,
 ): Promise<ResultadoAcao> {
+  const negado = await verificarAcesso();
+  if (negado) return negado;
   const concursoId = idSchema.safeParse(concursoIdBruto);
   const eventoId = idSchema.safeParse(eventoIdBruto);
   if (!concursoId.success || !eventoId.success) return falha(INVALIDO);

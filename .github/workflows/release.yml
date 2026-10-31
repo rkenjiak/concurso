@@ -1,0 +1,40 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*.*.*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Criar GitHub Release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Extrair notas do CHANGELOG
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          VERSAO="${TAG#v}"
+          # Captura a seção "## [X.Y.Z]" até a próxima seção "## [".
+          awk -v v="$VERSAO" '
+            index($0, "## [" v "]") == 1 { dentro = 1; next }
+            dentro && /^## \[/ { exit }
+            dentro { print }
+          ' CHANGELOG.md > notas.md
+          if [ ! -s notas.md ]; then
+            echo "Seção [$VERSAO] não encontrada no CHANGELOG.md." > notas.md
+          fi
+          cat notas.md
+
+      - name: Publicar release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          PRERELEASE=""
+          case "$TAG" in v0.*) PRERELEASE="--prerelease" ;; esac
+          gh release create "$TAG" --title "$TAG" --notes-file notas.md --verify-tag $PRERELEASE

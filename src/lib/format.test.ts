@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  centavosParaEntrada,
   formatarBRL,
   formatarData,
   formatarDataHora,
   formatarDataInstante,
+  mascararBRL,
   parseBRL,
 } from "./format";
 
@@ -97,5 +99,42 @@ describe("formatarDataInstante / formatarDataHora", () => {
   it("valor ausente vira traço", () => {
     expect(formatarDataInstante(null)).toBe("—");
     expect(formatarDataHora(undefined)).toBe("—");
+  });
+});
+
+describe("centavosParaEntrada", () => {
+  it("formata sem símbolo de moeda", () => {
+    expect(centavosParaEntrada(123456)).toBe("1.234,56");
+    expect(centavosParaEntrada(5)).toBe("0,05");
+    expect(centavosParaEntrada(0)).toBe("0,00");
+  });
+
+  it("vazio para nulo", () => {
+    expect(centavosParaEntrada(null)).toBe("");
+    expect(centavosParaEntrada(undefined)).toBe("");
+    expect(centavosParaEntrada(Number.NaN)).toBe("");
+  });
+});
+
+describe("mascararBRL", () => {
+  it("preenche da direita para a esquerda", () => {
+    expect(mascararBRL("1")).toBe("0,01");
+    expect(mascararBRL("123456")).toBe("1.234,56");
+    expect(mascararBRL("1.234,567")).toBe("12.345,67");
+  });
+
+  it("ignora não dígitos e zeros à esquerda", () => {
+    expect(mascararBRL("R$ 0,05")).toBe("0,05");
+    expect(mascararBRL("abc")).toBe("");
+    expect(mascararBRL("")).toBe("");
+    expect(mascararBRL("0,00")).toBe("0,00");
+  });
+
+  it("limita a quantidade de dígitos", () => {
+    expect(mascararBRL("9".repeat(20))).toBe("9.999.999.999.999,99");
+  });
+
+  it("resultado é aceito por parseBRL", () => {
+    expect(parseBRL(mascararBRL("1400000"))).toBe(1400000);
   });
 });

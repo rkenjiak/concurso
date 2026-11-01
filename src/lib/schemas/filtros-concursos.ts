@@ -182,3 +182,24 @@ export function contarFiltrosAvancados(filtros: FiltrosConcursos): number {
 export function temFiltros(filtros: FiltrosConcursos): boolean {
   return filtros.busca !== null || contarFiltrosAvancados(filtros) > 0;
 }
+
+/** Visões da página `/concursos`: lista (padrão) ou quadro por status (kanban). */
+export const VISOES = ["lista", "quadro"] as const;
+export type Visao = (typeof VISOES)[number];
+
+/** Parâmetro da URL que escolhe a visão (`?visao=quadro`); a lista é o padrão e fica omitida. */
+export const PARAM_VISAO = "visao";
+
+const visaoSchema = z.preprocess(primeiro, z.enum(VISOES)).catch("lista");
+
+/** Visão escolhida nos `searchParams`; ausente ou inválida = lista. */
+export function lerVisao(parametros: ParametrosBusca): Visao {
+  return visaoSchema.parse(parametros[PARAM_VISAO]);
+}
+
+/** URL canônica de `/concursos` com os filtros e a visão (lista omitida). */
+export function hrefConcursos(filtros: FiltrosConcursos, visao: Visao = "lista"): string {
+  const busca = filtrosParaBusca(filtros);
+  if (visao === "lista") return `/concursos${busca}`;
+  return `/concursos${busca ? `${busca}&` : "?"}${PARAM_VISAO}=${visao}`;
+}

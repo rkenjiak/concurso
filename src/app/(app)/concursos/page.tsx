@@ -2,9 +2,11 @@ import { CalendarDays, Plus } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { connection } from "next/server";
+import { AlternarVisao } from "@/components/concurso/alternar-visao";
 import { BadgeStatus } from "@/components/concurso/badge-status";
 import { FiltrosConcursosForm } from "@/components/concurso/filtros-concursos";
 import { ListaTags } from "@/components/concurso/lista-tags";
+import { QuadroConcursos } from "@/components/concurso/quadro-concursos";
 import { CabecalhoPagina } from "@/components/layout/cabecalho-pagina";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -13,22 +15,28 @@ import { formatarBRL, formatarData } from "@/lib/format";
 import {
   FILTROS_VAZIOS,
   filtrosParaBusca,
+  hrefConcursos,
   lerFiltrosConcursos,
+  lerVisao,
   temFiltros,
 } from "@/lib/schemas/filtros-concursos";
 import { hojeSP } from "@/lib/tz";
 import { getDb } from "@/server/db/client";
 import { listarConcursos } from "@/server/queries/concursos";
+import { opcoesStatusPorConcurso } from "@/server/queries/historico";
 
 export const metadata: Metadata = { title: "Concursos" };
 
 export default async function ConcursosPage({ searchParams }: PageProps<"/concursos">) {
   await connection();
-  const filtros = lerFiltrosConcursos(await searchParams);
+  const parametros = await searchParams;
+  const filtros = lerFiltrosConcursos(parametros);
+  const visao = lerVisao(parametros);
   const busca = filtrosParaBusca(filtros);
   const filtrando = temFiltros(filtros);
   const concursos = await listarConcursos(getDb(), filtros, hojeSP());
-  const limpar = `/concursos${filtrosParaBusca({ ...FILTROS_VAZIOS, ordem: filtros.ordem })}`;
+  const limpar = hrefConcursos({ ...FILTROS_VAZIOS, ordem: filtros.ordem }, visao);
+  const opcoes = visao === "quadro" ? await opcoesStatusPorConcurso(getDb(), concursos) : null;
 
   return (
     <div className="space-y-6">
@@ -44,7 +52,8 @@ export default async function ConcursosPage({ searchParams }: PageProps<"/concur
           </Button>
         }
       />
-      <FiltrosConcursosForm key={busca} filtros={filtros} />
+      <AlternarVisao filtros={filtros} visao={visao} />
+      <FiltrosConcursosForm key={busca} filtros={filtros} visao={visao} />
       {filtrando ? (
         <p className="text-muted-foreground text-sm" aria-live="polite">
           {concursos.length === 1
@@ -72,6 +81,20 @@ export default async function ConcursosPage({ searchParams }: PageProps<"/concur
             .
           </CardContent>
         </Card>
+      ) : opcoes ? (
+        <QuadroConcursos
+          key={busca}
+          cartoes={concursos.map((c) => ({
+            id: c.id,
+            orgao: c.orgao,
+            cargo: c.cargo,
+            banca: c.banca,
+            status: c.status,
+            proximaData: c.proximaData,
+            tags: c.tags,
+            transicoes: opcoes.get(c.id)?.transicoes ?? [],
+          }))}
+        />
       ) : (
         <ul className="grid gap-3">
           {concursos.map((c) => {

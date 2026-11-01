@@ -1,5 +1,5 @@
 /** Leituras do histórico de status (RF03). */
-import { asc, eq } from "drizzle-orm";
+import { asc, eq, inArray } from "drizzle-orm";
 import type { Status } from "@/domain/enums";
 import { contextoDoHistorico, podeDesfazer, transicoesPermitidas } from "@/domain/status";
 import type { Db } from "../db/client";
@@ -41,4 +41,36 @@ export async function obterOpcoesStatus(
 ): Promise<{ historico: StatusHistorico[]; opcoes: OpcoesStatus }> {
   const historico = await listarHistorico(db, concursoId);
   return { historico, opcoes: opcoesStatus(atual, historico) };
+}
+
+/**
+ * Opções de status de vários concursos de uma vez (quadro): lê os históricos numa só consulta e
+ * aplica {@link opcoesStatus} a cada concurso.
+ */
+export async function opcoesStatusPorConcurso(
+  db: Db,
+  concursos: readonly { id: number; status: Status }[],
+): Promise<Map<number, OpcoesStatus>> {
+  const resultado = new Map<number, OpcoesStatus>();
+  if (concursos.length === 0) return resultado;
+  const linhas = await db
+    .select()
+    .from(statusHistorico)
+    .where(
+      inArray(
+        statusHistorico.concursoId,
+        concursos.map((c) => c.id),
+      ),
+    )
+    .orderBy(asc(statusHistorico.alteradoEm), asc(statusHistorico.id));
+  const porConcurso = new Map<number, StatusHistorico[]>();
+  for (const l of linhas) {
+    const lista = porConcurso.get(l.concursoId) ?? [];
+    lista.push(l);
+    porConcurso.set(l.concursoId, lista);
+  }
+  for (const c of concursos) {
+    resultado.set(c.id, opcoesStatus(c.status, porConcurso.get(c.id) ?? []));
+  }
+  return resultado;
 }

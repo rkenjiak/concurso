@@ -65,6 +65,10 @@ export const concurso = sqliteTable(
       .notNull()
       .default(false),
     validadeFimManual: text("validade_fim_manual"),
+    /** Oculta do dashboard o pseudo-evento de fim da validade (preferência de exibição, #44). */
+    validadeOcultaDashboard: integer("validade_oculta_dashboard", { mode: "boolean" })
+      .notNull()
+      .default(false),
     buscaNormalizada: text("busca_normalizada").notNull().default(""),
     createdAt: criadoEm(),
     updatedAt: atualizadoEm(),
@@ -105,6 +109,8 @@ export const evento = sqliteTable(
     observacao: text("observacao"),
     concluido: integer("concluido", { mode: "boolean" }).notNull().default(false),
     concluidoEm: integer("concluido_em", { mode: "timestamp_ms" }),
+    /** Oculta o evento da lista de próximos prazos do dashboard (preferência de exibição, #44). */
+    ocultoDashboard: integer("oculto_dashboard", { mode: "boolean" }).notNull().default(false),
     createdAt: criadoEm(),
     updatedAt: atualizadoEm(),
   },

@@ -1,4 +1,4 @@
-import { CalendarCheck, Plus } from "lucide-react";
+import { CalendarCheck, Eye, EyeOff, Plus } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { connection } from "next/server";
@@ -6,8 +6,15 @@ import { BadgeStatus } from "@/components/concurso/badge-status";
 import { ListaPrazos } from "@/components/dashboard/lista-prazos";
 import { CabecalhoPagina } from "@/components/layout/cabecalho-pagina";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { JANELA_PADRAO_DIAS } from "@/domain/prazos";
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { JANELA_PADRAO_DIAS, semOcultos, totalPrazos } from "@/domain/prazos";
 import { ehAtivo } from "@/domain/status";
 import { formatarData } from "@/lib/format";
 import { hojeSP } from "@/lib/tz";
@@ -42,10 +49,17 @@ function Grupo({
   );
 }
 
-export default async function DashboardPage() {
+/** `?ocultos=1` exibe também os prazos ocultos pelo usuário (#44). */
+const PARAM_OCULTOS = "ocultos";
+
+export default async function DashboardPage({ searchParams }: PageProps<"/">) {
   await connection();
   const hoje = hojeSP();
-  const { prazos, totalPrazos, porStatus, totalConcursos } = await obterDashboard(getDb(), hoje);
+  const mostrarOcultos = (await searchParams)[PARAM_OCULTOS] === "1";
+  const dashboard = await obterDashboard(getDb(), hoje);
+  const { porStatus, totalConcursos, ocultos } = dashboard;
+  const prazos = mostrarOcultos ? dashboard.prazos : semOcultos(dashboard.prazos);
+  const totalExibidos = totalPrazos(prazos);
   const ativos = porStatus.filter((s) => ehAtivo(s.status)).reduce((n, s) => n + s.quantidade, 0);
 
   const novo = (
@@ -94,15 +108,44 @@ export default async function DashboardPage() {
               Eventos pendentes de concursos em andamento: vencidos, hoje e próximos{" "}
               {JANELA_PADRAO_DIAS} dias.
             </CardDescription>
+            {ocultos > 0 ? (
+              <CardAction className="flex flex-col items-end gap-1">
+                <span className="text-muted-foreground text-xs" data-testid="contador-ocultos">
+                  {ocultos} {ocultos === 1 ? "oculto" : "ocultos"}
+                </span>
+                <Button asChild variant="outline" size="sm">
+                  <Link
+                    href={mostrarOcultos ? "/" : `/?${PARAM_OCULTOS}=1`}
+                    aria-pressed={mostrarOcultos}
+                  >
+                    {mostrarOcultos ? <EyeOff aria-hidden /> : <Eye aria-hidden />}
+                    {mostrarOcultos ? "Esconder ocultos" : "Mostrar ocultos"}
+                  </Link>
+                </Button>
+              </CardAction>
+            ) : null}
           </CardHeader>
           <CardContent className="space-y-6">
-            {totalPrazos === 0 ? (
+            {totalExibidos === 0 ? (
               <div className="space-y-2 py-6 text-center">
                 <CalendarCheck className="mx-auto size-8 text-muted-foreground" aria-hidden />
-                <p className="font-medium">Nenhum prazo nos próximos {JANELA_PADRAO_DIAS} dias</p>
-                <p className="text-muted-foreground text-sm">
-                  Adicione eventos na aba “Eventos” de cada concurso para acompanhá-los aqui.
-                </p>
+                {ocultos > 0 ? (
+                  <>
+                    <p className="font-medium">Todos os prazos estão ocultos</p>
+                    <p className="text-muted-foreground text-sm">
+                      Use “Mostrar ocultos” para vê-los e reexibir os que voltarem a interessar.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="font-medium">
+                      Nenhum prazo nos próximos {JANELA_PADRAO_DIAS} dias
+                    </p>
+                    <p className="text-muted-foreground text-sm">
+                      Adicione eventos na aba “Eventos” de cada concurso para acompanhá-los aqui.
+                    </p>
+                  </>
+                )}
               </div>
             ) : (
               <>

@@ -5,6 +5,11 @@
  *
  * Instantes (UTC) circulam como strings ISO 8601; datas de calendário como `YYYY-MM-DD`.
  * `busca_normalizada` não é exportada: é derivada e recalculada na importação.
+ *
+ * Campos adicionados depois da versão 1 sem quebrar o formato (opcionais, com default na
+ * importação, para aceitar backups antigos): `concursos[].validadeOcultaDashboard` e
+ * `eventos[].ocultoDashboard` (prazos ocultos do dashboard, #44). Versões antigas do app ignoram
+ * esses campos ao importar um backup novo.
  */
 import { z } from "zod";
 import {
@@ -65,6 +70,7 @@ const concursoBackup = z.object({
   validadeMeses: z.int().min(VALIDADE_MESES_MIN).max(VALIDADE_MESES_MAX).nullable(),
   validadeProrrogada: z.boolean(),
   validadeFimManual: data.nullable(),
+  validadeOcultaDashboard: z.boolean().default(false),
   createdAt: instante,
   updatedAt: instante,
 });
@@ -100,6 +106,7 @@ const eventoBackup = z.object({
   observacao: texto().nullable(),
   concluido: z.boolean(),
   concluidoEm: instante.nullable(),
+  ocultoDashboard: z.boolean().default(false),
   createdAt: instante,
   updatedAt: instante,
 });

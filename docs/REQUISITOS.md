@@ -80,6 +80,8 @@ Status sugeridos, em ordem:
 - Lista de próximos eventos (ex.: próximos 30 dias), destacando prazos críticos
   (fim de inscrição, vencimento de boleto, provas, prazos de recurso).
 - Contagem de concursos por status.
+- Ocultar/reexibir eventos individualmente da lista de próximos prazos, com contador de ocultos e
+  opção "mostrar ocultos"; a escolha persiste entre sessões (#44).
 - Visão em lista e, desejável, visão em quadro (kanban por status) e calendário.
 
 ### RF07 — Busca e filtros

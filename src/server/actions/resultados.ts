@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { idSchema } from "@/lib/schemas/comum";
 import { resultadoFaseSchema } from "@/lib/schemas/resultado-fase";
-import { verificarAcesso } from "../auth/acesso";
+import { exigirUsuarioAcao } from "../auth/acesso";
 import { getDb } from "../db/client";
 import * as repo from "../repositories/resultados";
 import { executar, falha, falhaValidacao, type ResultadoAcao, sucesso } from "./resultado";
@@ -16,8 +16,9 @@ export async function salvarResultadoFase(
   resultadoIdBruto: unknown,
   entrada: unknown,
 ): Promise<ResultadoAcao<{ id: number }>> {
-  const negado = await verificarAcesso();
-  if (negado) return negado;
+  const sessao = await exigirUsuarioAcao();
+  if (!sessao.ok) return sessao;
+  const usuarioId = sessao.usuario.id;
   const concursoId = idSchema.safeParse(concursoIdBruto);
   if (!concursoId.success) return falha("Concurso não encontrado.");
   const resultadoId = resultadoIdBruto == null ? null : idSchema.safeParse(resultadoIdBruto);
@@ -29,9 +30,9 @@ export async function salvarResultadoFase(
     let id: number;
     if (resultadoId?.success) {
       id = resultadoId.data;
-      await repo.atualizarResultadoFase(db, concursoId.data, id, dados.data);
+      await repo.atualizarResultadoFase(db, usuarioId, concursoId.data, id, dados.data);
     } else {
-      id = await repo.criarResultadoFase(db, concursoId.data, dados.data);
+      id = await repo.criarResultadoFase(db, usuarioId, concursoId.data, dados.data);
     }
     revalidatePath(`/concursos/${concursoId.data}`);
     return sucesso({ id });
@@ -42,13 +43,14 @@ export async function excluirResultadoFase(
   concursoIdBruto: unknown,
   resultadoIdBruto: unknown,
 ): Promise<ResultadoAcao> {
-  const negado = await verificarAcesso();
-  if (negado) return negado;
+  const sessao = await exigirUsuarioAcao();
+  if (!sessao.ok) return sessao;
+  const usuarioId = sessao.usuario.id;
   const concursoId = idSchema.safeParse(concursoIdBruto);
   const resultadoId = idSchema.safeParse(resultadoIdBruto);
   if (!concursoId.success || !resultadoId.success) return falha(INVALIDO);
   return executar(async () => {
-    await repo.excluirResultadoFase(getDb(), concursoId.data, resultadoId.data);
+    await repo.excluirResultadoFase(getDb(), usuarioId, concursoId.data, resultadoId.data);
     revalidatePath(`/concursos/${concursoId.data}`);
     return sucesso(null);
   });

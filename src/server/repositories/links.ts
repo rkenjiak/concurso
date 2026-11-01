@@ -1,4 +1,7 @@
-/** Escritas de links (RF02). Toda operação é restrita ao concurso informado. */
+/**
+ * Escritas de links (RF02). Toda operação é restrita ao concurso informado, que precisa ser do
+ * usuário (#49).
+ */
 import { and, eq, max } from "drizzle-orm";
 import { ErroDominio } from "@/domain/erros";
 import type { LinkDados } from "@/lib/schemas/link";
@@ -49,20 +52,29 @@ async function atualizarLinkTx(
 }
 
 /** Cria o link no fim da lista. Retorna o ID. */
-export async function criarLink(db: Db, concursoId: number, dados: LinkDados): Promise<number> {
+export async function criarLink(
+  db: Db,
+  usuarioId: number,
+  concursoId: number,
+  dados: LinkDados,
+): Promise<number> {
   return db.transaction(async (tx) => {
-    await exigirConcurso(tx, concursoId);
+    await exigirConcurso(tx, usuarioId, concursoId);
     return inserirLink(tx, concursoId, dados);
   });
 }
 
 export async function atualizarLink(
   db: Db,
+  usuarioId: number,
   concursoId: number,
   linkId: number,
   dados: LinkDados,
 ): Promise<void> {
-  await atualizarLinkTx(db, concursoId, linkId, dados);
+  await db.transaction(async (tx) => {
+    await exigirConcurso(tx, usuarioId, concursoId);
+    await atualizarLinkTx(tx, concursoId, linkId, dados);
+  });
 }
 
 /**
@@ -71,11 +83,12 @@ export async function atualizarLink(
  */
 export async function salvarLinks(
   db: Db,
+  usuarioId: number,
   concursoId: number,
   itens: readonly ItemLink[],
 ): Promise<number[]> {
   return db.transaction(async (tx) => {
-    await exigirConcurso(tx, concursoId);
+    await exigirConcurso(tx, usuarioId, concursoId);
     const ids: number[] = [];
     for (const { id, dados } of itens) {
       if (id === null) {
@@ -89,21 +102,31 @@ export async function salvarLinks(
   });
 }
 
-export async function excluirLink(db: Db, concursoId: number, linkId: number): Promise<void> {
-  const linhas = await db
-    .delete(link)
-    .where(and(eq(link.id, linkId), eq(link.concursoId, concursoId)))
-    .returning({ id: link.id });
-  if (linhas.length === 0) throw new ErroDominio(NAO_ENCONTRADO);
+export async function excluirLink(
+  db: Db,
+  usuarioId: number,
+  concursoId: number,
+  linkId: number,
+): Promise<void> {
+  await db.transaction(async (tx) => {
+    await exigirConcurso(tx, usuarioId, concursoId);
+    const linhas = await tx
+      .delete(link)
+      .where(and(eq(link.id, linkId), eq(link.concursoId, concursoId)))
+      .returning({ id: link.id });
+    if (linhas.length === 0) throw new ErroDominio(NAO_ENCONTRADO);
+  });
 }
 
 /** Define a nova ordem: `ids` deve conter exatamente os links do concurso. */
 export async function reordenarLinks(
   db: Db,
+  usuarioId: number,
   concursoId: number,
   ids: readonly number[],
 ): Promise<void> {
   await db.transaction(async (tx) => {
+    await exigirConcurso(tx, usuarioId, concursoId);
     const atuais = (await listarLinks(tx, concursoId)).map((l) => l.id);
     const mesmoConjunto =
       atuais.length === ids.length && new Set([...atuais, ...ids]).size === atuais.length;

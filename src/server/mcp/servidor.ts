@@ -1,7 +1,8 @@
 /**
  * Servidor MCP do app (issue #39): permite que uma LLM com acesso ao edital cadastre e atualize
  * concursos. Mesma definição para os dois transportes — stdio (`pnpm mcp`, uso local) e HTTP
- * (`/api/mcp`, hospedado, com `MCP_TOKEN`).
+ * (`/api/mcp`, hospedado, com o token pessoal do usuário). Cada instância é presa a um usuário
+ * (#49) e só enxerga os dados dele.
  *
  * Ferramentas sem exclusão: os dados só são criados ou alterados.
  */
@@ -26,6 +27,8 @@ import { guiaCadastro, guiaRetificacao, INSTRUCOES, referencia } from "./textos"
 
 export interface OpcoesServidorMcp {
   db: Db;
+  /** Dono dos dados acessados (#49): o usuário do token (HTTP) ou o usuário inicial (stdio). */
+  usuarioId: number;
   /** Chamado após cada escrita bem-sucedida (ex.: `revalidatePath` no Next). */
   aoAlterar?: () => void;
 }
@@ -54,7 +57,7 @@ const idConcurso = z.number().int().positive().describe("ID do concurso.");
 const LEITURA = { readOnlyHint: true, destructiveHint: false, openWorldHint: false } as const;
 const ESCRITA = { readOnlyHint: false, destructiveHint: false, openWorldHint: false } as const;
 
-export function criarServidorMcp({ db, aoAlterar }: OpcoesServidorMcp): McpServer {
+export function criarServidorMcp({ db, usuarioId, aoAlterar }: OpcoesServidorMcp): McpServer {
   const servidor = new McpServer(
     { name: "concurso", title: "Concursos", version },
     { instructions: INSTRUCOES },
@@ -84,7 +87,7 @@ export function criarServidorMcp({ db, aoAlterar }: OpcoesServidorMcp): McpServe
       }),
       annotations: LEITURA,
     },
-    async (filtros) => json(await op.listar(db, filtros)),
+    async (filtros) => json(await op.listar(db, usuarioId, filtros)),
   );
 
   servidor.registerTool(
@@ -98,7 +101,7 @@ export function criarServidorMcp({ db, aoAlterar }: OpcoesServidorMcp): McpServe
       annotations: LEITURA,
     },
     async ({ id }) => {
-      const ficha = await op.obterFicha(db, id);
+      const ficha = await op.obterFicha(db, usuarioId, id);
       return ficha ? json(ficha) : erro("Concurso não encontrado.");
     },
   );
@@ -121,7 +124,8 @@ export function criarServidorMcp({ db, aoAlterar }: OpcoesServidorMcp): McpServe
       }),
       annotations: LEITURA,
     },
-    async ({ janelaDias }) => json(await op.proximosPrazos(db, janelaDias ?? JANELA_PADRAO_DIAS)),
+    async ({ janelaDias }) =>
+      json(await op.proximosPrazos(db, usuarioId, janelaDias ?? JANELA_PADRAO_DIAS)),
   );
 
   servidor.registerTool(
@@ -136,7 +140,7 @@ export function criarServidorMcp({ db, aoAlterar }: OpcoesServidorMcp): McpServe
       }),
       annotations: LEITURA,
     },
-    async (alvo) => json(await op.verificarDuplicados(db, alvo)),
+    async (alvo) => json(await op.verificarDuplicados(db, usuarioId, alvo)),
   );
 
   // --- Escritas ---------------------------------------------------------------------------
@@ -163,7 +167,7 @@ export function criarServidorMcp({ db, aoAlterar }: OpcoesServidorMcp): McpServe
       annotations: { ...ESCRITA, idempotentHint: false },
     },
     async (entrada) => {
-      const r = await op.cadastrar(db, entrada);
+      const r = await op.cadastrar(db, usuarioId, entrada);
       return escrita(r, r.ok && !r.data.simulacao);
     },
   );
@@ -178,7 +182,7 @@ export function criarServidorMcp({ db, aoAlterar }: OpcoesServidorMcp): McpServe
       inputSchema: z.object({ id: idConcurso, campos: concursoParcialEntrada }),
       annotations: { ...ESCRITA, idempotentHint: true },
     },
-    async ({ id, campos }) => escrita(await op.atualizar(db, id, campos)),
+    async ({ id, campos }) => escrita(await op.atualizar(db, usuarioId, id, campos)),
   );
 
   servidor.registerTool(
@@ -196,7 +200,7 @@ export function criarServidorMcp({ db, aoAlterar }: OpcoesServidorMcp): McpServe
       }),
       annotations: { ...ESCRITA, idempotentHint: false },
     },
-    async ({ id, ...entrada }) => escrita(await op.alterarStatus(db, id, entrada)),
+    async ({ id, ...entrada }) => escrita(await op.alterarStatus(db, usuarioId, id, entrada)),
   );
 
   servidor.registerTool(
@@ -213,7 +217,8 @@ export function criarServidorMcp({ db, aoAlterar }: OpcoesServidorMcp): McpServe
       }),
       annotations: { ...ESCRITA, idempotentHint: false },
     },
-    async ({ concursoId, eventos }) => escrita(await op.salvarEventos(db, concursoId, eventos)),
+    async ({ concursoId, eventos }) =>
+      escrita(await op.salvarEventos(db, usuarioId, concursoId, eventos)),
   );
 
   servidor.registerTool(
@@ -229,7 +234,8 @@ export function criarServidorMcp({ db, aoAlterar }: OpcoesServidorMcp): McpServe
       }),
       annotations: { ...ESCRITA, idempotentHint: false },
     },
-    async ({ concursoId, links }) => escrita(await op.salvarLinks(db, concursoId, links)),
+    async ({ concursoId, links }) =>
+      escrita(await op.salvarLinks(db, usuarioId, concursoId, links)),
   );
 
   servidor.registerTool(
@@ -243,7 +249,7 @@ export function criarServidorMcp({ db, aoAlterar }: OpcoesServidorMcp): McpServe
       annotations: { ...ESCRITA, idempotentHint: false },
     },
     async ({ concursoId, ...entrada }) =>
-      escrita(await op.registrarResultado(db, concursoId, entrada)),
+      escrita(await op.registrarResultado(db, usuarioId, concursoId, entrada)),
   );
 
   // --- Recursos ---------------------------------------------------------------------------
@@ -265,7 +271,7 @@ export function criarServidorMcp({ db, aoAlterar }: OpcoesServidorMcp): McpServe
     "concurso",
     new ResourceTemplate("concurso://concursos/{id}", {
       list: async () => ({
-        resources: (await op.listar(db)).map((c) => ({
+        resources: (await op.listar(db, usuarioId)).map((c) => ({
           uri: `concurso://concursos/${c.id}`,
           name: `${c.orgao} — ${c.cargo}`,
           mimeType: "application/json",
@@ -274,7 +280,7 @@ export function criarServidorMcp({ db, aoAlterar }: OpcoesServidorMcp): McpServe
     }),
     { title: "Concurso", description: "Ficha completa do concurso.", mimeType: "application/json" },
     async (uri, { id }) => {
-      const ficha = await op.obterFicha(db, Number(id));
+      const ficha = await op.obterFicha(db, usuarioId, Number(id));
       if (!ficha) throw new Error("Concurso não encontrado.");
       return {
         contents: [

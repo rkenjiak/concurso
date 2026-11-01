@@ -5,6 +5,7 @@ import {
   concursoSchema,
   VALORES_INICIAIS_CONCURSO,
 } from "@/lib/schemas/concurso";
+import { ID_USUARIO_INICIAL as U } from "@/server/db/schema";
 import { criarBancoTeste } from "../db/banco-teste";
 import type { Db } from "../db/client";
 import { tag } from "../db/schema";
@@ -28,14 +29,14 @@ function dados(tags: string[], orgao = "TRF"): ConcursoDados {
 
 describe("tags", () => {
   it("cria tags normalizadas e associa ao concurso", async () => {
-    const id = await criarConcurso(db, dados(["  Prioridade ", "TRIBUNAIS", "prioridade"]));
-    expect((await obterConcurso(db, id))?.tags).toEqual(["prioridade", "tribunais"]);
-    expect(await listarTags(db)).toEqual(["prioridade", "tribunais"]);
+    const id = await criarConcurso(db, U, dados(["  Prioridade ", "TRIBUNAIS", "prioridade"]));
+    expect((await obterConcurso(db, U, id))?.tags).toEqual(["prioridade", "tribunais"]);
+    expect(await listarTags(db, U)).toEqual(["prioridade", "tribunais"]);
   });
 
   it("reaproveita tags existentes entre concursos", async () => {
-    const a = await criarConcurso(db, dados(["tribunais"], "A"));
-    const b = await criarConcurso(db, dados(["Tribunais", "federal"], "B"));
+    const a = await criarConcurso(db, U, dados(["tribunais"], "A"));
+    const b = await criarConcurso(db, U, dados(["Tribunais", "federal"], "B"));
     expect(await db.select().from(tag)).toHaveLength(2);
     const mapa = await tagsPorConcurso(db, [a, b]);
     expect(mapa.get(a)).toEqual(["tribunais"]);
@@ -43,36 +44,36 @@ describe("tags", () => {
   });
 
   it("inclui as tags em busca_normalizada", async () => {
-    const id = await criarConcurso(db, dados(["Área Fiscal"]));
-    expect((await obterConcurso(db, id))?.buscaNormalizada).toBe("trf analista area fiscal");
+    const id = await criarConcurso(db, U, dados(["Área Fiscal"]));
+    expect((await obterConcurso(db, U, id))?.buscaNormalizada).toBe("trf analista area fiscal");
   });
 
   it("ao editar, remove tags desassociadas e limpa órfãs", async () => {
-    const a = await criarConcurso(db, dados(["tribunais", "prioridade"], "A"));
-    await criarConcurso(db, dados(["tribunais"], "B"));
-    await atualizarConcurso(db, a, dados(["federal"], "A"));
-    expect((await obterConcurso(db, a))?.tags).toEqual(["federal"]);
-    expect(await listarTags(db)).toEqual(["federal", "tribunais"]);
-    expect((await obterConcurso(db, a))?.buscaNormalizada).toBe("a analista federal");
+    const a = await criarConcurso(db, U, dados(["tribunais", "prioridade"], "A"));
+    await criarConcurso(db, U, dados(["tribunais"], "B"));
+    await atualizarConcurso(db, U, a, dados(["federal"], "A"));
+    expect((await obterConcurso(db, U, a))?.tags).toEqual(["federal"]);
+    expect(await listarTags(db, U)).toEqual(["federal", "tribunais"]);
+    expect((await obterConcurso(db, U, a))?.buscaNormalizada).toBe("a analista federal");
   });
 
   it("ao excluir o concurso, remove tags que ficaram órfãs", async () => {
-    const a = await criarConcurso(db, dados(["exclusiva", "comum"], "A"));
-    await criarConcurso(db, dados(["comum"], "B"));
-    await excluirConcurso(db, a);
-    expect(await listarTags(db)).toEqual(["comum"]);
+    const a = await criarConcurso(db, U, dados(["exclusiva", "comum"], "A"));
+    await criarConcurso(db, U, dados(["comum"], "B"));
+    await excluirConcurso(db, U, a);
+    expect(await listarTags(db, U)).toEqual(["comum"]);
   });
 
   it("sincronizarTags com lista vazia remove todas", async () => {
-    const id = await criarConcurso(db, dados(["x"]));
+    const id = await criarConcurso(db, U, dados(["x"]));
     expect(await sincronizarTags(db, id, ["", "  "])).toEqual([]);
-    expect(await listarTags(db)).toEqual([]);
+    expect(await listarTags(db, U)).toEqual([]);
   });
 
   it("listarConcursos traz as tags de cada concurso", async () => {
-    await criarConcurso(db, dados(["b", "a"], "Com tags"));
-    await criarConcurso(db, dados([], "Sem tags"));
-    const lista = await listarConcursos(db);
+    await criarConcurso(db, U, dados(["b", "a"], "Com tags"));
+    await criarConcurso(db, U, dados([], "Sem tags"));
+    const lista = await listarConcursos(db, U);
     expect(lista.map((c) => [c.orgao, c.tags])).toEqual([
       ["Sem tags", []],
       ["Com tags", ["a", "b"]],

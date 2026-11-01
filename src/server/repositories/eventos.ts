@@ -1,4 +1,7 @@
-/** Escritas de eventos (RF04). Toda operação é restrita ao concurso informado. */
+/**
+ * Escritas de eventos (RF04). Toda operação é restrita ao concurso informado, que precisa ser do
+ * usuário (#49).
+ */
 import { and, eq } from "drizzle-orm";
 import { ErroDominio } from "@/domain/erros";
 import type { EventoDados } from "@/lib/schemas/evento";
@@ -17,12 +20,16 @@ export interface ItemEvento {
   dados: EventoDados;
 }
 
-/** Lança {@link ErroDominio} se o concurso não existe. */
-export async function exigirConcurso(tx: Executor, concursoId: number): Promise<void> {
+/** Lança {@link ErroDominio} se o concurso não existe ou é de outro usuário. */
+export async function exigirConcurso(
+  tx: Executor,
+  usuarioId: number,
+  concursoId: number,
+): Promise<void> {
   const [existe] = await tx
     .select({ id: concurso.id })
     .from(concurso)
-    .where(eq(concurso.id, concursoId));
+    .where(and(eq(concurso.id, concursoId), eq(concurso.usuarioId, usuarioId)));
   if (!existe) throw new ErroDominio("Concurso não encontrado.");
 }
 
@@ -65,12 +72,13 @@ async function atualizarEventoTx(
 /** Cria o evento. Retorna o ID. */
 export async function criarEvento(
   db: Db,
+  usuarioId: number,
   concursoId: number,
   dados: EventoDados,
   agora: Date = new Date(),
 ): Promise<number> {
   return db.transaction(async (tx) => {
-    await exigirConcurso(tx, concursoId);
+    await exigirConcurso(tx, usuarioId, concursoId);
     return inserirEvento(tx, concursoId, dados, agora);
   });
 }
@@ -78,12 +86,16 @@ export async function criarEvento(
 /** Atualiza o evento; `concluido_em` só muda quando o estado de conclusão muda. */
 export async function atualizarEvento(
   db: Db,
+  usuarioId: number,
   concursoId: number,
   eventoId: number,
   dados: EventoDados,
   agora: Date = new Date(),
 ): Promise<void> {
-  await db.transaction((tx) => atualizarEventoTx(tx, concursoId, eventoId, dados, agora));
+  await db.transaction(async (tx) => {
+    await exigirConcurso(tx, usuarioId, concursoId);
+    await atualizarEventoTx(tx, concursoId, eventoId, dados, agora);
+  });
 }
 
 /**
@@ -92,12 +104,13 @@ export async function atualizarEvento(
  */
 export async function salvarEventos(
   db: Db,
+  usuarioId: number,
   concursoId: number,
   itens: readonly ItemEvento[],
   agora: Date = new Date(),
 ): Promise<number[]> {
   return db.transaction(async (tx) => {
-    await exigirConcurso(tx, concursoId);
+    await exigirConcurso(tx, usuarioId, concursoId);
     const ids: number[] = [];
     for (const { id, dados } of itens) {
       if (id === null) {
@@ -114,23 +127,35 @@ export async function salvarEventos(
 /** Marca ou desmarca o evento como concluído. */
 export async function definirConcluido(
   db: Db,
+  usuarioId: number,
   concursoId: number,
   eventoId: number,
   concluido: boolean,
   agora: Date = new Date(),
 ): Promise<void> {
-  const linhas = await db
-    .update(evento)
-    .set({ concluido, concluidoEm: concluido ? agora : null })
-    .where(doConcurso(concursoId, eventoId))
-    .returning({ id: evento.id });
-  if (linhas.length === 0) throw new ErroDominio(NAO_ENCONTRADO);
+  await db.transaction(async (tx) => {
+    await exigirConcurso(tx, usuarioId, concursoId);
+    const linhas = await tx
+      .update(evento)
+      .set({ concluido, concluidoEm: concluido ? agora : null })
+      .where(doConcurso(concursoId, eventoId))
+      .returning({ id: evento.id });
+    if (linhas.length === 0) throw new ErroDominio(NAO_ENCONTRADO);
+  });
 }
 
-export async function excluirEvento(db: Db, concursoId: number, eventoId: number): Promise<void> {
-  const linhas = await db
-    .delete(evento)
-    .where(doConcurso(concursoId, eventoId))
-    .returning({ id: evento.id });
-  if (linhas.length === 0) throw new ErroDominio(NAO_ENCONTRADO);
+export async function excluirEvento(
+  db: Db,
+  usuarioId: number,
+  concursoId: number,
+  eventoId: number,
+): Promise<void> {
+  await db.transaction(async (tx) => {
+    await exigirConcurso(tx, usuarioId, concursoId);
+    const linhas = await tx
+      .delete(evento)
+      .where(doConcurso(concursoId, eventoId))
+      .returning({ id: evento.id });
+    if (linhas.length === 0) throw new ErroDominio(NAO_ENCONTRADO);
+  });
 }

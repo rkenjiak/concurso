@@ -121,8 +121,8 @@ jobs:
           for i in $(seq 1 30); do curl -fsS http://localhost:3000/api/health && break; sleep 1; done
           curl -fsS http://localhost:3000/api/health
           test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/api/export)" = 401
-          # Sem MCP_TOKEN o endpoint MCP fica desligado.
-          test "$(curl -s -o /dev/null -w '%{http_code}' -X POST http://localhost:3000/api/mcp)" = 404
+          # Sem token pessoal o endpoint MCP recusa.
+          test "$(curl -s -o /dev/null -w '%{http_code}' -X POST http://localhost:3000/api/mcp)" = 401
 
       - name: Logs do container
         if: failure()

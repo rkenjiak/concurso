@@ -9,6 +9,7 @@ import {
   VALORES_INICIAIS_RESULTADO_FASE,
   valoresDoResultadoFase,
 } from "@/lib/schemas/resultado-fase";
+import { ID_USUARIO_INICIAL as U } from "@/server/db/schema";
 import { criarBancoTeste } from "../db/banco-teste";
 import type { Db } from "../db/client";
 import { listarResultadosFase } from "../queries/resultados";
@@ -23,6 +24,7 @@ beforeEach(async () => {
   ({ db, client } = await criarBancoTeste());
   concursoId = await criarConcurso(
     db,
+    U,
     concursoSchema.parse({ ...VALORES_INICIAIS_CONCURSO, orgao: "X", cargo: "Y" }),
   );
 });
@@ -42,6 +44,7 @@ describe("resultados por fase", () => {
   it("cria na ordem de cadastro com todos os campos", async () => {
     const a = await criarResultadoFase(
       db,
+      U,
       concursoId,
       dados({
         fase: "OBJETIVA",
@@ -56,7 +59,7 @@ describe("resultados por fase", () => {
         observacao: "Recurso deferido na questão 12",
       }),
     );
-    const b = await criarResultadoFase(db, concursoId, dados({ fase: "DISCURSIVA" }));
+    const b = await criarResultadoFase(db, U, concursoId, dados({ fase: "DISCURSIVA" }));
     const lista = await listarResultadosFase(db, concursoId);
     expect(lista.map((r) => r.id)).toEqual([a, b]);
     expect(lista.map((r) => r.ordem)).toEqual([0, 1]);
@@ -77,13 +80,14 @@ describe("resultados por fase", () => {
   });
 
   it("rejeita resultado de concurso inexistente", async () => {
-    await expect(criarResultadoFase(db, 999, dados())).rejects.toThrow(ErroDominio);
+    await expect(criarResultadoFase(db, U, 999, dados())).rejects.toThrow(ErroDominio);
   });
 
   it("atualiza e volta aos valores do formulário", async () => {
-    const id = await criarResultadoFase(db, concursoId, dados({ nota: "50" }));
+    const id = await criarResultadoFase(db, U, concursoId, dados({ nota: "50" }));
     await atualizarResultadoFase(
       db,
+      U,
       concursoId,
       id,
       dados({ nota: "81,125", situacao: "CLASSIFICADO", classificacaoGeral: "3" }),
@@ -100,18 +104,25 @@ describe("resultados por fase", () => {
   });
 
   it("restringe atualização e exclusão ao concurso", async () => {
-    const id = await criarResultadoFase(db, concursoId, dados());
-    await expect(atualizarResultadoFase(db, 999, id, dados())).rejects.toThrow(
+    const outro = await criarConcurso(
+      db,
+      U,
+      concursoSchema.parse({ ...VALORES_INICIAIS_CONCURSO, orgao: "Outro", cargo: "Z" }),
+    );
+    const id = await criarResultadoFase(db, U, concursoId, dados());
+    await expect(atualizarResultadoFase(db, U, outro, id, dados())).rejects.toThrow(
       "Resultado não encontrado.",
     );
-    await expect(excluirResultadoFase(db, 999, id)).rejects.toThrow("Resultado não encontrado.");
-    await excluirResultadoFase(db, concursoId, id);
+    await expect(excluirResultadoFase(db, U, outro, id)).rejects.toThrow(
+      "Resultado não encontrado.",
+    );
+    await excluirResultadoFase(db, U, concursoId, id);
     expect(await listarResultadosFase(db, concursoId)).toEqual([]);
   });
 
   it("exclui os resultados junto com o concurso", async () => {
-    await criarResultadoFase(db, concursoId, dados());
-    await excluirConcurso(db, concursoId);
+    await criarResultadoFase(db, U, concursoId, dados());
+    await excluirConcurso(db, U, concursoId);
     expect(await listarResultadosFase(db, concursoId)).toEqual([]);
   });
 });

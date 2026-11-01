@@ -1,4 +1,4 @@
-/** Leituras de concurso (RF01, RF07). */
+/** Leituras de concurso (RF01, RF07), sempre restritas aos concursos do usuário (#49). */
 import { and, asc, desc, eq, gte, inArray, lte, type SQL, sql } from "drizzle-orm";
 import { normalizarTexto } from "@/lib/normalize";
 import { FILTROS_VAZIOS, type FiltrosConcursos } from "@/lib/schemas/filtros-concursos";
@@ -38,9 +38,10 @@ function escaparLike(texto: string): string {
  * Condições da busca/filtros. A busca textual exige que cada termo (normalizado, sem acento)
  * apareça em `busca_normalizada` (órgão + cargo + banca + tags).
  */
-function condicoes(filtros: FiltrosConcursos): SQL | undefined {
+function condicoes(usuarioId: number, filtros: FiltrosConcursos): SQL | undefined {
   const termos = filtros.busca ? normalizarTexto(filtros.busca).split(" ").filter(Boolean) : [];
   return and(
+    eq(concurso.usuarioId, usuarioId),
     ...termos.map(
       (t) => sql`${concurso.buscaNormalizada} like ${`%${escaparLike(t)}%`} escape '!'`,
     ),
@@ -65,6 +66,7 @@ function condicoes(filtros: FiltrosConcursos): SQL | undefined {
  */
 export async function listarConcursos(
   db: Db,
+  usuarioId: number,
   filtrosParciais: Partial<FiltrosConcursos> = {},
   hoje: DataISO = hojeSP(),
 ): Promise<ConcursoResumo[]> {
@@ -109,7 +111,7 @@ export async function listarConcursos(
     })
     .from(concurso)
     .leftJoin(proximas, eq(proximas.concursoId, concurso.id))
-    .where(condicoes(filtros))
+    .where(condicoes(usuarioId, filtros))
     .orderBy(...ordem[filtros.ordem]);
   const tags = await tagsPorConcurso(
     db,
@@ -118,8 +120,15 @@ export async function listarConcursos(
   return linhas.map((l) => ({ ...l, tags: tags.get(l.id) ?? [] }));
 }
 
-export async function obterConcurso(db: Db, id: number): Promise<ConcursoDetalhe | null> {
-  const [linha] = await db.select().from(concurso).where(eq(concurso.id, id));
+export async function obterConcurso(
+  db: Db,
+  usuarioId: number,
+  id: number,
+): Promise<ConcursoDetalhe | null> {
+  const [linha] = await db
+    .select()
+    .from(concurso)
+    .where(and(eq(concurso.id, id), eq(concurso.usuarioId, usuarioId)));
   if (!linha) return null;
   const tags = await tagsPorConcurso(db, [id]);
   return { ...linha, tags: tags.get(id) ?? [] };

@@ -1,6 +1,6 @@
 /**
  * `POST /api/import` (RF09, ARQUITETURA.md §5.3): restaura um backup JSON substituindo todos os
- * dados. Corpo `multipart/form-data` com `arquivo` (o JSON) e `confirmacao=SUBSTITUIR_TUDO`.
+ * dados do usuário da sessão (#49). Corpo `multipart/form-data` com `arquivo` (o JSON) e `confirmacao=SUBSTITUIR_TUDO`.
  *
  * Route Handler (e não Server Action) para aceitar arquivos maiores que o limite de corpo das
  * Server Actions. Responde no formato padronizado `{ ok, data } | { ok, erros }`.
@@ -9,15 +9,15 @@ import { revalidatePath } from "next/cache";
 import { ErroDominio } from "@/domain/erros";
 import { CONFIRMACAO_IMPORTACAO, TAMANHO_MAX_BACKUP, validarBackup } from "@/lib/schemas/backup";
 import { falha, sucesso } from "@/server/actions/resultado";
-import { respostaNaoAutorizada } from "@/server/auth/acesso";
+import { exigirUsuarioRota } from "@/server/auth/acesso";
 import { getDb } from "@/server/db/client";
 import { substituirTudo } from "@/server/repositories/importacao";
 
 const erro = (mensagem: string, status = 400) => Response.json(falha(mensagem), { status });
 
 export async function POST(request: Request): Promise<Response> {
-  const negado = await respostaNaoAutorizada();
-  if (negado) return negado;
+  const usuario = await exigirUsuarioRota();
+  if (usuario instanceof Response) return usuario;
   let form: FormData;
   try {
     form = await request.formData();
@@ -25,7 +25,7 @@ export async function POST(request: Request): Promise<Response> {
     return erro("Envie o arquivo de backup.");
   }
   if (form.get("confirmacao") !== CONFIRMACAO_IMPORTACAO) {
-    return erro("Confirme que deseja substituir todos os dados atuais.");
+    return erro("Confirme que deseja substituir todos os seus dados atuais.");
   }
   const arquivo = form.get("arquivo");
   if (!(arquivo instanceof File) || arquivo.size === 0) {
@@ -43,7 +43,7 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   try {
-    const resumo = await substituirTudo(getDb(), validarBackup(json));
+    const resumo = await substituirTudo(getDb(), usuario.id, validarBackup(json));
     revalidatePath("/", "layout");
     return Response.json(sucesso(resumo));
   } catch (e) {

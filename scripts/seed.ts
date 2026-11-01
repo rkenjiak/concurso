@@ -1,12 +1,20 @@
 /**
  * Seed opcional com concursos FICTÍCIOS para desenvolvimento local (`pnpm db:seed`).
- * Só insere se o banco estiver vazio; use `--force` para inserir mesmo assim.
+ * Insere para o usuário inicial, só se o banco estiver vazio; use `--force` para inserir mesmo assim.
  */
 import { count } from "drizzle-orm";
 import { montarBuscaNormalizada, normalizarTag } from "../src/lib/normalize";
 import { criarDb } from "../src/server/db/client";
 import { aplicarMigracoes } from "../src/server/db/migrate";
-import { concurso, concursoTag, evento, link, statusHistorico, tag } from "../src/server/db/schema";
+import {
+  concurso,
+  concursoTag,
+  evento,
+  ID_USUARIO_INICIAL,
+  link,
+  statusHistorico,
+  tag,
+} from "../src/server/db/schema";
 import { carregarEnv } from "./env";
 
 carregarEnv();
@@ -31,6 +39,7 @@ try {
       const [trf] = await tx
         .insert(concurso)
         .values({
+          usuarioId: ID_USUARIO_INICIAL,
           orgao: "Tribunal Regional Exemplo",
           cargo: "Analista Judiciário — Área Judiciária",
           banca: "Banca Exemplo",
@@ -58,6 +67,7 @@ try {
       const [pref] = await tx
         .insert(concurso)
         .values({
+          usuarioId: ID_USUARIO_INICIAL,
           orgao: "Prefeitura de Cidade Exemplo",
           cargo: "Técnico Administrativo",
           esfera: "MUNICIPAL",

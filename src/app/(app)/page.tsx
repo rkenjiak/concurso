@@ -18,6 +18,7 @@ import { JANELA_PADRAO_DIAS, semOcultos, totalPrazos } from "@/domain/prazos";
 import { ehAtivo } from "@/domain/status";
 import { formatarData } from "@/lib/format";
 import { hojeSP } from "@/lib/tz";
+import { exigirUsuarioPagina } from "@/server/auth/acesso";
 import { getDb } from "@/server/db/client";
 import { obterDashboard } from "@/server/queries/dashboard";
 
@@ -56,7 +57,8 @@ export default async function DashboardPage({ searchParams }: PageProps<"/">) {
   await connection();
   const hoje = hojeSP();
   const mostrarOcultos = (await searchParams)[PARAM_OCULTOS] === "1";
-  const dashboard = await obterDashboard(getDb(), hoje);
+  const { id: usuarioId } = await exigirUsuarioPagina();
+  const dashboard = await obterDashboard(getDb(), usuarioId, hoje);
   const { porStatus, totalConcursos, ocultos } = dashboard;
   const prazos = mostrarOcultos ? dashboard.prazos : semOcultos(dashboard.prazos);
   const totalExibidos = totalPrazos(prazos);

@@ -1,9 +1,13 @@
-/** Escritas de resultados por fase (RF05). Toda operação é restrita ao concurso informado. */
+/**
+ * Escritas de resultados por fase (RF05). Toda operação é restrita ao concurso informado, que
+ * precisa ser do usuário (#49).
+ */
 import { and, eq, max } from "drizzle-orm";
 import { ErroDominio } from "@/domain/erros";
 import type { ResultadoFaseDados } from "@/lib/schemas/resultado-fase";
 import type { Db } from "../db/client";
-import { concurso, resultadoFase } from "../db/schema";
+import { resultadoFase } from "../db/schema";
+import { exigirConcurso } from "./eventos";
 
 const NAO_ENCONTRADO = "Resultado não encontrado.";
 
@@ -13,15 +17,12 @@ const doConcurso = (concursoId: number, resultadoId: number) =>
 /** Cria o resultado ao fim da lista de fases. Retorna o ID. */
 export async function criarResultadoFase(
   db: Db,
+  usuarioId: number,
   concursoId: number,
   dados: ResultadoFaseDados,
 ): Promise<number> {
   return db.transaction(async (tx) => {
-    const [existe] = await tx
-      .select({ id: concurso.id })
-      .from(concurso)
-      .where(eq(concurso.id, concursoId));
-    if (!existe) throw new ErroDominio("Concurso não encontrado.");
+    await exigirConcurso(tx, usuarioId, concursoId);
     const [ultimo] = await tx
       .select({ ordem: max(resultadoFase.ordem) })
       .from(resultadoFase)
@@ -37,26 +38,34 @@ export async function criarResultadoFase(
 
 export async function atualizarResultadoFase(
   db: Db,
+  usuarioId: number,
   concursoId: number,
   resultadoId: number,
   dados: ResultadoFaseDados,
 ): Promise<void> {
-  const linhas = await db
-    .update(resultadoFase)
-    .set(dados)
-    .where(doConcurso(concursoId, resultadoId))
-    .returning({ id: resultadoFase.id });
-  if (linhas.length === 0) throw new ErroDominio(NAO_ENCONTRADO);
+  await db.transaction(async (tx) => {
+    await exigirConcurso(tx, usuarioId, concursoId);
+    const linhas = await tx
+      .update(resultadoFase)
+      .set(dados)
+      .where(doConcurso(concursoId, resultadoId))
+      .returning({ id: resultadoFase.id });
+    if (linhas.length === 0) throw new ErroDominio(NAO_ENCONTRADO);
+  });
 }
 
 export async function excluirResultadoFase(
   db: Db,
+  usuarioId: number,
   concursoId: number,
   resultadoId: number,
 ): Promise<void> {
-  const linhas = await db
-    .delete(resultadoFase)
-    .where(doConcurso(concursoId, resultadoId))
-    .returning({ id: resultadoFase.id });
-  if (linhas.length === 0) throw new ErroDominio(NAO_ENCONTRADO);
+  await db.transaction(async (tx) => {
+    await exigirConcurso(tx, usuarioId, concursoId);
+    const linhas = await tx
+      .delete(resultadoFase)
+      .where(doConcurso(concursoId, resultadoId))
+      .returning({ id: resultadoFase.id });
+    if (linhas.length === 0) throw new ErroDominio(NAO_ENCONTRADO);
+  });
 }

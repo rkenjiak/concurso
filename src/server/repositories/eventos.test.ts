@@ -8,6 +8,7 @@ import {
   eventoSchema,
   VALORES_INICIAIS_EVENTO,
 } from "@/lib/schemas/evento";
+import { ID_USUARIO_INICIAL as U } from "@/server/db/schema";
 import { criarBancoTeste } from "../db/banco-teste";
 import type { Db } from "../db/client";
 import { listarEventos } from "../queries/eventos";
@@ -28,6 +29,7 @@ beforeEach(async () => {
   ({ db, client } = await criarBancoTeste());
   concursoId = await criarConcurso(
     db,
+    U,
     concursoSchema.parse({ ...VALORES_INICIAIS_CONCURSO, orgao: "X", cargo: "Y" }),
   );
 });
@@ -42,10 +44,10 @@ const T2 = new Date("2026-11-02T12:00:00Z");
 
 describe("eventos", () => {
   it("lista por data, sem hora primeiro, depois hora", async () => {
-    await criarEvento(db, concursoId, dados({ data: "2026-12-01", tipo: "PROVA_OBJETIVA" }));
-    await criarEvento(db, concursoId, dados({ data: "2026-11-10", hora: "14:00" }));
-    await criarEvento(db, concursoId, dados({ data: "2026-11-10", hora: "08:30" }));
-    await criarEvento(db, concursoId, dados({ data: "2026-11-10" }));
+    await criarEvento(db, U, concursoId, dados({ data: "2026-12-01", tipo: "PROVA_OBJETIVA" }));
+    await criarEvento(db, U, concursoId, dados({ data: "2026-11-10", hora: "14:00" }));
+    await criarEvento(db, U, concursoId, dados({ data: "2026-11-10", hora: "08:30" }));
+    await criarEvento(db, U, concursoId, dados({ data: "2026-11-10" }));
     const eventos = await listarEventos(db, concursoId);
     expect(eventos.map((e) => [e.data, e.hora])).toEqual([
       ["2026-11-10", null],
@@ -58,6 +60,7 @@ describe("eventos", () => {
   it("grava todos os campos e concluido_em ao criar já concluído", async () => {
     const id = await criarEvento(
       db,
+      U,
       concursoId,
       dados({
         tipo: "PROVA_OBJETIVA",
@@ -83,32 +86,32 @@ describe("eventos", () => {
   });
 
   it("rejeita evento de concurso inexistente", async () => {
-    await expect(criarEvento(db, 999, dados({}))).rejects.toThrow(ErroDominio);
+    await expect(criarEvento(db, U, 999, dados({}))).rejects.toThrow(ErroDominio);
   });
 
   it("atualiza preservando concluido_em se a conclusão não muda", async () => {
-    const id = await criarEvento(db, concursoId, dados({ concluido: true }), T1);
-    await atualizarEvento(db, concursoId, id, dados({ concluido: true, local: "Sala 2" }), T2);
+    const id = await criarEvento(db, U, concursoId, dados({ concluido: true }), T1);
+    await atualizarEvento(db, U, concursoId, id, dados({ concluido: true, local: "Sala 2" }), T2);
     let [e] = await listarEventos(db, concursoId);
     expect(e).toMatchObject({ local: "Sala 2", concluido: true, concluidoEm: T1 });
 
-    await atualizarEvento(db, concursoId, id, dados({ concluido: false }), T2);
+    await atualizarEvento(db, U, concursoId, id, dados({ concluido: false }), T2);
     [e] = await listarEventos(db, concursoId);
     expect(e).toMatchObject({ concluido: false, concluidoEm: null, local: null });
 
-    await atualizarEvento(db, concursoId, id, dados({ concluido: true }), T2);
+    await atualizarEvento(db, U, concursoId, id, dados({ concluido: true }), T2);
     [e] = await listarEventos(db, concursoId);
     expect(e).toMatchObject({ concluido: true, concluidoEm: T2 });
   });
 
   it("marca e desmarca concluído", async () => {
-    const id = await criarEvento(db, concursoId, dados({}));
-    await definirConcluido(db, concursoId, id, true, T1);
+    const id = await criarEvento(db, U, concursoId, dados({}));
+    await definirConcluido(db, U, concursoId, id, true, T1);
     expect((await listarEventos(db, concursoId))[0]).toMatchObject({
       concluido: true,
       concluidoEm: T1,
     });
-    await definirConcluido(db, concursoId, id, false, T2);
+    await definirConcluido(db, U, concursoId, id, false, T2);
     expect((await listarEventos(db, concursoId))[0]).toMatchObject({
       concluido: false,
       concluidoEm: null,
@@ -116,17 +119,26 @@ describe("eventos", () => {
   });
 
   it("restringe atualização, conclusão e exclusão ao concurso", async () => {
-    const id = await criarEvento(db, concursoId, dados({}));
-    await expect(atualizarEvento(db, 999, id, dados({}))).rejects.toThrow("Evento não encontrado.");
-    await expect(definirConcluido(db, 999, id, true)).rejects.toThrow("Evento não encontrado.");
-    await expect(excluirEvento(db, 999, id)).rejects.toThrow("Evento não encontrado.");
-    await excluirEvento(db, concursoId, id);
+    const outro = await criarConcurso(
+      db,
+      U,
+      concursoSchema.parse({ ...VALORES_INICIAIS_CONCURSO, orgao: "Outro", cargo: "Z" }),
+    );
+    const id = await criarEvento(db, U, concursoId, dados({}));
+    await expect(atualizarEvento(db, U, outro, id, dados({}))).rejects.toThrow(
+      "Evento não encontrado.",
+    );
+    await expect(definirConcluido(db, U, outro, id, true)).rejects.toThrow(
+      "Evento não encontrado.",
+    );
+    await expect(excluirEvento(db, U, outro, id)).rejects.toThrow("Evento não encontrado.");
+    await excluirEvento(db, U, concursoId, id);
     expect(await listarEventos(db, concursoId)).toEqual([]);
   });
 
   it("exclui os eventos junto com o concurso", async () => {
-    await criarEvento(db, concursoId, dados({}));
-    await excluirConcurso(db, concursoId);
+    await criarEvento(db, U, concursoId, dados({}));
+    await excluirConcurso(db, U, concursoId);
     expect(await listarEventos(db, concursoId)).toEqual([]);
   });
 });
@@ -166,9 +178,10 @@ describe("eventoSchema", () => {
 
 describe("salvarEventos", () => {
   it("cria e atualiza em lote, devolvendo os IDs na ordem", async () => {
-    const existente = await criarEvento(db, concursoId, dados({ tipo: "PROVA_OBJETIVA" }));
+    const existente = await criarEvento(db, U, concursoId, dados({ tipo: "PROVA_OBJETIVA" }));
     const ids = await salvarEventos(
       db,
+      U,
       concursoId,
       [
         { id: null, dados: dados({ tipo: "PRAZO_RECURSO", data: "2026-11-20" }) },
@@ -190,11 +203,12 @@ describe("salvarEventos", () => {
   it("é tudo ou nada: evento de outro concurso desfaz o lote", async () => {
     const outro = await criarConcurso(
       db,
+      U,
       concursoSchema.parse({ ...VALORES_INICIAIS_CONCURSO, orgao: "Z", cargo: "W" }),
     );
-    const alheio = await criarEvento(db, outro, dados({}));
+    const alheio = await criarEvento(db, U, outro, dados({}));
     await expect(
-      salvarEventos(db, concursoId, [
+      salvarEventos(db, U, concursoId, [
         { id: null, dados: dados({}) },
         { id: alheio, dados: dados({ data: "2027-01-01" }) },
       ]),
@@ -204,6 +218,6 @@ describe("salvarEventos", () => {
   });
 
   it("rejeita concurso inexistente", async () => {
-    await expect(salvarEventos(db, 999, [])).rejects.toThrow("Concurso não encontrado.");
+    await expect(salvarEventos(db, U, 999, [])).rejects.toThrow("Concurso não encontrado.");
   });
 });

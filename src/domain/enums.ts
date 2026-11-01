@@ -120,3 +120,7 @@ export const UF = [
   "TO",
 ] as const;
 export type Uf = (typeof UF)[number];
+
+/** Papel do usuário (#49): `ADMIN` gerencia a instância (painel, #50). */
+export const PAPEL = ["USUARIO", "ADMIN"] as const;
+export type Papel = (typeof PAPEL)[number];

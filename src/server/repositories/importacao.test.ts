@@ -6,7 +6,8 @@ import { concursoSchema, VALORES_INICIAIS_CONCURSO } from "@/lib/schemas/concurs
 import { eventoSchema, VALORES_INICIAIS_EVENTO } from "@/lib/schemas/evento";
 import { linkSchema } from "@/lib/schemas/link";
 import { resultadoFaseSchema, VALORES_INICIAIS_RESULTADO_FASE } from "@/lib/schemas/resultado-fase";
-import { criarBancoTeste } from "../db/banco-teste";
+import { ID_USUARIO_INICIAL as U } from "@/server/db/schema";
+import { criarBancoTeste, criarUsuarioTeste } from "../db/banco-teste";
 import type { Db } from "../db/client";
 import { listarConcursos, obterConcurso } from "../queries/concursos";
 import { exportarConcursosCsv, exportarDados } from "../queries/exportacao";
@@ -38,6 +39,7 @@ const T1 = new Date("2026-10-15T09:30:00Z");
 async function popular(db: Db) {
   const a = await criarConcurso(
     db,
+    U,
     concursoSchema.parse({
       ...VALORES_INICIAIS_CONCURSO,
       orgao: "Tribunal Regional Federal",
@@ -62,6 +64,7 @@ async function popular(db: Db) {
   );
   const b = await criarConcurso(
     db,
+    U,
     concursoSchema.parse({
       ...VALORES_INICIAIS_CONCURSO,
       orgao: "Prefeitura",
@@ -73,14 +76,16 @@ async function popular(db: Db) {
     }),
     T0,
   );
-  await alterarStatus(db, a, "PROVA_AGENDADA", "boleto pago", T1);
+  await alterarStatus(db, U, a, "PROVA_AGENDADA", "boleto pago", T1);
   await criarLink(
     db,
+    U,
     a,
     linkSchema.parse({ tipo: "EDITAL_ABERTURA", rotulo: "Edital", url: "https://ex.com/e.pdf" }),
   );
   const evento = await criarEvento(
     db,
+    U,
     a,
     eventoSchema.parse({
       ...VALORES_INICIAIS_EVENTO,
@@ -93,10 +98,11 @@ async function popular(db: Db) {
     T1,
   );
   // Preferências de exibição do dashboard (#44) também fazem parte do backup.
-  await definirPrazoOculto(db, { tipo: "evento", eventoId: evento }, true);
-  await definirPrazoOculto(db, { tipo: "validade", concursoId: a }, true);
+  await definirPrazoOculto(db, U, { tipo: "evento", eventoId: evento }, true);
+  await definirPrazoOculto(db, U, { tipo: "validade", concursoId: a }, true);
   await criarResultadoFase(
     db,
+    U,
     a,
     resultadoFaseSchema.parse({
       ...VALORES_INICIAIS_RESULTADO_FASE,
@@ -109,13 +115,42 @@ async function popular(db: Db) {
   return { a, b };
 }
 
+/**
+ * Backup sem os IDs (a importação gera IDs novos): concursos pela posição, tags pelo nome e
+ * filhas pelo concurso, na ordem do arquivo.
+ */
+function semIds(b: BackupJson) {
+  const posicao = new Map(b.dados.concursos.map((c, i) => [c.id, i]));
+  const nomeTag = new Map(b.dados.tags.map((t) => [t.id, t.nome]));
+  const filhas = <L extends { id: number; concursoId: number }>(linhas: L[]) =>
+    linhas.map(({ id: _, concursoId, ...resto }) => ({
+      ...resto,
+      concurso: posicao.get(concursoId),
+    }));
+  return {
+    ...b,
+    dados: {
+      concursos: b.dados.concursos.map(({ id: _, ...c }) => c),
+      tags: b.dados.tags.map((t) => t.nome).sort(),
+      concursoTags: b.dados.concursoTags
+        .map((ct) => `${posicao.get(ct.concursoId)}:${nomeTag.get(ct.tagId)}`)
+        .sort(),
+      links: filhas(b.dados.links),
+      eventos: filhas(b.dados.eventos),
+      statusHistorico: filhas(b.dados.statusHistorico),
+      resultadosFase: filhas(b.dados.resultadosFase),
+      anexos: filhas(b.dados.anexos ?? []),
+    },
+  };
+}
+
 /** Simula gravar e ler o arquivo. */
 const viaArquivo = (backup: BackupJson): unknown => JSON.parse(JSON.stringify(backup));
 
 describe("exportar → importar", () => {
   it("restaura exatamente os mesmos dados em um banco vazio", async () => {
     await popular(origem.db);
-    const exportado = await exportarDados(origem.db, T1);
+    const exportado = await exportarDados(origem.db, U, T1);
 
     expect(exportado.schemaVersion).toBe(VERSAO_BACKUP);
     expect(exportado.dados.concursos).toHaveLength(2);
@@ -132,20 +167,21 @@ describe("exportar → importar", () => {
       ["MAGENTA", "🏛️"],
     ]);
 
-    const resumo = await substituirTudo(destino.db, validarBackup(viaArquivo(exportado)));
+    const resumo = await substituirTudo(destino.db, U, validarBackup(viaArquivo(exportado)));
     expect(resumo).toMatchObject({ concursos: 2, tags: 2, eventos: 1, statusHistorico: 3 });
 
-    expect(await exportarDados(destino.db, T1)).toEqual(exportado);
+    expect(await exportarDados(destino.db, U, T1)).toEqual(exportado);
     // Colunas derivadas (busca) também são reconstruídas.
-    const [linha] = await listarConcursos(destino.db, { busca: "tribunais" });
+    const [linha] = await listarConcursos(destino.db, U, { busca: "tribunais" });
     expect(linha?.orgao).toBe("Tribunal Regional Federal");
   });
 
   it("substitui todos os dados existentes e permite continuar cadastrando", async () => {
     const { a } = await popular(origem.db);
-    const exportado = await exportarDados(origem.db, T1);
+    const exportado = await exportarDados(origem.db, U, T1);
     await criarConcurso(
       destino.db,
+      U,
       concursoSchema.parse({
         ...VALORES_INICIAIS_CONCURSO,
         orgao: "Velho",
@@ -155,27 +191,58 @@ describe("exportar → importar", () => {
     );
     await criarConcurso(
       destino.db,
+      U,
       concursoSchema.parse({ ...VALORES_INICIAIS_CONCURSO, orgao: "Velho 2", cargo: "Z" }),
     );
     await criarConcurso(
       destino.db,
+      U,
       concursoSchema.parse({ ...VALORES_INICIAIS_CONCURSO, orgao: "Velho 3", cargo: "Z" }),
     );
 
-    await substituirTudo(destino.db, validarBackup(viaArquivo(exportado)));
-    expect(await exportarDados(destino.db, T1)).toEqual(exportado);
-    expect((await obterConcurso(destino.db, a))?.tags).toEqual(["prioridade", "tribunais"]);
+    await substituirTudo(destino.db, U, validarBackup(viaArquivo(exportado)));
+    const importado = await exportarDados(destino.db, U, T1);
+    expect(semIds(importado)).toEqual(semIds(exportado));
+    // IDs novos, mas na ordem do arquivo.
+    const novoA = importado.dados.concursos[exportado.dados.concursos.findIndex((c) => c.id === a)];
+    expect((await obterConcurso(destino.db, U, novoA?.id ?? 0))?.tags).toEqual([
+      "prioridade",
+      "tribunais",
+    ]);
 
     const novo = await criarConcurso(
       destino.db,
+      U,
       concursoSchema.parse({ ...VALORES_INICIAIS_CONCURSO, orgao: "Novo", cargo: "Z" }),
     );
-    expect(novo).toBeGreaterThan(2);
+    expect(novo).toBeGreaterThan(Math.max(...importado.dados.concursos.map((c) => c.id)));
+  });
+
+  it("importa só para o usuário, sem tocar nos dados de outros (#49)", async () => {
+    await popular(origem.db);
+    const exportado = await exportarDados(origem.db, U, T1);
+    // No destino, o usuário inicial já tem dados; outro usuário importa o backup.
+    await popular(destino.db);
+    const antes = await exportarDados(destino.db, U, T1);
+    const outro = await criarUsuarioTeste(destino.db);
+    expect((await exportarDados(destino.db, outro, T1)).dados.concursos).toEqual([]);
+
+    await substituirTudo(destino.db, outro, validarBackup(viaArquivo(exportado)));
+    expect(semIds(await exportarDados(destino.db, outro, T1))).toEqual(semIds(exportado));
+    expect(await exportarDados(destino.db, U, T1)).toEqual(antes);
+
+    // Reimportar um backup vazio apaga só os dados do outro usuário; as tags seguem em uso.
+    const vazio = await exportarDados(origem.db, outro, T1);
+    await substituirTudo(destino.db, outro, validarBackup(viaArquivo(vazio)));
+    expect((await exportarDados(destino.db, outro, T1)).dados.concursos).toEqual([]);
+    expect(await exportarDados(destino.db, U, T1)).toEqual(antes);
+    expect(await listarConcursos(destino.db, outro)).toEqual([]);
+    expect(await exportarConcursosCsv(destino.db, outro)).not.toContain("Tribunal");
   });
 
   it("não altera nada se a importação falhar no meio", async () => {
     await popular(destino.db);
-    const antes = await exportarDados(destino.db, T1);
+    const antes = await exportarDados(destino.db, U, T1);
     const backup = validarBackup(viaArquivo(antes));
     // Viola a unicidade de chave_storage dentro da transação.
     const anexoBase = {
@@ -190,22 +257,22 @@ describe("exportar → importar", () => {
       { id: 1, ...anexoBase },
       { id: 2, ...anexoBase },
     ];
-    await expect(substituirTudo(destino.db, backup)).rejects.toThrow();
-    expect(await exportarDados(destino.db, T1)).toEqual(antes);
+    await expect(substituirTudo(destino.db, U, backup)).rejects.toThrow();
+    expect(await exportarDados(destino.db, U, T1)).toEqual(antes);
   });
 
   it("importa backup vazio", async () => {
     await popular(destino.db);
-    const vazio = await exportarDados(origem.db, T1);
-    await substituirTudo(destino.db, validarBackup(viaArquivo(vazio)));
-    expect(await exportarDados(destino.db, T1)).toEqual(vazio);
+    const vazio = await exportarDados(origem.db, U, T1);
+    await substituirTudo(destino.db, U, validarBackup(viaArquivo(vazio)));
+    expect(await exportarDados(destino.db, U, T1)).toEqual(vazio);
   });
 });
 
 describe("validarBackup", () => {
   const base = async () => {
     await popular(origem.db);
-    return viaArquivo(await exportarDados(origem.db, T1)) as BackupJson;
+    return viaArquivo(await exportarDados(origem.db, U, T1)) as BackupJson;
   };
 
   const mensagem = (entrada: unknown) => {
@@ -273,8 +340,8 @@ describe("validarBackup", () => {
     const backup = validarBackup(antigo);
     expect(backup.dados.concursos.map((c) => c.validadeOcultaDashboard)).toEqual([false, false]);
     expect(backup.dados.eventos.map((e) => e.ocultoDashboard)).toEqual([false]);
-    await substituirTudo(destino.db, backup);
-    const reexportado = await exportarDados(destino.db, T1);
+    await substituirTudo(destino.db, U, backup);
+    const reexportado = await exportarDados(destino.db, U, T1);
     expect(reexportado.dados.eventos[0]?.ocultoDashboard).toBe(false);
   });
 
@@ -289,8 +356,8 @@ describe("validarBackup", () => {
       [null, null],
       [null, null],
     ]);
-    await substituirTudo(destino.db, backup);
-    const reexportado = await exportarDados(destino.db, T1);
+    await substituirTudo(destino.db, U, backup);
+    const reexportado = await exportarDados(destino.db, U, T1);
     expect(reexportado.dados.concursos.map((c) => c.cor)).toEqual([null, null]);
   });
 
@@ -320,7 +387,7 @@ describe("validarBackup", () => {
 describe("exportarConcursosCsv", () => {
   it("gera uma linha por concurso com rótulos, valores e tags", async () => {
     await popular(origem.db);
-    const csv = await exportarConcursosCsv(origem.db);
+    const csv = await exportarConcursosCsv(origem.db, U);
     expect(csv.startsWith("﻿ID;Órgão;Cargo;")).toBe(true);
     const linhas = csv.trimEnd().split("\r\n");
     expect(linhas).toHaveLength(3);

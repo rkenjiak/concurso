@@ -19,6 +19,14 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
   `ocultoNoDashboard`). O backup JSON inclui os novos campos sem mudar o `schemaVersion` (1):
   backups antigos, sem eles, são importados com tudo visível.
 
+### Corrigido
+
+- Observações do concurso: tabelas em markdown voltam a ser renderizadas como tabela (#43), em vez
+  de texto cru (`| a | b |`). O `react-markdown` passa a usar `remark-gfm`, o que também habilita
+  tachado, listas de tarefas e autolinks. A tabela tem bordas, padding e cabeçalho destacado com as
+  cores do tema, e tabelas largas rolam na horizontal sem quebrar o layout. HTML bruto continua
+  descartado (`skipHtml`) e URLs perigosas continuam neutralizadas.
+
 ## [1.2.0] - 2026-11-01
 
 ### Adicionado

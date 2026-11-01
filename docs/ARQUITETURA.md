@@ -230,7 +230,7 @@ senão → indefinida
 | `/configuracoes` | Exportar/importar dados, sobre/versão | MVP |
 | `/login` | Senha única (só se auth habilitada) | MVP |
 | `/concursos?visao=quadro` | Quadro por status (kanban; arrastar ou “Mover para” = transição validada) | v1.1 |
-| `/calendario?mes=AAAA-MM` | Visão mensal de eventos (agenda em lista no celular) | v1.1 |
+| `/calendario?mes=AAAA-MM` | Visão mensal de eventos (agenda em lista no celular); clique abre os detalhes do evento | v1.1 |
 
 Layout responsivo: navegação lateral no desktop, barra inferior no celular. Links externos com
 `target="_blank" rel="noopener noreferrer"`.

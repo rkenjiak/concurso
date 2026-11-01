@@ -16,7 +16,7 @@ const { carregarEnv } = await import("./env");
 carregarEnv();
 
 const { serveStdio } = await import("@modelcontextprotocol/server/stdio");
-const { criarDb } = await import("../src/server/db/client");
+const { criarDb, urlDoBanco } = await import("../src/server/db/client");
 const { aplicarMigracoes } = await import("../src/server/db/migrate");
 const { criarServidorMcp } = await import("../src/server/mcp/servidor");
 const { ID_USUARIO_INICIAL } = await import("../src/server/db/schema");
@@ -27,6 +27,4 @@ await aplicarMigracoes(db);
 serveStdio(() => criarServidorMcp({ db, usuarioId: ID_USUARIO_INICIAL }), {
   onerror: (erro) => console.error("MCP:", erro),
 });
-console.error(
-  `Servidor MCP "concurso" pronto (stdio, banco ${process.env.DATABASE_URL ?? "padrão"}).`,
-);
+console.error(`Servidor MCP "concurso" pronto (stdio, banco ${urlDoBanco()}).`);

@@ -13,12 +13,12 @@ import {
   PASTA_BACKUPS,
   podarBackups,
 } from "../src/server/db/backup";
-import { criarDb, DATABASE_URL_PADRAO } from "../src/server/db/client";
+import { criarDb, urlDoBanco } from "../src/server/db/client";
 import { carregarEnv } from "./env";
 
 carregarEnv();
 
-const url = process.env.DATABASE_URL || DATABASE_URL_PADRAO;
+const url = urlDoBanco();
 const argManter = process.argv.find((a) => a.startsWith("--manter="))?.split("=")[1];
 const manter = Number(argManter ?? process.env.BACKUP_KEEP ?? MANTER_BACKUPS_PADRAO);
 

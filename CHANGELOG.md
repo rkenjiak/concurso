@@ -7,6 +7,8 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-10-31
+
 ### Adicionado
 
 - Visão em quadro (kanban) dos concursos (RF06) em `/concursos?visao=quadro`, com alternância

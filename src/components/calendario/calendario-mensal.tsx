@@ -53,7 +53,7 @@ function ItemGrade({
             "block w-full cursor-pointer truncate rounded border-l-4 text-left bg-muted/60 px-1.5 py-0.5 text-xs transition-colors hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring",
             BORDA_CRITICIDADE[item.criticidade],
             item.criticidade === "ALTA" && "bg-destructive/10 font-medium text-destructive",
-            item.criticidade === "MEDIA" && "bg-amber-500/15 text-amber-800 dark:text-amber-300",
+            item.criticidade === "MEDIA" && "bg-aviso/15 text-aviso-foreground",
             item.esmaecido && "text-muted-foreground opacity-60",
             item.concluido && "line-through",
           )}

@@ -9,6 +9,13 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 
 ### Adicionado
 
+- Tema claro, escuro e do sistema (#47): seletor Claro / Escuro / Sistema na navegação (lateral no
+  desktop, cabeçalho no celular) e em Configurações → Aparência. Padrão Sistema (segue
+  `prefers-color-scheme`, inclusive mudanças ao vivo); a escolha fica salva no navegador e é
+  aplicada por um script inline no `<head>` antes da primeira pintura, sem flash de tema errado.
+  O tema escuro passa a usar a classe `dark` no `<html>`, e os destaques de atenção (prazo da
+  semana, validade vencendo, suspenso, sub judice) usam os tokens `--aviso`/`--aviso-foreground`,
+  com contraste adequado nos dois temas; o fundo dos diálogos escurece mais no tema escuro.
 - Ocultar e reexibir prazos no dashboard (RF06, #44): cada item da lista de próximos prazos tem
   um botão de olho para ocultá-lo; o cabeçalho mostra o contador “N ocultos” e o botão “Mostrar
   ocultos” (`/?ocultos=1`), que exibe os ocultos esmaecidos, com selo “Oculto” e a ação de

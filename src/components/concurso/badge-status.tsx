@@ -10,7 +10,7 @@ const COR: Partial<Record<Status, string>> = {
   NOMEADO: "bg-emerald-700 text-white",
   EMPOSSADO: "bg-emerald-800 text-white",
   REPROVADO: "bg-destructive/10 text-destructive",
-  SUSPENSO: "bg-amber-500/15 text-amber-700 dark:text-amber-400",
+  SUSPENSO: "bg-aviso/15 text-aviso-foreground",
 };
 
 export function BadgeStatus({ status, className }: { status: Status; className?: string }) {

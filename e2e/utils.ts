@@ -12,6 +12,19 @@ export interface NovoConcurso {
   cargo: string;
   status?: string;
   tags?: string[];
+  /** Rótulo da cor (ex.: "Verde-água"); ausente = automática. */
+  cor?: string;
+  icone?: string;
+}
+
+/**
+ * Escolhe a cor no formulário do concurso clicando na amostra (o rádio nativo é visualmente
+ * oculto) e confere que o rádio ficou marcado.
+ */
+export async function escolherCor(page: Page, nome: string | RegExp): Promise<void> {
+  const radio = page.getByRole("radio", { name: nome, exact: typeof nome === "string" });
+  await page.locator("label").filter({ has: radio }).click();
+  await expect(radio).toBeChecked();
 }
 
 /** Cadastra um concurso pela interface e espera a página de detalhe. Retorna a URL. */
@@ -27,6 +40,8 @@ export async function cadastrarConcurso(page: Page, dados: NovoConcurso): Promis
     await tags.fill(tag);
     await tags.press("Enter");
   }
+  if (dados.cor) await escolherCor(page, dados.cor);
+  if (dados.icone) await page.getByLabel("Ícone (opcional)").fill(dados.icone);
   await page.getByRole("button", { name: "Cadastrar concurso" }).click();
   await expect(page).toHaveURL(/\/concursos\/\d+$/);
   await expect(page.getByRole("heading", { level: 1, name: dados.orgao })).toBeVisible();

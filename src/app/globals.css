@@ -79,6 +79,19 @@
   /* Atenção (prazo crítico em até 7 dias, vencendo, suspenso): âmbar com contraste AA. */
   --aviso: oklch(0.769 0.188 70.08);
   --aviso-foreground: oklch(0.473 0.137 46.201);
+  /*
+   * Paleta de identificação dos concursos (#46, src/domain/cores.ts): marcadores (ponto/faixa),
+   * nunca fundo de texto. Tons escuros no tema claro e claros no escuro, com contraste >= 3:1
+   * contra o fundo (WCAG 1.4.11). Sem vermelho/âmbar, reservados à criticidade dos prazos.
+   */
+  --concurso-azul: oklch(0.546 0.245 262.881);
+  --concurso-ciano: oklch(0.52 0.105 223.128);
+  --concurso-verde-agua: oklch(0.511 0.096 186.391);
+  --concurso-verde: oklch(0.527 0.154 150.069);
+  --concurso-violeta: oklch(0.541 0.281 293.009);
+  --concurso-magenta: oklch(0.518 0.253 323.949);
+  --concurso-rosa: oklch(0.592 0.249 0.584);
+  --concurso-cinza: oklch(0.554 0.046 257.417);
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
   --sidebar-primary: oklch(0.205 0 0);
@@ -124,6 +137,14 @@
   --sidebar-ring: oklch(0.556 0 0);
   --aviso: oklch(0.769 0.188 70.08);
   --aviso-foreground: oklch(0.879 0.169 91.605);
+  --concurso-azul: oklch(0.707 0.165 254.624);
+  --concurso-ciano: oklch(0.789 0.154 211.53);
+  --concurso-verde-agua: oklch(0.777 0.152 181.912);
+  --concurso-verde: oklch(0.792 0.209 151.711);
+  --concurso-violeta: oklch(0.702 0.183 293.541);
+  --concurso-magenta: oklch(0.74 0.238 322.16);
+  --concurso-rosa: oklch(0.718 0.202 349.761);
+  --concurso-cinza: oklch(0.704 0.04 256.788);
 }
 
 @layer base {

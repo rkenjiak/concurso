@@ -8,10 +8,12 @@
  *
  * Campos adicionados depois da versão 1 sem quebrar o formato (opcionais, com default na
  * importação, para aceitar backups antigos): `concursos[].validadeOcultaDashboard` e
- * `eventos[].ocultoDashboard` (prazos ocultos do dashboard, #44). Versões antigas do app ignoram
- * esses campos ao importar um backup novo.
+ * `eventos[].ocultoDashboard` (prazos ocultos do dashboard, #44); `concursos[].cor` e
+ * `concursos[].icone` (identificação visual, #46; ausentes = `null`, cor automática). Versões
+ * antigas do app ignoram esses campos ao importar um backup novo.
  */
 import { z } from "zod";
+import { COR_CONCURSO, ehIconeValido } from "@/domain/cores";
 import {
   ESCOLARIDADE,
   ESFERA,
@@ -71,6 +73,8 @@ const concursoBackup = z.object({
   validadeProrrogada: z.boolean(),
   validadeFimManual: data.nullable(),
   validadeOcultaDashboard: z.boolean().default(false),
+  cor: z.enum(COR_CONCURSO).nullable().default(null),
+  icone: z.string().refine(ehIconeValido, "Ícone inválido.").nullable().default(null),
   createdAt: instante,
   updatedAt: instante,
 });

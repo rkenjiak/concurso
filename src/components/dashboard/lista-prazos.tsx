@@ -1,5 +1,6 @@
 import { AlertTriangle, Clock, EyeOff, MapPin } from "lucide-react";
 import Link from "next/link";
+import { MarcadorConcurso } from "@/components/concurso/marcador-concurso";
 import { Badge } from "@/components/ui/badge";
 import { ROTULO_TIPO_EVENTO } from "@/domain/labels";
 import { type Criticidade, descreverDias, type Prazo } from "@/domain/prazos";
@@ -81,8 +82,11 @@ export function ListaPrazos({ prazos }: { prazos: readonly PrazoDashboard[] }) {
                     </Badge>
                   ) : null}
                 </div>
-                <p className="truncate text-muted-foreground text-sm">
-                  {p.concurso.orgao} — {p.concurso.cargo}
+                <p className="flex items-center gap-1.5 text-muted-foreground text-sm">
+                  <MarcadorConcurso cor={p.concurso.cor} icone={p.concurso.icone} />
+                  <span className="min-w-0 truncate">
+                    {p.concurso.orgao} — {p.concurso.cargo}
+                  </span>
                 </p>
                 <div className="flex flex-wrap gap-x-4 gap-y-1 text-muted-foreground text-xs">
                   <span>

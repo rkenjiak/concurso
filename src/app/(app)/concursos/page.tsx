@@ -6,10 +6,12 @@ import { AlternarVisao } from "@/components/concurso/alternar-visao";
 import { BadgeStatus } from "@/components/concurso/badge-status";
 import { FiltrosConcursosForm } from "@/components/concurso/filtros-concursos";
 import { ListaTags } from "@/components/concurso/lista-tags";
+import { MarcadorConcurso } from "@/components/concurso/marcador-concurso";
 import { QuadroConcursos } from "@/components/concurso/quadro-concursos";
 import { CabecalhoPagina } from "@/components/layout/cabecalho-pagina";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { corDoConcurso } from "@/domain/cores";
 import { ROTULO_ESFERA } from "@/domain/labels";
 import { formatarBRL, formatarData } from "@/lib/format";
 import {
@@ -92,6 +94,8 @@ export default async function ConcursosPage({ searchParams }: PageProps<"/concur
             status: c.status,
             proximaData: c.proximaData,
             tags: c.tags,
+            cor: corDoConcurso(c),
+            icone: c.icone,
             transicoes: opcoes.get(c.id)?.transicoes ?? [],
           }))}
         />
@@ -113,7 +117,10 @@ export default async function ConcursosPage({ searchParams }: PageProps<"/concur
                 >
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <p className="truncate font-medium">{c.orgao}</p>
+                      <p className="flex items-center gap-1.5 font-medium">
+                        <MarcadorConcurso cor={corDoConcurso(c)} icone={c.icone} />
+                        <span className="min-w-0 truncate">{c.orgao}</span>
+                      </p>
                       <p className="truncate text-muted-foreground text-sm">{c.cargo}</p>
                     </div>
                     <BadgeStatus status={c.status} />

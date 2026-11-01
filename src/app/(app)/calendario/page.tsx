@@ -2,7 +2,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { connection } from "next/server";
-import { AgendaMes, GradeMes } from "@/components/calendario/calendario-mensal";
+import { AgendaMes, GradeMes, LegendaConcursos } from "@/components/calendario/calendario-mensal";
 import { CabecalhoPagina } from "@/components/layout/cabecalho-pagina";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -70,6 +70,8 @@ export default async function CalendarioPage({ searchParams }: PageProps<"/calen
           <div className="md:hidden">
             <AgendaMes itens={itens} hoje={hoje} />
           </div>
+
+          <LegendaConcursos itens={itens} />
 
           <ul
             aria-label="Legenda"

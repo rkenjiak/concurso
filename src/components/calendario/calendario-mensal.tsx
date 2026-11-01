@@ -1,7 +1,12 @@
 import { AlertTriangle, Check, Clock } from "lucide-react";
-import Link from "next/link";
+import { DetalhesEvento } from "@/components/calendario/detalhes-evento";
 import { BORDA_CRITICIDADE, nomePrazo } from "@/components/dashboard/lista-prazos";
-import { agruparPorData, DIAS_SEMANA, type DiaGrade } from "@/domain/calendario";
+import {
+  agruparPorData,
+  DIAS_SEMANA,
+  type DiaGrade,
+  proximosDoConcurso,
+} from "@/domain/calendario";
 import { formatarDataLonga } from "@/lib/format";
 import type { DataISO } from "@/lib/tz";
 import { cn } from "@/lib/utils";
@@ -27,28 +32,36 @@ function rotuloItem(item: ItemDoCalendario): string {
   return partes.join(" · ");
 }
 
-/** Item compacto da grade (desktop). */
-function ItemGrade({ item }: { item: ItemDoCalendario }) {
+/** Item compacto da grade (desktop); abre os detalhes do evento. */
+function ItemGrade({
+  item,
+  proximos,
+}: {
+  item: ItemDoCalendario;
+  proximos: readonly ItemDoCalendario[];
+}) {
   return (
     <li>
-      <Link
-        href={`/concursos/${item.concurso.id}`}
-        title={rotuloItem(item)}
-        aria-label={rotuloItem(item)}
-        data-criticidade={item.criticidade}
-        data-esmaecido={item.esmaecido || undefined}
-        className={cn(
-          "block truncate rounded border-l-4 bg-muted/60 px-1.5 py-0.5 text-xs transition-colors hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring",
-          BORDA_CRITICIDADE[item.criticidade],
-          item.criticidade === "ALTA" && "bg-destructive/10 font-medium text-destructive",
-          item.criticidade === "MEDIA" && "bg-amber-500/15 text-amber-800 dark:text-amber-300",
-          item.esmaecido && "text-muted-foreground opacity-60",
-          item.concluido && "line-through",
-        )}
-      >
-        {item.hora ? <span className="tabular-nums">{item.hora} </span> : null}
-        {nomePrazo(item)} · {item.concurso.orgao}
-      </Link>
+      <DetalhesEvento item={item} proximos={proximos}>
+        <button
+          type="button"
+          title={rotuloItem(item)}
+          aria-label={rotuloItem(item)}
+          data-criticidade={item.criticidade}
+          data-esmaecido={item.esmaecido || undefined}
+          className={cn(
+            "block w-full cursor-pointer truncate rounded border-l-4 text-left bg-muted/60 px-1.5 py-0.5 text-xs transition-colors hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring",
+            BORDA_CRITICIDADE[item.criticidade],
+            item.criticidade === "ALTA" && "bg-destructive/10 font-medium text-destructive",
+            item.criticidade === "MEDIA" && "bg-amber-500/15 text-amber-800 dark:text-amber-300",
+            item.esmaecido && "text-muted-foreground opacity-60",
+            item.concluido && "line-through",
+          )}
+        >
+          {item.hora ? <span className="tabular-nums">{item.hora} </span> : null}
+          {nomePrazo(item)} · {item.concurso.orgao}
+        </button>
+      </DetalhesEvento>
     </li>
   );
 }
@@ -58,10 +71,12 @@ export function GradeMes({
   grade,
   itens,
   titulo,
+  hoje,
 }: {
   grade: DiaGrade[][];
   itens: readonly ItemDoCalendario[];
   titulo: string;
+  hoje: DataISO;
 }) {
   const porData = agruparPorData(itens);
   return (
@@ -85,7 +100,12 @@ export function GradeMes({
         {grade.map((semana) => (
           <tr key={semana[0]?.data}>
             {semana.map((dia) => (
-              <CelulaDia key={dia.data} dia={dia} itens={porData.get(dia.data) ?? []} />
+              <CelulaDia
+                key={dia.data}
+                dia={dia}
+                itens={porData.get(dia.data) ?? []}
+                proximos={(item) => proximosDoConcurso(itens, item, hoje)}
+              />
             ))}
           </tr>
         ))}
@@ -94,7 +114,15 @@ export function GradeMes({
   );
 }
 
-function CelulaDia({ dia, itens }: { dia: DiaGrade; itens: readonly ItemDoCalendario[] }) {
+function CelulaDia({
+  dia,
+  itens,
+  proximos,
+}: {
+  dia: DiaGrade;
+  itens: readonly ItemDoCalendario[];
+  proximos: (item: ItemDoCalendario) => ItemDoCalendario[];
+}) {
   return (
     <td
       aria-current={dia.hoje ? "date" : undefined}
@@ -117,7 +145,7 @@ function CelulaDia({ dia, itens }: { dia: DiaGrade; itens: readonly ItemDoCalend
       {dia.doMes && itens.length > 0 ? (
         <ul className="space-y-1">
           {itens.map((item) => (
-            <ItemGrade key={item.chave} item={item} />
+            <ItemGrade key={item.chave} item={item} proximos={proximos(item)} />
           ))}
         </ul>
       ) : null}
@@ -152,39 +180,41 @@ export function AgendaMes({ itens, hoje }: { itens: readonly ItemDoCalendario[];
                 key={item.chave}
                 className={cn("border-l-4", BORDA_CRITICIDADE[item.criticidade])}
               >
-                <Link
-                  href={`/concursos/${item.concurso.id}`}
-                  className={cn(
-                    "flex gap-2 p-3 transition-colors hover:bg-accent/50 focus-visible:outline-2 focus-visible:outline-ring",
-                    item.esmaecido && "text-muted-foreground opacity-60",
-                  )}
-                >
-                  <div className="min-w-0 flex-1 space-y-0.5">
-                    <p
-                      className={cn(
-                        "flex items-center gap-1.5 font-medium",
-                        item.concluido && "line-through",
-                      )}
-                    >
-                      {item.criticidade === "ALTA" ? (
-                        <AlertTriangle className="size-4 shrink-0 text-destructive" aria-hidden />
-                      ) : null}
-                      {item.concluido ? (
-                        <Check className="size-4 shrink-0" aria-label="Concluído" />
-                      ) : null}
-                      {nomePrazo(item)}
-                    </p>
-                    <p className="truncate text-muted-foreground text-sm">
-                      {item.concurso.orgao} — {item.concurso.cargo}
-                    </p>
-                  </div>
-                  {item.hora ? (
-                    <span className="inline-flex shrink-0 items-center gap-1 text-muted-foreground text-xs">
-                      <Clock className="size-3" aria-hidden />
-                      {item.hora}
-                    </span>
-                  ) : null}
-                </Link>
+                <DetalhesEvento item={item} proximos={proximosDoConcurso(itens, item, hoje)}>
+                  <button
+                    type="button"
+                    className={cn(
+                      "flex w-full cursor-pointer gap-2 p-3 text-left transition-colors hover:bg-accent/50 focus-visible:outline-2 focus-visible:outline-ring",
+                      item.esmaecido && "text-muted-foreground opacity-60",
+                    )}
+                  >
+                    <div className="min-w-0 flex-1 space-y-0.5">
+                      <p
+                        className={cn(
+                          "flex items-center gap-1.5 font-medium",
+                          item.concluido && "line-through",
+                        )}
+                      >
+                        {item.criticidade === "ALTA" ? (
+                          <AlertTriangle className="size-4 shrink-0 text-destructive" aria-hidden />
+                        ) : null}
+                        {item.concluido ? (
+                          <Check className="size-4 shrink-0" aria-label="Concluído" />
+                        ) : null}
+                        {nomePrazo(item)}
+                      </p>
+                      <p className="truncate text-muted-foreground text-sm">
+                        {item.concurso.orgao} — {item.concurso.cargo}
+                      </p>
+                    </div>
+                    {item.hora ? (
+                      <span className="inline-flex shrink-0 items-center gap-1 text-muted-foreground text-xs">
+                        <Clock className="size-3" aria-hidden />
+                        {item.hora}
+                      </span>
+                    ) : null}
+                  </button>
+                </DetalhesEvento>
               </li>
             ))}
           </ul>

@@ -216,6 +216,8 @@ export async function proximosPrazos(db: Db, janelaDias: number, hoje: DataISO =
     hora: p.hora,
     dias: p.dias,
     critico: p.critico,
+    // Preferência de exibição do dashboard (#44): a LLM continua vendo todos os prazos.
+    ocultoNoDashboard: p.oculto,
   });
   return {
     hoje,

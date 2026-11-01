@@ -1,4 +1,4 @@
-import { AlertTriangle, Clock, MapPin } from "lucide-react";
+import { AlertTriangle, Clock, EyeOff, MapPin } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { ROTULO_TIPO_EVENTO } from "@/domain/labels";
@@ -6,6 +6,7 @@ import { type Criticidade, descreverDias, type Prazo } from "@/domain/prazos";
 import { formatarData } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { ConcursoDoPrazo, EventoDoPrazo } from "@/server/queries/dashboard";
+import { BotaoOcultarPrazo } from "./botao-ocultar-prazo";
 
 type PrazoDashboard = Prazo<EventoDoPrazo, ConcursoDoPrazo>;
 
@@ -39,17 +40,28 @@ function BadgeCriticidade({ prazo }: { prazo: PrazoDashboard }) {
   return prazo.critico ? <Badge variant="outline">Prazo crítico</Badge> : null;
 }
 
-/** Lista de prazos de um grupo do dashboard, com destaque visual por criticidade. */
+/**
+ * Lista de prazos de um grupo do dashboard, com destaque visual por criticidade. Cada item tem a
+ * ação de ocultar/reexibir (#44); prazos ocultos (exibidos só com "Mostrar ocultos") aparecem
+ * esmaecidos.
+ */
 export function ListaPrazos({ prazos }: { prazos: readonly PrazoDashboard[] }) {
   return (
     <ul className="divide-y rounded-lg border">
       {prazos.map((p) => {
         const nome = nomePrazo(p);
         return (
-          <li key={p.chave} className={cn("border-l-4", BORDA_CRITICIDADE[p.criticidade])}>
+          <li
+            key={p.chave}
+            data-oculto={p.oculto || undefined}
+            className={cn("flex items-start border-l-4", BORDA_CRITICIDADE[p.criticidade])}
+          >
             <Link
               href={`/concursos/${p.concurso.id}`}
-              className="flex gap-3 p-3 transition-colors hover:bg-accent/50 focus-visible:outline-2 focus-visible:outline-ring"
+              className={cn(
+                "flex min-w-0 flex-1 gap-3 p-3 transition-colors hover:bg-accent/50 focus-visible:outline-2 focus-visible:outline-ring",
+                p.oculto && "opacity-60",
+              )}
             >
               <div className="w-14 shrink-0 text-center">
                 <p className="font-semibold text-sm tabular-nums">
@@ -64,6 +76,12 @@ export function ListaPrazos({ prazos }: { prazos: readonly PrazoDashboard[] }) {
                   ) : null}
                   <span className="font-medium">{nome}</span>
                   <BadgeCriticidade prazo={p} />
+                  {p.oculto ? (
+                    <Badge variant="outline" className="text-muted-foreground">
+                      <EyeOff aria-hidden />
+                      Oculto
+                    </Badge>
+                  ) : null}
                 </div>
                 <p className="truncate text-muted-foreground text-sm">
                   {p.concurso.orgao} — {p.concurso.cargo}
@@ -87,6 +105,9 @@ export function ListaPrazos({ prazos }: { prazos: readonly PrazoDashboard[] }) {
                 </div>
               </div>
             </Link>
+            <div className="shrink-0 p-2">
+              <BotaoOcultarPrazo chave={p.chave} oculto={p.oculto} nome={nome} />
+            </div>
           </li>
         );
       })}

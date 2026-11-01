@@ -7,6 +7,18 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 
 ## [Unreleased]
 
+### Adicionado
+
+- Ocultar e reexibir prazos no dashboard (RF06, #44): cada item da lista de próximos prazos tem
+  um botão de olho para ocultá-lo; o cabeçalho mostra o contador “N ocultos” e o botão “Mostrar
+  ocultos” (`/?ocultos=1`), que exibe os ocultos esmaecidos, com selo “Oculto” e a ação de
+  reexibir. Vale também para o pseudo-evento de fim da validade. A preferência é gravada no banco
+  (migração `0001_dashboard_ocultos`: `evento.oculto_dashboard` e
+  `concurso.validade_oculta_dashboard`), persiste entre sessões e não altera `updated_at`; o
+  calendário e o MCP continuam listando todos os prazos (`proximos_prazos` informa
+  `ocultoNoDashboard`). O backup JSON inclui os novos campos sem mudar o `schemaVersion` (1):
+  backups antigos, sem eles, são importados com tudo visível.
+
 ## [1.2.0] - 2026-11-01
 
 ### Adicionado

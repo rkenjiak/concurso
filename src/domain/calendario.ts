@@ -133,7 +133,7 @@ export function montarGradeMes(mes: MesISO, hoje: DataISO): DiaGrade[][] {
 export type ItemCalendario<
   E extends EventoPrazo = EventoPrazo,
   C extends ConcursoPrazo = ConcursoPrazo,
-> = Prazo<E, C> & {
+> = Omit<Prazo<E, C>, "oculto"> & {
   concluido: boolean;
   /** Esmaecido: evento concluído ou de concurso encerrado (não exige mais ação). */
   esmaecido: boolean;

@@ -4,6 +4,7 @@ import {
   type ConcursoPrazo,
   compararPrazos,
   concursoAcompanhado,
+  contarOcultos,
   criticidade,
   DIAS_CRITICIDADE_ALTA,
   DIAS_CRITICIDADE_MEDIA,
@@ -11,8 +12,10 @@ import {
   type EventoPrazo,
   ehTipoCritico,
   JANELA_PADRAO_DIAS,
+  lerChavePrazo,
   proximaData,
   proximosPrazos,
+  semOcultos,
   TIPOS_CRITICOS,
   totalPrazos,
 } from "./prazos";
@@ -278,6 +281,7 @@ describe("proximosPrazos", () => {
           critico: false,
           criticidade: "NORMAL",
           derivado: true,
+          oculto: false,
         },
       ]);
     });
@@ -339,6 +343,71 @@ describe("proximosPrazos", () => {
     expect(a).toEqual(["evento-2", "evento-3", "evento-1"]);
     expect(b).toEqual(a);
     expect(eventos).toEqual(copia);
+  });
+});
+
+describe("prazos ocultos do dashboard (#44)", () => {
+  const eventos = [
+    ev({ id: 1, data: "2026-10-30", tipo: "FIM_INSCRICOES", ocultoDashboard: true }),
+    ev({ id: 2, data: HOJE }),
+    ev({ id: 3, data: "2026-11-05", ocultoDashboard: true }),
+    ev({ id: 4, data: "2026-11-06", ocultoDashboard: false }),
+  ];
+  const concursos: ConcursoPrazo[] = [
+    { ...ativo, validadeFim: "2026-11-10", validadeOcultaDashboard: true },
+  ];
+
+  it("marca os prazos ocultos sem removê-los dos grupos", () => {
+    const g = proximosPrazos(eventos, concursos, HOJE);
+    expect(g.vencidos.map((p) => [p.chave, p.oculto])).toEqual([["evento-1", true]]);
+    expect(g.hoje.map((p) => [p.chave, p.oculto])).toEqual([["evento-2", false]]);
+    expect(g.proximos.map((p) => [p.chave, p.oculto])).toEqual([
+      ["evento-3", true],
+      ["evento-4", false],
+      ["validade-1", true],
+    ]);
+    expect(contarOcultos(g)).toBe(3);
+  });
+
+  it("semOcultos remove apenas os ocultos", () => {
+    const g = semOcultos(proximosPrazos(eventos, concursos, HOJE));
+    expect(chaves(g.vencidos)).toEqual([]);
+    expect(chaves(g.hoje)).toEqual(["evento-2"]);
+    expect(chaves(g.proximos)).toEqual(["evento-4"]);
+    expect(contarOcultos(g)).toBe(0);
+    expect(totalPrazos(g)).toBe(2);
+  });
+
+  it("sem a preferência, tudo é visível", () => {
+    const g = proximosPrazos([ev({ id: 9, data: HOJE })], [{ ...ativo, validadeFim: HOJE }], HOJE);
+    expect(g.hoje.every((p) => !p.oculto)).toBe(true);
+    expect(contarOcultos(g)).toBe(0);
+  });
+});
+
+describe("lerChavePrazo", () => {
+  it("interpreta chaves de evento e de validade", () => {
+    expect(lerChavePrazo("evento-12")).toEqual({ tipo: "evento", eventoId: 12 });
+    expect(lerChavePrazo("validade-3")).toEqual({ tipo: "validade", concursoId: 3 });
+  });
+
+  it("rejeita chaves inválidas", () => {
+    for (const chave of [
+      "",
+      "evento-",
+      "evento-0",
+      "evento-01",
+      "evento--1",
+      "evento-1.5",
+      "outro-1",
+      " evento-1",
+      "evento-99999999999999999",
+      12,
+      null,
+      undefined,
+    ]) {
+      expect(lerChavePrazo(chave)).toBeNull();
+    }
   });
 });
 

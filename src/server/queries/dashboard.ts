@@ -2,9 +2,11 @@
 import { and, asc, count, eq, lte, or } from "drizzle-orm";
 import { STATUS, type Status } from "@/domain/enums";
 import {
+  contarOcultos,
   type GruposPrazos,
   JANELA_PADRAO_DIAS,
   proximosPrazos,
+  semOcultos,
   totalPrazos,
 } from "@/domain/prazos";
 import { calcularValidadeFim } from "@/domain/validade";
@@ -19,6 +21,8 @@ export interface ConcursoDoPrazo {
   status: Status;
   /** Fim da validade (§4.3), calculado a partir dos dados do concurso; `null` se indefinida. */
   validadeFim: DataISO | null;
+  /** Pseudo-evento de validade oculto do dashboard (#44). */
+  validadeOcultaDashboard: boolean;
 }
 
 export interface EventoDoPrazo {
@@ -30,6 +34,8 @@ export interface EventoDoPrazo {
   hora: string | null;
   local: string | null;
   concluido: boolean;
+  /** Oculto do dashboard (#44). */
+  ocultoDashboard: boolean;
 }
 
 export interface ContagemStatus {
@@ -38,8 +44,12 @@ export interface ContagemStatus {
 }
 
 export interface Dashboard {
+  /** Todos os prazos da janela, inclusive os ocultos (`prazo.oculto`); filtre com `semOcultos`. */
   prazos: GruposPrazos<EventoDoPrazo, ConcursoDoPrazo>;
+  /** Total de prazos visíveis (não ocultos). */
   totalPrazos: number;
+  /** Prazos da janela ocultos pelo usuário (#44). */
+  ocultos: number;
   /** Apenas status com ao menos um concurso, na ordem do enum. */
   porStatus: ContagemStatus[];
   totalConcursos: number;
@@ -70,6 +80,7 @@ export async function listarConcursosDoPrazo(db: Db): Promise<ConcursoDoPrazo[]>
       validadeMeses: concurso.validadeMeses,
       validadeProrrogada: concurso.validadeProrrogada,
       validadeFimManual: concurso.validadeFimManual,
+      validadeOcultaDashboard: concurso.validadeOcultaDashboard,
     })
     .from(concurso);
   return linhas.map(
@@ -95,6 +106,7 @@ export const COLUNAS_EVENTO_PRAZO = {
   hora: evento.hora,
   local: evento.local,
   concluido: evento.concluido,
+  ocultoDashboard: evento.ocultoDashboard,
 };
 
 /**
@@ -121,7 +133,8 @@ export async function obterDashboard(
   const prazos = proximosPrazos(eventos, concursos, hoje, janelaDias);
   return {
     prazos,
-    totalPrazos: totalPrazos(prazos),
+    totalPrazos: totalPrazos(semOcultos(prazos)),
+    ocultos: contarOcultos(prazos),
     porStatus,
     totalConcursos: porStatus.reduce((soma, s) => soma + s.quantidade, 0),
   };

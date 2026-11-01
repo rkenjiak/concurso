@@ -5,9 +5,14 @@
 import { eq } from "drizzle-orm";
 import { montarBuscaNormalizada } from "@/lib/normalize";
 import type { ConcursoDados, ConcursoEdicaoDados } from "@/lib/schemas/concurso";
+import type { EventoDados } from "@/lib/schemas/evento";
+import type { LinkDados } from "@/lib/schemas/link";
 import type { Db } from "../db/client";
 import { concurso, statusHistorico } from "../db/schema";
+import { inserirEvento } from "./eventos";
+import { inserirLink } from "./links";
 import { removerTagsOrfas, sincronizarTags } from "./tags";
+import type { Transacao } from "./tipos";
 
 function colunas(dados: ConcursoEdicaoDados) {
   return {
@@ -33,23 +38,49 @@ function colunas(dados: ConcursoEdicaoDados) {
   };
 }
 
+/** Insere o concurso, suas tags e o registro inicial do histórico numa transação aberta. */
+export async function inserirConcurso(
+  tx: Transacao,
+  dados: ConcursoDados,
+  agora: Date,
+): Promise<number> {
+  const [linha] = await tx
+    .insert(concurso)
+    .values({ ...colunas(dados), status: dados.status, statusDesde: agora })
+    .returning({ id: concurso.id });
+  if (!linha) throw new Error("Falha ao inserir o concurso.");
+  await tx
+    .insert(statusHistorico)
+    .values({ concursoId: linha.id, de: null, para: dados.status, alteradoEm: agora });
+  await sincronizarTags(tx, linha.id, dados.tags);
+  return linha.id;
+}
+
 /** Cria o concurso, suas tags e o registro inicial do histórico (`de = null`). Retorna o ID. */
 export async function criarConcurso(
   db: Db,
   dados: ConcursoDados,
   agora: Date = new Date(),
 ): Promise<number> {
+  return db.transaction((tx) => inserirConcurso(tx, dados, agora));
+}
+
+/**
+ * Cria o concurso com seus eventos e links numa única transação (tudo ou nada) — usado pelo
+ * cadastro a partir do edital (MCP). Os links entram na ordem informada. Retorna o ID.
+ */
+export async function criarConcursoCompleto(
+  db: Db,
+  dados: ConcursoDados,
+  eventos: readonly EventoDados[],
+  links: readonly LinkDados[],
+  agora: Date = new Date(),
+): Promise<number> {
   return db.transaction(async (tx) => {
-    const [linha] = await tx
-      .insert(concurso)
-      .values({ ...colunas(dados), status: dados.status, statusDesde: agora })
-      .returning({ id: concurso.id });
-    if (!linha) throw new Error("Falha ao inserir o concurso.");
-    await tx
-      .insert(statusHistorico)
-      .values({ concursoId: linha.id, de: null, para: dados.status, alteradoEm: agora });
-    await sincronizarTags(tx, linha.id, dados.tags);
-    return linha.id;
+    const id = await inserirConcurso(tx, dados, agora);
+    for (const e of eventos) await inserirEvento(tx, id, e, agora);
+    for (const l of links) await inserirLink(tx, id, l);
+    return id;
   });
 }
 

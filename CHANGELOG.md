@@ -7,6 +7,22 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 
 ## [Unreleased]
 
+### Adicionado
+
+- Servidor MCP (RF10, #39) para cadastrar e atualizar concursos com uma LLM que tem acesso ao
+  edital: o usuário escolhe o cargo e `cadastrar_concurso` grava concurso + eventos + links + tags
+  numa única transação, com `simular: true` para conferir antes e recusa de concursos parecidos
+  (órgão e cargo, sem acento; números distinguem órgãos) salvo `ignorarDuplicados`. Ferramentas
+  `atualizar_concurso` (só os campos informados), `alterar_status` (transição validada, histórico e
+  status permitidos na recusa), `salvar_eventos`/`salvar_links` (lotes tudo ou nada, para
+  retificações), `registrar_resultado`, `listar_concursos`, `obter_concurso`, `proximos_prazos` e
+  `verificar_duplicado`; recursos `concurso://referencia` e `concurso://concursos/{id}`; prompts
+  `cadastrar_edital` e `aplicar_retificacao`. Sem ferramentas de exclusão. Entradas em reais e
+  validadas pelos mesmos schemas Zod da UI, com erros por campo (`eventos[2].data`) para a LLM
+  corrigir. Uso local por stdio (`pnpm --silent mcp`) e hospedado por HTTP em `/api/mcp`,
+  desligado sem `MCP_TOKEN` (≥ 32 caracteres, `Authorization: Bearer`, atraso progressivo após
+  falhas), independente da senha do app. SDK `@modelcontextprotocol/server` v2.
+
 ## [1.1.0] - 2026-10-31
 
 ### Adicionado

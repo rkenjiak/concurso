@@ -7,7 +7,7 @@ import { alterarStatusSchema } from "@/lib/schemas/status";
 import { criarBancoTeste } from "../db/banco-teste";
 import type { Db } from "../db/client";
 import { obterConcurso } from "../queries/concursos";
-import { listarHistorico, obterOpcoesStatus } from "../queries/historico";
+import { listarHistorico, obterOpcoesStatus, opcoesStatusPorConcurso } from "../queries/historico";
 import { criarConcurso } from "./concursos";
 import { alterarStatus, desfazerUltimoStatus } from "./status";
 
@@ -115,6 +115,27 @@ describe("obterOpcoesStatus", () => {
     r = await obterOpcoesStatus(db, id, "SUSPENSO");
     expect(r.opcoes).toEqual({ transicoes: ["APROVADO", "CANCELADO"], desfazerPara: "APROVADO" });
     expect(r.historico).toHaveLength(2);
+  });
+});
+
+describe("opcoesStatusPorConcurso", () => {
+  it("lista vazia não consulta o banco", async () => {
+    expect((await opcoesStatusPorConcurso(db, [])).size).toBe(0);
+  });
+
+  it("calcula as opções de cada concurso a partir do próprio histórico", async () => {
+    const a = await novo("APROVADO");
+    const b = await novo("PREVISTO");
+    await alterarStatus(db, a, "SUSPENSO", null, t(2));
+    await alterarStatus(db, b, "INSCRITO", null, t(3));
+    const mapa = await opcoesStatusPorConcurso(db, [
+      { id: a, status: "SUSPENSO" },
+      { id: b, status: "INSCRITO" },
+    ]);
+    expect(mapa.get(a)).toEqual((await obterOpcoesStatus(db, a, "SUSPENSO")).opcoes);
+    expect(mapa.get(a)?.transicoes).toEqual(["APROVADO", "CANCELADO"]);
+    expect(mapa.get(b)?.desfazerPara).toBe("PREVISTO");
+    expect(mapa.get(b)?.transicoes).not.toContain("PREVISTO");
   });
 });
 

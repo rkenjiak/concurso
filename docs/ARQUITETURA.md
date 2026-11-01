@@ -216,7 +216,7 @@ senão → indefinida
 | `/concursos/[id]/editar` | Formulário de edição | MVP |
 | `/configuracoes` | Exportar/importar dados, sobre/versão | MVP |
 | `/login` | Senha única (só se auth habilitada) | MVP |
-| `/kanban` | Quadro por status (arrastar = transição validada) | pós-MVP |
+| `/concursos?visao=quadro` | Quadro por status (kanban; arrastar ou “Mover para” = transição validada) | v1.1 |
 | `/calendario` | Visão mensal de eventos | pós-MVP |
 
 Layout responsivo: navegação lateral no desktop, barra inferior no celular. Links externos com

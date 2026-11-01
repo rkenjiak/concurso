@@ -7,6 +7,17 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 
 ## [Unreleased]
 
+### Adicionado
+
+- Visão em quadro (kanban) dos concursos (RF06) em `/concursos?visao=quadro`, com alternância
+  Lista/Quadro que preserva busca, filtros e ordenação. Uma coluna por status na ordem do pipeline
+  (trilha principal, Aprovado, Classificado, Nomeado) e os encerrados/suspensos agrupados numa
+  coluna recolhível. Cartões com órgão, cargo, banca, próxima data pendente e tags; o nome abre o
+  detalhe. Mover um cartão — arrastando (HTML5 nativo, destaca as colunas permitidas) ou pelo menu
+  “Mover para” de cada cartão (teclado e celular) — usa a mesma ação da troca de status: transição
+  validada pelo domínio (mensagem quando não permitida), histórico gravado e botão “Desfazer”.
+  Rolagem horizontal no celular.
+
 ## [1.0.0] - 2026-10-31
 
 ### Adicionado

@@ -84,6 +84,17 @@ describe("atualizarConcurso", () => {
   it("retorna false para concurso inexistente", async () => {
     expect(await atualizarConcurso(db, 999, dados())).toBe(false);
   });
+
+  it("grava, troca e limpa a cor e o ícone (#46)", async () => {
+    const id = await criarConcurso(db, dados(), AGORA);
+    expect(await obterConcurso(db, id)).toMatchObject({ cor: null, icone: null });
+    await atualizarConcurso(db, id, dados({ cor: "VIOLETA", icone: "⚖️" }));
+    expect(await obterConcurso(db, id)).toMatchObject({ cor: "VIOLETA", icone: "⚖️" });
+    const [resumo] = await listarConcursos(db);
+    expect(resumo).toMatchObject({ cor: "VIOLETA", icone: "⚖️" });
+    await atualizarConcurso(db, id, dados({ cor: "", icone: "" }));
+    expect(await obterConcurso(db, id)).toMatchObject({ cor: null, icone: null });
+  });
 });
 
 describe("excluirConcurso", () => {

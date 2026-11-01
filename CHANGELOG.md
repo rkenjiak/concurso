@@ -7,6 +7,52 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-11-01
+
+### Adicionado
+
+- Tema claro, escuro e do sistema (#47): seletor Claro / Escuro / Sistema na navegação (lateral no
+  desktop, cabeçalho no celular) e em Configurações → Aparência. Padrão Sistema (segue
+  `prefers-color-scheme`, inclusive mudanças ao vivo); a escolha fica salva no navegador e é
+  aplicada por um script inline no `<head>` antes da primeira pintura, sem flash de tema errado.
+  O tema escuro passa a usar a classe `dark` no `<html>`, e os destaques de atenção (prazo da
+  semana, validade vencendo, suspenso, sub judice) usam os tokens `--aviso`/`--aviso-foreground`,
+  com contraste adequado nos dois temas; o fundo dos diálogos escurece mais no tema escuro.
+- Ocultar e reexibir prazos no dashboard (RF06, #44): cada item da lista de próximos prazos tem
+  um botão de olho para ocultá-lo; o cabeçalho mostra o contador “N ocultos” e o botão “Mostrar
+  ocultos” (`/?ocultos=1`), que exibe os ocultos esmaecidos, com selo “Oculto” e a ação de
+  reexibir. Vale também para o pseudo-evento de fim da validade. A preferência é gravada no banco
+  (migração `0001_dashboard_ocultos`: `evento.oculto_dashboard` e
+  `concurso.validade_oculta_dashboard`), persiste entre sessões e não altera `updated_at`; o
+  calendário e o MCP continuam listando todos os prazos (`proximos_prazos` informa
+  `ocultoNoDashboard`). O backup JSON inclui os novos campos sem mudar o `schemaVersion` (1):
+  backups antigos, sem eles, são importados com tudo visível.
+- Cor e ícone por concurso (#46): no formulário, cor de uma paleta pré-definida (azul, ciano,
+  verde-água, verde, violeta, magenta, rosa, cinza) ou “Automática” — derivada do ID, sempre a
+  mesma — e, opcionalmente, um emoji como ícone. Calendário (grade, agenda e diálogo de detalhes),
+  próximos prazos do dashboard, lista, quadro e detalhe do concurso mostram um marcador com a cor
+  e o ícone, sem tirar o destaque vermelho/âmbar dos prazos críticos; o calendário ganha a
+  legenda cor → concurso. A paleta usa tokens CSS com tons próprios para os temas claro e
+  escuro (contraste ≥ 3:1, verificado em teste). Migração `0002_cor_icone_concurso`
+  (`concurso.cor` e `concurso.icone`); backup JSON com os campos opcionais sem mudar o
+  `schemaVersion` (1) e MCP aceitando/retornando `cor` e `icone`.
+
+### Alterado
+
+- Calendário (#45): clicar num evento (grade do mês ou agenda em lista no celular) abre um diálogo
+  com os detalhes em vez de navegar — nome, data e horário, local, concurso (órgão, cargo e
+  status), situação (concluído, urgente, vencido) e os próximos eventos pendentes do concurso no
+  mês — e o botão “Ir para o concurso”. Fecha com Esc, clique fora ou botão Fechar, devolvendo o
+  foco ao evento; acessível por teclado (Radix Dialog).
+
+### Corrigido
+
+- Observações do concurso: tabelas em markdown voltam a ser renderizadas como tabela (#43), em vez
+  de texto cru (`| a | b |`). O `react-markdown` passa a usar `remark-gfm`, o que também habilita
+  tachado, listas de tarefas e autolinks. A tabela tem bordas, padding e cabeçalho destacado com as
+  cores do tema, e tabelas largas rolam na horizontal sem quebrar o layout. HTML bruto continua
+  descartado (`skipHtml`) e URLs perigosas continuam neutralizadas.
+
 ## [1.2.0] - 2026-11-01
 
 ### Adicionado

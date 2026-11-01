@@ -7,6 +7,7 @@
  * erros vêm com o caminho do item (ex.: `eventos[2].data`) e nada é gravado.
  */
 
+import { corDoConcurso } from "@/domain/cores";
 import { possiveisDuplicados } from "@/domain/duplicados";
 import type { Esfera, Status, Uf } from "@/domain/enums";
 import { ErroDominio } from "@/domain/erros";
@@ -184,6 +185,10 @@ export async function obterFicha(db: Db, id: number) {
     transicoesPermitidas: status.opcoes.transicoes,
     observacoes: c.observacoes,
     tags: c.tags,
+    // `null` = cor automática (a exibida fica em `corExibida`).
+    cor: c.cor,
+    corExibida: corDoConcurso(c),
+    icone: c.icone,
     homologacaoData: c.homologacaoData,
     validadeMeses: c.validadeMeses,
     validadeProrrogada: c.validadeProrrogada,
@@ -216,6 +221,8 @@ export async function proximosPrazos(db: Db, janelaDias: number, hoje: DataISO =
     hora: p.hora,
     dias: p.dias,
     critico: p.critico,
+    // Preferência de exibição do dashboard (#44): a LLM continua vendo todos os prazos.
+    ocultoNoDashboard: p.oculto,
   });
   return {
     hoje,

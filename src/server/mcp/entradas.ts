@@ -5,6 +5,7 @@
  * formulários, que passam pelos MESMOS schemas Zod da UI (`src/lib/schemas/*`) antes de gravar.
  */
 import { z } from "zod";
+import { COR_CONCURSO } from "@/domain/cores";
 import {
   ESCOLARIDADE,
   ESFERA,
@@ -64,6 +65,14 @@ const camposConcurso = {
     .array(z.string())
     .optional()
     .describe("Tags livres (ex.: 'tribunais', 'nível superior'). Substituem as atuais."),
+  cor: z
+    .enum(COR_CONCURSO)
+    .nullish()
+    .describe(
+      "Cor de identificação no calendário/painel. Só informe se o usuário pedir; " +
+        "null = automática (derivada do ID).",
+    ),
+  icone: textoOpc("Ícone de identificação: UM emoji (ex.: '⚖️'). Só informe se o usuário pedir."),
   homologacaoData: dataOpc("Data da homologação do resultado final."),
   validadeMeses: inteiroOpc("Prazo de validade do concurso em meses (1 a 24)."),
   validadeProrrogada: z.boolean().optional().describe("Se a validade já foi prorrogada."),
@@ -191,6 +200,8 @@ const CONVERSORES_CONCURSO: Partial<Record<keyof ConcursoFormValores, Conversor>
   status: direto,
   observacoes: texto,
   tags: (v) => v ?? [],
+  cor: enumOpc,
+  icone: texto,
   homologacaoData: texto,
   validadeMeses: texto,
   validadeProrrogada: booleano,

@@ -3,6 +3,7 @@ import { connection } from "next/server";
 import { BotaoSair } from "@/components/auth/botao-sair";
 import { ExportarImportar } from "@/components/configuracoes/exportar-importar";
 import { CabecalhoPagina } from "@/components/layout/cabecalho-pagina";
+import { SeletorTema } from "@/components/tema/seletor-tema";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { lerConfigAuth } from "@/server/auth/config";
 
@@ -14,7 +15,21 @@ export default async function ConfiguracoesPage() {
 
   return (
     <div className="space-y-6">
-      <CabecalhoPagina titulo="Configurações" descricao="Backup dos dados e informações do app." />
+      <CabecalhoPagina
+        titulo="Configurações"
+        descricao="Aparência, backup dos dados e informações do app."
+      />
+      <Card>
+        <CardHeader>
+          <CardTitle>Aparência</CardTitle>
+          <CardDescription>
+            Tema claro, escuro ou do sistema (padrão). A escolha fica salva neste navegador.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <SeletorTema />
+        </CardContent>
+      </Card>
       <Card>
         <CardHeader>
           <CardTitle>Exportar e importar</CardTitle>

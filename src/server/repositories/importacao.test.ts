@@ -11,6 +11,7 @@ import type { Db } from "../db/client";
 import { listarConcursos, obterConcurso } from "../queries/concursos";
 import { exportarConcursosCsv, exportarDados } from "../queries/exportacao";
 import { criarConcurso } from "./concursos";
+import { definirPrazoOculto } from "./dashboard";
 import { criarEvento } from "./eventos";
 import { substituirTudo } from "./importacao";
 import { criarLink } from "./links";
@@ -66,6 +67,9 @@ async function popular(db: Db) {
       orgao: "Prefeitura",
       cargo: "Técnico",
       tags: ["prioridade"],
+      // Identificação visual (#46): o outro concurso fica com a cor automática.
+      cor: "MAGENTA",
+      icone: "🏛️",
     }),
     T0,
   );
@@ -75,7 +79,7 @@ async function popular(db: Db) {
     a,
     linkSchema.parse({ tipo: "EDITAL_ABERTURA", rotulo: "Edital", url: "https://ex.com/e.pdf" }),
   );
-  await criarEvento(
+  const evento = await criarEvento(
     db,
     a,
     eventoSchema.parse({
@@ -88,6 +92,9 @@ async function popular(db: Db) {
     }),
     T1,
   );
+  // Preferências de exibição do dashboard (#44) também fazem parte do backup.
+  await definirPrazoOculto(db, { tipo: "evento", eventoId: evento }, true);
+  await definirPrazoOculto(db, { tipo: "validade", concursoId: a }, true);
   await criarResultadoFase(
     db,
     a,
@@ -118,6 +125,12 @@ describe("exportar → importar", () => {
     expect(exportado.dados.eventos).toHaveLength(1);
     expect(exportado.dados.statusHistorico).toHaveLength(3);
     expect(exportado.dados.resultadosFase).toHaveLength(1);
+    expect(exportado.dados.eventos[0]?.ocultoDashboard).toBe(true);
+    expect(exportado.dados.concursos.map((c) => c.validadeOcultaDashboard)).toEqual([true, false]);
+    expect(exportado.dados.concursos.map((c) => [c.cor, c.icone])).toEqual([
+      [null, null],
+      ["MAGENTA", "🏛️"],
+    ]);
 
     const resumo = await substituirTudo(destino.db, validarBackup(viaArquivo(exportado)));
     expect(resumo).toMatchObject({ concursos: 2, tags: 2, eventos: 1, statusHistorico: 3 });
@@ -244,6 +257,56 @@ describe("validarBackup", () => {
     );
     expect(mensagem({ ...b, dados: { ...b.dados, tags: [] } })).toMatch(
       /referencia uma tag inexistente/,
+    );
+  });
+
+  it("aceita backup antigo, sem os campos de prazos ocultos do dashboard", async () => {
+    const b = await base();
+    const antigo = {
+      ...b,
+      dados: {
+        ...b.dados,
+        concursos: b.dados.concursos.map(({ validadeOcultaDashboard: _, ...c }) => c),
+        eventos: b.dados.eventos.map(({ ocultoDashboard: _, ...e }) => e),
+      },
+    };
+    const backup = validarBackup(antigo);
+    expect(backup.dados.concursos.map((c) => c.validadeOcultaDashboard)).toEqual([false, false]);
+    expect(backup.dados.eventos.map((e) => e.ocultoDashboard)).toEqual([false]);
+    await substituirTudo(destino.db, backup);
+    const reexportado = await exportarDados(destino.db, T1);
+    expect(reexportado.dados.eventos[0]?.ocultoDashboard).toBe(false);
+  });
+
+  it("aceita backup antigo, sem cor e ícone (cor automática)", async () => {
+    const b = await base();
+    const antigo = {
+      ...b,
+      dados: { ...b.dados, concursos: b.dados.concursos.map(({ cor: _, icone: __, ...c }) => c) },
+    };
+    const backup = validarBackup(antigo);
+    expect(backup.dados.concursos.map((c) => [c.cor, c.icone])).toEqual([
+      [null, null],
+      [null, null],
+    ]);
+    await substituirTudo(destino.db, backup);
+    const reexportado = await exportarDados(destino.db, T1);
+    expect(reexportado.dados.concursos.map((c) => c.cor)).toEqual([null, null]);
+  });
+
+  it("rejeita cor fora da paleta e ícone inválido", async () => {
+    const b = await base();
+    const c0 = b.dados.concursos[0];
+    if (!c0) throw new Error("sem concurso");
+    const com = (extra: object) => ({
+      ...b,
+      dados: { ...b.dados, concursos: [{ ...c0, ...extra }, ...b.dados.concursos.slice(1)] },
+    });
+    expect(mensagem(com({ cor: "VERMELHO" }))).toMatch(
+      /^Backup inválido em dados\.concursos\[0\]\.cor/,
+    );
+    expect(mensagem(com({ icone: "dois símbolos" }))).toBe(
+      "Backup inválido em dados.concursos[0].icone: Ícone inválido.",
     );
   });
 

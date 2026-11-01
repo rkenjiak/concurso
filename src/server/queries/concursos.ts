@@ -19,6 +19,8 @@ export type ConcursoResumo = Pick<
   | "status"
   | "remuneracaoCentavos"
   | "createdAt"
+  | "cor"
+  | "icone"
 > & {
   tags: string[];
   /** Menor data `>= hoje` entre os eventos não concluídos (§4.2), ou `null`. */
@@ -101,6 +103,8 @@ export async function listarConcursos(
       status: concurso.status,
       remuneracaoCentavos: concurso.remuneracaoCentavos,
       createdAt: concurso.createdAt,
+      cor: concurso.cor,
+      icone: concurso.icone,
       proximaData,
     })
     .from(concurso)

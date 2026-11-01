@@ -10,6 +10,7 @@ import {
 import { criarBancoTeste } from "../db/banco-teste";
 import type { Db } from "../db/client";
 import { criarConcurso } from "../repositories/concursos";
+import { definirPrazoOculto } from "../repositories/dashboard";
 import { criarEvento } from "../repositories/eventos";
 import { listarConcursos } from "./concursos";
 import { contarPorStatus, obterDashboard } from "./dashboard";
@@ -43,6 +44,7 @@ describe("obterDashboard", () => {
     expect(await obterDashboard(db, HOJE)).toEqual({
       prazos: { vencidos: [], hoje: [], proximos: [] },
       totalPrazos: 0,
+      ocultos: 0,
       porStatus: [],
       totalConcursos: 0,
     });
@@ -124,6 +126,37 @@ describe("obterDashboard", () => {
       ["Com evento", "2026-11-25", false, "2026-11-15"],
     ]);
     expect(d.prazos.proximos.slice(0, 2).map((p) => p.concurso.id)).toEqual([prorrogada, calc]);
+  });
+
+  it("marca prazos ocultos (#44) e não os conta no total", async () => {
+    const id = await criarConcurso(
+      db,
+      concursoSchema.parse({
+        ...VALORES_INICIAIS_CONCURSO,
+        orgao: "TRF",
+        cargo: "Analista",
+        status: "CLASSIFICADO",
+        validadeFimManual: "2026-11-20",
+      }),
+    );
+    const prova = await novoEvento(id, { tipo: "PROVA_OBJETIVA" });
+    await novoEvento(id, { tipo: "FIM_INSCRICOES", data: "2026-11-05" });
+    await definirPrazoOculto(db, { tipo: "evento", eventoId: prova }, true);
+    await definirPrazoOculto(db, { tipo: "validade", concursoId: id }, true);
+
+    let d = await obterDashboard(db, HOJE);
+    expect(d.totalPrazos).toBe(1);
+    expect(d.ocultos).toBe(2);
+    expect(d.prazos.hoje.map((p) => [p.chave, p.oculto])).toEqual([[`evento-${prova}`, true]]);
+    expect(d.prazos.proximos.map((p) => [p.tipo, p.oculto])).toEqual([
+      ["FIM_INSCRICOES", false],
+      ["VALIDADE", true],
+    ]);
+
+    await definirPrazoOculto(db, { tipo: "evento", eventoId: prova }, false);
+    d = await obterDashboard(db, HOJE);
+    expect(d.totalPrazos).toBe(2);
+    expect(d.ocultos).toBe(1);
   });
 
   it("respeita a janela informada", async () => {

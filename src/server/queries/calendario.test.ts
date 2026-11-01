@@ -1,5 +1,6 @@
 import type { Client } from "@libsql/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { corPadrao } from "@/domain/cores";
 import type { Status } from "@/domain/enums";
 import { concursoSchema, VALORES_INICIAIS_CONCURSO } from "@/lib/schemas/concurso";
 import {
@@ -46,6 +47,18 @@ const novoEvento = (concursoId: number, parcial: Partial<EventoFormValores>) =>
 describe("obterCalendario", () => {
   it("banco vazio", async () => {
     expect(await obterCalendario(db, "2026-11", HOJE)).toEqual([]);
+  });
+
+  it("traz a cor escolhida ou a automática e o ícone do concurso (#46)", async () => {
+    const escolhida = await novoConcurso("TRF", "INSCRITO", { cor: "VERDE", icone: "⚖️" });
+    const automatica = await novoConcurso("TJ", "INSCRITO");
+    await novoEvento(escolhida, { tipo: "OUTRO", data: "2026-11-05" });
+    await novoEvento(automatica, { tipo: "OUTRO", data: "2026-11-06" });
+    const itens = await obterCalendario(db, "2026-11", HOJE);
+    expect(itens.map((i) => [i.concurso.id, i.concurso.cor, i.concurso.icone])).toEqual([
+      [escolhida, "VERDE", "⚖️"],
+      [automatica, corPadrao(automatica), null],
+    ]);
   });
 
   it("eventos do mês (inclusive concluídos e de encerrados) e validade calculada", async () => {

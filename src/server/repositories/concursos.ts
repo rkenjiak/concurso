@@ -30,6 +30,8 @@ function colunas(dados: ConcursoEdicaoDados) {
     possuiCadastroReserva: dados.possuiCadastroReserva,
     vagasCotas: dados.vagasCotas,
     observacoes: dados.observacoes,
+    cor: dados.cor,
+    icone: dados.icone,
     homologacaoData: dados.homologacaoData,
     validadeMeses: dados.validadeMeses,
     validadeProrrogada: dados.validadeProrrogada,

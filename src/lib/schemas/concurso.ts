@@ -2,6 +2,7 @@
  * Schema do formulário de concurso (RF01), compartilhado entre cliente e servidor.
  */
 import { z } from "zod";
+import { COR_CONCURSO, type CorConcurso, ehIconeValido } from "@/domain/cores";
 import {
   ESCOLARIDADE,
   ESFERA,
@@ -40,6 +41,19 @@ const validadeMeses = z
     return n;
   });
 
+/** Ícone opcional: um único emoji/símbolo; vazio → `null`. */
+const icone = z
+  .string()
+  .trim()
+  .transform((v, ctx) => {
+    if (v === "") return null;
+    if (!ehIconeValido(v)) {
+      ctx.addIssue({ code: "custom", message: "Use um único emoji ou símbolo." });
+      return z.NEVER;
+    }
+    return v;
+  });
+
 const camposConcurso = z.object({
   orgao: textoObrigatorio("Informe o nome ou órgão.", 200),
   cargo: textoObrigatorio("Informe o cargo ou área.", 200),
@@ -57,6 +71,9 @@ const camposConcurso = z.object({
   status: z.enum(STATUS, { error: "Selecione o status." }),
   observacoes: textoOpcional(20_000),
   tags: tagsSchema,
+  // Identificação visual (#46): "" = cor automática.
+  cor: enumOpcional(COR_CONCURSO, "Cor inválida."),
+  icone,
   // Validade (RF05, §4.3)
   homologacaoData: dataOpcional,
   validadeMeses,
@@ -111,6 +128,8 @@ export const VALORES_INICIAIS_CONCURSO: ConcursoFormValores = {
   status: "PREVISTO",
   observacoes: "",
   tags: [],
+  cor: "",
+  icone: "",
   homologacaoData: "",
   validadeMeses: "",
   validadeProrrogada: false,
@@ -135,6 +154,8 @@ export interface ConcursoParaFormulario {
   status: Status;
   observacoes: string | null;
   tags?: readonly string[];
+  cor?: CorConcurso | null;
+  icone?: string | null;
   homologacaoData?: string | null;
   validadeMeses?: number | null;
   validadeProrrogada?: boolean;
@@ -162,6 +183,8 @@ export function valoresDoConcurso(c: ConcursoParaFormulario): ConcursoFormValore
     status: c.status,
     observacoes: texto(c.observacoes),
     tags: [...(c.tags ?? [])],
+    cor: c.cor ?? "",
+    icone: texto(c.icone),
     homologacaoData: texto(c.homologacaoData),
     validadeMeses: texto(c.validadeMeses),
     validadeProrrogada: c.validadeProrrogada ?? false,

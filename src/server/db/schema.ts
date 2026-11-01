@@ -10,6 +10,7 @@
  */
 import { sql } from "drizzle-orm";
 import { index, integer, primaryKey, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { COR_CONCURSO } from "../../domain/cores";
 import {
   ESCOLARIDADE,
   ESFERA,
@@ -65,6 +66,14 @@ export const concurso = sqliteTable(
       .notNull()
       .default(false),
     validadeFimManual: text("validade_fim_manual"),
+    /** Oculta do dashboard o pseudo-evento de fim da validade (preferência de exibição, #44). */
+    validadeOcultaDashboard: integer("validade_oculta_dashboard", { mode: "boolean" })
+      .notNull()
+      .default(false),
+    /** Cor da paleta (#46); `null` = automática, derivada do ID (`domain/cores`). */
+    cor: text("cor", { enum: COR_CONCURSO }),
+    /** Ícone opcional (um emoji) exibido junto da cor (#46). */
+    icone: text("icone"),
     buscaNormalizada: text("busca_normalizada").notNull().default(""),
     createdAt: criadoEm(),
     updatedAt: atualizadoEm(),
@@ -105,6 +114,8 @@ export const evento = sqliteTable(
     observacao: text("observacao"),
     concluido: integer("concluido", { mode: "boolean" }).notNull().default(false),
     concluidoEm: integer("concluido_em", { mode: "timestamp_ms" }),
+    /** Oculta o evento da lista de próximos prazos do dashboard (preferência de exibição, #44). */
+    ocultoDashboard: integer("oculto_dashboard", { mode: "boolean" }).notNull().default(false),
     createdAt: criadoEm(),
     updatedAt: atualizadoEm(),
   },

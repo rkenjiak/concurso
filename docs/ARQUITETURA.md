@@ -19,7 +19,7 @@
 | Validação | **Zod** | Um schema por formulário/ação, reaproveitado no cliente (react-hook-form) e no servidor. |
 | Formulários | **react-hook-form** + `@hookform/resolvers/zod` | Formulários grandes (RF01) com pouca re-renderização. |
 | Datas | **date-fns** + **@date-fns/tz** | Cálculo de "hoje" e prazos em `America/Sao_Paulo`. |
-| Markdown | **react-markdown** (sem HTML bruto) | Observações (RF01) renderizadas com segurança. |
+| Markdown | **react-markdown** + **remark-gfm** (sem HTML bruto) | Observações (RF01) renderizadas com segurança. |
 | MCP | **`@modelcontextprotocol/server`** (SDK v2) | Servidor MCP (RF10) com stdio e HTTP web-standard (`fetch`) a partir da mesma definição; só depende de Zod. |
 | Testes | **Vitest** (unit/integração) + **Playwright** (e2e smoke) | Rápidos; Vitest roda o domínio puro e o banco em memória. |
 | Lint/format | **Biome** | Uma ferramenta só para lint + format, rápida, configuração mínima. |
@@ -104,6 +104,9 @@ erDiagram
 | validade_meses | integer | | 1–24 |
 | validade_prorrogada | boolean | | default false |
 | validade_fim_manual | text (date) | | sobrescreve o cálculo, se o edital dispuser diferente |
+| validade_oculta_dashboard | boolean | | default false; oculta do dashboard o pseudo-evento de validade (#44) |
+| cor | enum `CorConcurso` | | `null` = automática, derivada do ID (§7.4, #46) |
+| icone | text | | um único emoji/símbolo (grafema), opcional (#46) |
 | busca_normalizada | text | ✔ | orgao+cargo+banca+tags em minúsculas sem acento (busca RF07) |
 | created_at / updated_at | integer (UTC) | ✔ | |
 
@@ -114,8 +117,9 @@ erDiagram
 ### 3.3 `evento` (RF04)
 `id`, `concurso_id` FK, `tipo` enum `TipoEvento`, `titulo` text (opcional; default = rótulo do tipo),
 `data` text `YYYY-MM-DD` ✔, `hora` text `HH:mm` (opcional), `local` text, `observacao` text,
-`concluido` boolean (default false), `concluido_em` integer (UTC), `created_at`, `updated_at`.
-Índice: `(data, concluido)`.
+`concluido` boolean (default false), `concluido_em` integer (UTC), `oculto_dashboard` boolean
+(default false; oculta o evento da lista de próximos prazos do dashboard, #44), `created_at`,
+`updated_at`. Índice: `(data, concluido)`.
 
 ### 3.4 `status_historico` (RF03)
 `id`, `concurso_id` FK, `de` enum `Status` (null na criação), `para` enum `Status` ✔,
@@ -145,6 +149,7 @@ erDiagram
 | `TipoEvento` | `PUBLICACAO_EDITAL`, `INICIO_INSCRICOES`, `FIM_INSCRICOES`, `PEDIDO_ISENCAO`, `VENCIMENTO_BOLETO`, `PROVA_OBJETIVA`, `PROVA_DISCURSIVA`, `OUTRA_FASE` (TAF, títulos, psicotécnico, investigação social…), `GABARITO_PRELIMINAR`, `PRAZO_RECURSO`, `RESULTADO_FINAL`, `HOMOLOGACAO`, `CONVOCACAO`, `NOMEACAO`, `POSSE`, `VALIDADE`, `OUTRO` |
 | `Fase` | `OBJETIVA`, `DISCURSIVA`, `TAF`, `TITULOS`, `PSICOTECNICO`, `INVESTIGACAO_SOCIAL`, `ORAL`, `CURSO_FORMACAO`, `OUTRA` |
 | `SituacaoFase` | `PENDENTE`, `APROVADO`, `CLASSIFICADO`, `ELIMINADO`, `SUB_JUDICE` |
+| `CorConcurso` | `AZUL`, `CIANO`, `VERDE_AGUA`, `VERDE`, `VIOLETA`, `MAGENTA`, `ROSA`, `CINZA` (`domain/cores.ts`) |
 
 Semântica: **Aprovado** = dentro das vagas; **Classificado** = fora das vagas (cadastro de reserva);
 **Reprovado** = eliminado/não classificado.
@@ -190,6 +195,13 @@ PROVA_REALIZADA(5) → AGUARDANDO_RESULTADO(6)`.
 5. **Criticidade**: tipos críticos = `FIM_INSCRICOES`, `PEDIDO_ISENCAO`, `VENCIMENTO_BOLETO`,
    `PROVA_*`, `OUTRA_FASE`, `PRAZO_RECURSO`, `POSSE`. Destaque: ≤ 3 dias = alta, ≤ 7 = média.
 6. Ordenação: `data` asc, depois `hora` (sem hora = "dia inteiro", vem primeiro), depois criticidade.
+7. **Ocultos** (#44): cada prazo carrega `oculto` (de `evento.oculto_dashboard` ou, para o
+   pseudo-evento, `concurso.validade_oculta_dashboard`). O agrupamento não os remove;
+   `semOcultos(grupos)` filtra e `contarOcultos(grupos)` alimenta o contador "N ocultos". O
+   dashboard esconde os ocultos por padrão e os mostra esmaecidos com `/?ocultos=1`. A preferência
+   é só de exibição: calendário e MCP continuam listando todos os prazos (o MCP informa
+   `ocultoNoDashboard`), e ocultar/reexibir não altera `updated_at`. App de usuário único: a
+   preferência fica no próprio registro (por usuário quando houver multiusuário, #49).
 
 `proximaData(concurso)` = menor `data >= hoje` entre eventos não concluídos → usado na ordenação RF07.
 
@@ -213,7 +225,7 @@ senão → indefinida
 
 | Rota | Tela | Fase |
 |---|---|---|
-| `/` | **Dashboard**: próximos prazos (vencidos/hoje/30 dias), contagem por status, atalhos | MVP |
+| `/` | **Dashboard**: próximos prazos (vencidos/hoje/30 dias), contagem por status, atalhos; ocultar/reexibir prazos, `?ocultos=1` mostra os ocultos | MVP |
 | `/concursos` | **Lista** com busca, filtros e ordenação em `searchParams` (URL compartilhável) | MVP |
 | `/concursos/novo` | **Formulário** de cadastro | MVP |
 | `/concursos/[id]` | **Detalhe** em abas: Visão geral · Eventos · Links · Resultados · Histórico | MVP |
@@ -221,7 +233,7 @@ senão → indefinida
 | `/configuracoes` | Exportar/importar dados, sobre/versão | MVP |
 | `/login` | Senha única (só se auth habilitada) | MVP |
 | `/concursos?visao=quadro` | Quadro por status (kanban; arrastar ou “Mover para” = transição validada) | v1.1 |
-| `/calendario?mes=AAAA-MM` | Visão mensal de eventos (agenda em lista no celular) | v1.1 |
+| `/calendario?mes=AAAA-MM` | Visão mensal de eventos (agenda em lista no celular); clique abre os detalhes do evento; cor/ícone por concurso com legenda (#46) | v1.1 |
 
 Layout responsivo: navegação lateral no desktop, barra inferior no celular. Links externos com
 `target="_blank" rel="noopener noreferrer"`.
@@ -234,6 +246,7 @@ Layout responsivo: navegação lateral no desktop, barra inferior no celular. Li
 | `alterarStatus(id, para, obs?)`, `desfazerUltimoStatus(id)` | RF03, usa `domain/status` |
 | `salvarLink`, `excluirLink`, `reordenarLinks` | RF02 |
 | `salvarEvento`, `excluirEvento`, `alternarConcluido` | RF04 |
+| `alternarPrazoOculto(chave, oculto)` | RF06 — oculta/reexibe um prazo do dashboard (`evento-<id>` ou `validade-<concursoId>`, #44) |
 | `salvarResultadoFase`, `excluirResultadoFase` | RF05 |
 | `login`, `logout` | Auth |
 
@@ -303,7 +316,8 @@ Decisões (issue #39):
 │   ├── app/                        # rotas (páginas, layouts, api/)
 │   ├── components/
 │   │   ├── ui/                     # shadcn/ui
-│   │   └── concurso/               # formulários, cards, tabelas, badges de status
+│   │   ├── concurso/               # formulários, cards, tabelas, badges de status
+│   │   └── tema/                   # seletor de tema (claro/escuro/sistema)
 │   ├── domain/                     # regras puras + testes *.test.ts ao lado
 │   │   ├── enums.ts  labels.ts
 │   │   ├── status.ts  prazos.ts  validade.ts
@@ -346,6 +360,33 @@ Decisões (issue #39):
   (nativo, bom no celular) exibindo `dd/mm/aaaa` nos textos.
 - Busca sem acento/maiúsculas via `busca_normalizada` (`normalize('NFD')` + remoção de diacríticos).
 - Testes rodam com `TZ=UTC` para garantir que o código não depende do fuso da máquina.
+
+### 7.3 Tema claro/escuro
+- Preferência **Claro / Escuro / Sistema** (padrão: Sistema, via `prefers-color-scheme`), salva no
+  `localStorage` (`concurso:tema`). Seletor na navegação (lateral e cabeçalho do celular) e em
+  Configurações (`components/tema/seletor-tema.tsx`); no modo Sistema acompanha mudanças do SO.
+- Sem flash: script inline no `<head>` do layout raiz (`SCRIPT_TEMA`, `lib/tema.ts`) aplica a classe
+  `dark` e o `color-scheme` no `<html>` antes da primeira pintura; o variant `dark:` do Tailwind usa
+  essa classe.
+- Cores sempre por tokens CSS (`globals.css`, `:root` e `.dark`), nunca fixas por tema. Atenção/aviso
+  usa `--aviso` (borda/fundo) e `--aviso-foreground` (texto, contraste AA nos dois temas).
+
+### 7.4 Cor e ícone do concurso (#46)
+- Paleta fechada (`CorConcurso`, `domain/cores.ts`) com tokens `--concurso-<cor>` em `globals.css`,
+  um tom escuro no `:root` e um claro no `.dark`. A cor é só marcador (ponto ao lado do nome, nunca
+  fundo de texto), com contraste ≥ 3:1 (WCAG 1.4.11) contra fundo, cartão e `muted` nos dois temas
+  — verificado em teste (`src/app/paleta-concurso.test.ts`). Vermelho e âmbar ficam de fora:
+  são da criticidade dos prazos, que mantém borda esquerda + fundo no calendário e no painel.
+- Sem escolha (`cor = null`), `corPadrao(id)` = `id × 5 mod 8`: determinística e permutação da
+  paleta (IDs consecutivos têm cores diferentes). `corDoConcurso` resolve a cor exibida; as
+  leituras de prazos/calendário já entregam a cor resolvida.
+- Ícone: um único grafema (emoji com modificadores/ZWJ incluído), validado com `Intl.Segmenter`.
+- Exibição via `components/concurso/marcador-concurso.tsx`: itens e diálogo de detalhes do
+  calendário, legenda cor → concurso (concursos com itens no mês), próximos prazos do dashboard,
+  lista, quadro e cabeçalho do detalhe. Formulário: rádios nativos com amostras ("Automática"
+  mostra a cor derivada na edição) e campo de ícone com sugestões.
+- Backup JSON (`schemaVersion` 1): `concursos[].cor`/`icone` opcionais (ausentes = `null`). MCP:
+  `cor`/`icone` em cadastrar/atualizar; a ficha devolve `cor`, `corExibida` e `icone`.
 
 ---
 
@@ -424,8 +465,9 @@ Cada item = uma branch `feature/*` a partir de `develop`; cada milestone fecha c
 | **M4 — Backup e hospedagem** → **`v1.0.0` (MVP)** | `feature/export-import` (RF09) · `feature/autenticacao` · `feature/e2e-playwright` · `feature/deploy` (Vercel+Turso, Dockerfile, `db:backup`, README) | MVP pronto para uso diário |
 | **M5 — Visões** → `v1.1.0` | `feature/kanban` · `feature/calendario` | RF06 desejáveis |
 | **Cadastro assistido** → `v1.2.0` | `feature/mcp` (issue #39) | RF10: servidor MCP para cadastrar/atualizar a partir do edital |
-| **M6 — Lembretes** → `v1.3.0` | `feature/exportar-ics` (RF08) · `feature/sugestao-status` · `feature/notificacao-email` (opcional) | RF08 |
-| **M7 — Anexos** → `v1.4.0` | `feature/anexos` | RF02 desejável |
+| **Ajustes de uso** → `v1.3.0` | `feature/markdown-tabelas` (#43) · `feature/dashboard-ocultar-eventos` (#44) · `feature/calendario-popup` (#45) · `feature/tema-escuro` (#47) · `feature/cor-concurso` (#46) | Melhorias pedidas no uso diário |
+| **M6 — Lembretes** → `v1.4.0` | `feature/exportar-ics` (RF08) · `feature/sugestao-status` · `feature/notificacao-email` (opcional) | RF08 |
+| **M7 — Anexos** → `v1.5.0` | `feature/anexos` | RF02 desejável |
 
 ---
 

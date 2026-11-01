@@ -20,7 +20,7 @@ const ROTULO: Readonly<Record<SituacaoValidade, string>> = {
 const COR: Readonly<Record<SituacaoValidade, string>> = {
   INDEFINIDA: "",
   VIGENTE: "bg-emerald-600 text-white",
-  VENCENDO: "bg-amber-500/15 text-amber-700 dark:text-amber-400",
+  VENCENDO: "bg-aviso/15 text-aviso-foreground",
   EXPIRADA: "bg-destructive/10 text-destructive",
 };
 
@@ -58,7 +58,7 @@ export function ValidadeConcurso({ dados, hoje }: { dados: DadosValidade; hoje: 
       </div>
       <p className="text-muted-foreground text-xs">{origem}</p>
       {v.situacao === "VENCENDO" ? (
-        <p role="status" className="text-amber-700 text-sm dark:text-amber-400">
+        <p role="status" className="text-aviso-foreground text-sm">
           Faltam {DIAS_ALERTA_VALIDADE} dias ou menos: acompanhe as convocações.
         </p>
       ) : null}

@@ -8,6 +8,7 @@ import { BotaoExcluirConcurso } from "@/components/concurso/botao-excluir-concur
 import { EventosConcurso } from "@/components/concurso/eventos-concurso";
 import { LinksConcurso } from "@/components/concurso/links-concurso";
 import { ListaTags } from "@/components/concurso/lista-tags";
+import { MarcadorConcurso } from "@/components/concurso/marcador-concurso";
 import { Markdown } from "@/components/concurso/markdown";
 import { ResultadosConcurso } from "@/components/concurso/resultados-concurso";
 import { TimelineStatus } from "@/components/concurso/timeline-status";
@@ -15,6 +16,7 @@ import { ValidadeConcurso } from "@/components/concurso/validade-concurso";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { corDoConcurso } from "@/domain/cores";
 import { ROTULO_ESCOLARIDADE, ROTULO_ESFERA } from "@/domain/labels";
 import { formatarBRL, formatarDataInstante } from "@/lib/format";
 import { idSchema } from "@/lib/schemas/comum";
@@ -75,7 +77,10 @@ export default async function ConcursoPage({ params }: PageProps<"/concursos/[id
 
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 space-y-1">
-          <h1 className="font-semibold text-2xl tracking-tight">{c.orgao}</h1>
+          <h1 className="flex items-center gap-2 font-semibold text-2xl tracking-tight">
+            <MarcadorConcurso cor={corDoConcurso(c)} icone={c.icone} />
+            <span className="min-w-0">{c.orgao}</span>
+          </h1>
           <p className="text-muted-foreground">{c.cargo}</p>
           <div className="flex flex-wrap items-center gap-2 pt-1">
             <BadgeStatus status={c.status} />

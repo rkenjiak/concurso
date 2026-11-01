@@ -56,6 +56,8 @@ export interface EventoPrazo {
   /** `HH:mm` ou `null` (dia inteiro). */
   hora: string | null;
   concluido: boolean;
+  /** Oculto do dashboard pelo usuário (#44); ausente = visível. */
+  ocultoDashboard?: boolean;
 }
 
 /** Dados mínimos de um concurso para o cálculo de prazos. */
@@ -67,6 +69,8 @@ export interface ConcursoPrazo {
    * `VALIDADE` quando o concurso não tem evento `VALIDADE` explícito.
    */
   validadeFim?: DataISO | null;
+  /** Pseudo-evento de validade oculto do dashboard pelo usuário (#44); ausente = visível. */
+  validadeOcultaDashboard?: boolean;
 }
 
 export interface Prazo<
@@ -88,6 +92,8 @@ export interface Prazo<
   criticidade: Criticidade;
   /** `true` se derivado dos dados do concurso (validade), não de um evento cadastrado. */
   derivado: boolean;
+  /** `true` se o usuário ocultou este prazo do dashboard (#44). */
+  oculto: boolean;
 }
 
 export interface GruposPrazos<
@@ -106,11 +112,17 @@ export function concursoAcompanhado(status: Status): boolean {
   return ehAtivo(status);
 }
 
+/** Campos usados na ordenação (serve também aos itens do calendário). */
+type PrazoOrdenavel = Pick<
+  Prazo,
+  "data" | "hora" | "criticidade" | "critico" | "concurso" | "evento"
+>;
+
 /**
  * Ordenação dos prazos: data asc; no mesmo dia, sem hora ("dia inteiro") primeiro, depois hora asc;
  * depois criticidade (alta primeiro); por fim concurso e evento, para estabilidade.
  */
-export function compararPrazos(a: Prazo, b: Prazo): number {
+export function compararPrazos(a: PrazoOrdenavel, b: PrazoOrdenavel): number {
   if (a.data !== b.data) return a.data < b.data ? -1 : 1;
   if (a.hora !== b.hora) {
     if (a.hora === null) return -1;
@@ -171,6 +183,7 @@ export function proximosPrazos<E extends EventoPrazo, C extends ConcursoPrazo>(
       critico: ehTipoCritico(e.tipo),
       criticidade: criticidade(e.tipo, dias),
       derivado: false,
+      oculto: e.ocultoDashboard === true,
     });
   }
 
@@ -190,6 +203,7 @@ export function proximosPrazos<E extends EventoPrazo, C extends ConcursoPrazo>(
       critico: false,
       criticidade: criticidade("VALIDADE", dias),
       derivado: true,
+      oculto: concurso.validadeOcultaDashboard === true,
     });
   }
 
@@ -211,6 +225,40 @@ export function proximosPrazos<E extends EventoPrazo, C extends ConcursoPrazo>(
 /** Total de prazos nos três grupos. */
 export function totalPrazos(grupos: GruposPrazos<EventoPrazo, ConcursoPrazo>): number {
   return grupos.vencidos.length + grupos.hoje.length + grupos.proximos.length;
+}
+
+/** Grupos sem os prazos ocultos pelo usuário (#44). */
+export function semOcultos<E extends EventoPrazo, C extends ConcursoPrazo>(
+  grupos: GruposPrazos<E, C>,
+): GruposPrazos<E, C> {
+  const visivel = (p: Prazo<E, C>) => !p.oculto;
+  return {
+    vencidos: grupos.vencidos.filter(visivel),
+    hoje: grupos.hoje.filter(visivel),
+    proximos: grupos.proximos.filter(visivel),
+  };
+}
+
+/** Número de prazos ocultos pelo usuário nos três grupos (#44). */
+export function contarOcultos(grupos: GruposPrazos<EventoPrazo, ConcursoPrazo>): number {
+  return [...grupos.vencidos, ...grupos.hoje, ...grupos.proximos].filter((p) => p.oculto).length;
+}
+
+/** Prazo identificado pela chave da lista: evento cadastrado ou validade derivada do concurso. */
+export type AlvoPrazo =
+  | { tipo: "evento"; eventoId: number }
+  | { tipo: "validade"; concursoId: number };
+
+/** Interpreta a {@link Prazo.chave} (`evento-<id>` / `validade-<concursoId>`); `null` se inválida. */
+export function lerChavePrazo(chave: unknown): AlvoPrazo | null {
+  if (typeof chave !== "string") return null;
+  const m = /^(evento|validade)-([1-9]\d{0,15})$/.exec(chave);
+  if (!m) return null;
+  const id = Number(m[2]);
+  if (!Number.isSafeInteger(id)) return null;
+  return m[1] === "evento"
+    ? { tipo: "evento", eventoId: id }
+    : { tipo: "validade", concursoId: id };
 }
 
 /**

@@ -8,6 +8,20 @@
       "when": 1793425054747,
       "tag": "0000_inicial",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1793554432119,
+      "tag": "0001_dashboard_ocultos",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1793555927923,
+      "tag": "0002_cor_icone_concurso",
+      "breakpoints": true
     }
   ]
 }

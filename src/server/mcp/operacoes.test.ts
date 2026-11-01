@@ -1,5 +1,6 @@
 import type { Client } from "@libsql/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { corPadrao } from "@/domain/cores";
 import { criarBancoTeste } from "../db/banco-teste";
 import type { Db } from "../db/client";
 import { obterConcurso } from "../queries/concursos";
@@ -106,6 +107,25 @@ describe("atualizar", () => {
       banca: "Cebraspe",
       remuneracaoCentavos: 852_965,
       tags: ["eleitoral"],
+    });
+  });
+
+  it("define, mantém e limpa cor e ícone; a ficha mostra a cor exibida (#46)", async () => {
+    const id = await cadastrar({ ...CONCURSO, cor: "CIANO", icone: "🗳️" });
+    expect(await op.obterFicha(db, id)).toMatchObject({
+      cor: "CIANO",
+      corExibida: "CIANO",
+      icone: "🗳️",
+    });
+    await op.atualizar(db, id, { banca: "FCC" });
+    expect(await obterConcurso(db, id)).toMatchObject({ cor: "CIANO", icone: "🗳️" });
+    const invalido = await op.atualizar(db, id, { icone: "🗳️⚖️" });
+    expect(!invalido.ok && invalido.erros.icone).toBeTruthy();
+    await op.atualizar(db, id, { cor: null, icone: null });
+    expect(await op.obterFicha(db, id)).toMatchObject({
+      cor: null,
+      corExibida: corPadrao(id),
+      icone: null,
     });
   });
 });

@@ -133,7 +133,7 @@ export function montarGradeMes(mes: MesISO, hoje: DataISO): DiaGrade[][] {
 export type ItemCalendario<
   E extends EventoPrazo = EventoPrazo,
   C extends ConcursoPrazo = ConcursoPrazo,
-> = Prazo<E, C> & {
+> = Omit<Prazo<E, C>, "oculto"> & {
   concluido: boolean;
   /** Esmaecido: evento concluído ou de concurso encerrado (não exige mais ação). */
   esmaecido: boolean;
@@ -227,4 +227,24 @@ export function agruparPorData<T extends { data: DataISO }>(
     else grupos.set(item.data, [item]);
   }
   return grupos;
+}
+
+/**
+ * Próximos itens pendentes do mesmo concurso de `item` (de `hoje` em diante, sem o próprio item),
+ * na ordem de `itens` (já ordenados), limitados a `limite`. Resumo exibido nos detalhes do evento.
+ */
+export function proximosDoConcurso<T extends ItemCalendario>(
+  itens: readonly T[],
+  item: T,
+  hoje: DataISO,
+  limite = 3,
+): T[] {
+  const proximos: T[] = [];
+  for (const i of itens) {
+    if (proximos.length >= limite) break;
+    if (i.concurso.id !== item.concurso.id || i.chave === item.chave) continue;
+    if (i.concluido || i.data < hoje) continue;
+    proximos.push(i);
+  }
+  return proximos;
 }

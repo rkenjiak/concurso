@@ -2,10 +2,13 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
-@custom-variant dark (@media (prefers-color-scheme: dark));
+/* Tema escuro: classe `dark` no <html>, aplicada pelo script inline (src/lib/tema.ts). */
+@custom-variant dark (&:where(.dark, .dark *));
 
 @theme inline {
   --color-background: var(--background);
+  --color-aviso: var(--aviso);
+  --color-aviso-foreground: var(--aviso-foreground);
   --color-foreground: var(--foreground);
   --font-heading: var(--font-sans);
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
@@ -71,7 +74,24 @@
   --chart-3: oklch(0.439 0 0);
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
+  color-scheme: light;
   --radius: 0.625rem;
+  /* Atenção (prazo crítico em até 7 dias, vencendo, suspenso): âmbar com contraste AA. */
+  --aviso: oklch(0.769 0.188 70.08);
+  --aviso-foreground: oklch(0.473 0.137 46.201);
+  /*
+   * Paleta de identificação dos concursos (#46, src/domain/cores.ts): marcadores (ponto/faixa),
+   * nunca fundo de texto. Tons escuros no tema claro e claros no escuro, com contraste >= 3:1
+   * contra o fundo (WCAG 1.4.11). Sem vermelho/âmbar, reservados à criticidade dos prazos.
+   */
+  --concurso-azul: oklch(0.546 0.245 262.881);
+  --concurso-ciano: oklch(0.52 0.105 223.128);
+  --concurso-verde-agua: oklch(0.511 0.096 186.391);
+  --concurso-verde: oklch(0.527 0.154 150.069);
+  --concurso-violeta: oklch(0.541 0.281 293.009);
+  --concurso-magenta: oklch(0.518 0.253 323.949);
+  --concurso-rosa: oklch(0.592 0.249 0.584);
+  --concurso-cinza: oklch(0.554 0.046 257.417);
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
   --sidebar-primary: oklch(0.205 0 0);
@@ -82,41 +102,49 @@
   --sidebar-ring: oklch(0.708 0 0);
 }
 
-/* Tema escuro segue a preferência do sistema. */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: oklch(0.145 0 0);
-    --foreground: oklch(0.985 0 0);
-    --card: oklch(0.205 0 0);
-    --card-foreground: oklch(0.985 0 0);
-    --popover: oklch(0.205 0 0);
-    --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.673 0.182 276.935);
-    --primary-foreground: oklch(0.145 0 0);
-    --secondary: oklch(0.269 0 0);
-    --secondary-foreground: oklch(0.985 0 0);
-    --muted: oklch(0.269 0 0);
-    --muted-foreground: oklch(0.708 0 0);
-    --accent: oklch(0.269 0 0);
-    --accent-foreground: oklch(0.985 0 0);
-    --destructive: oklch(0.704 0.191 22.216);
-    --border: oklch(1 0 0 / 10%);
-    --input: oklch(1 0 0 / 15%);
-    --ring: oklch(0.556 0 0);
-    --chart-1: oklch(0.87 0 0);
-    --chart-2: oklch(0.556 0 0);
-    --chart-3: oklch(0.439 0 0);
-    --chart-4: oklch(0.371 0 0);
-    --chart-5: oklch(0.269 0 0);
-    --sidebar: oklch(0.205 0 0);
-    --sidebar-foreground: oklch(0.985 0 0);
-    --sidebar-primary: oklch(0.488 0.243 264.376);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.269 0 0);
-    --sidebar-accent-foreground: oklch(0.985 0 0);
-    --sidebar-border: oklch(1 0 0 / 10%);
-    --sidebar-ring: oklch(0.556 0 0);
-  }
+.dark {
+  color-scheme: dark;
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.673 0.182 276.935);
+  --primary-foreground: oklch(0.145 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
+  --aviso: oklch(0.769 0.188 70.08);
+  --aviso-foreground: oklch(0.879 0.169 91.605);
+  --concurso-azul: oklch(0.707 0.165 254.624);
+  --concurso-ciano: oklch(0.789 0.154 211.53);
+  --concurso-verde-agua: oklch(0.777 0.152 181.912);
+  --concurso-verde: oklch(0.792 0.209 151.711);
+  --concurso-violeta: oklch(0.702 0.183 293.541);
+  --concurso-magenta: oklch(0.74 0.238 322.16);
+  --concurso-rosa: oklch(0.718 0.202 349.761);
+  --concurso-cinza: oklch(0.704 0.04 256.788);
 }
 
 @layer base {

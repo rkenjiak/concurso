@@ -7,9 +7,10 @@ import { lerConfigAuth } from "../auth/config";
 import { LimitadorTentativas } from "../auth/limitador";
 import { senhaConfere } from "../auth/senha";
 import { COOKIE_SESSAO, criarTokenSessao, destinoSeguro, opcoesCookieSessao } from "../auth/sessao";
+import { COOKIE_VISAO } from "../auth/visao";
 import { getDb } from "../db/client";
 import { ID_USUARIO_INICIAL } from "../db/schema";
-import { registrarAcesso } from "../repositories/usuarios";
+import { obterUsuario, registrarAcesso } from "../repositories/usuarios";
 
 export interface EstadoLogin {
   erro: string | null;
@@ -50,6 +51,9 @@ export async function login(_anterior: EstadoLogin, form: FormData): Promise<Est
   }
 
   limitador.registrarSucesso(chave);
+  if ((await obterUsuario(getDb(), ID_USUARIO_INICIAL))?.bloqueadoEm != null) {
+    return { erro: "Esta conta foi bloqueada pelo administrador." };
+  }
   await registrarAcesso(getDb(), ID_USUARIO_INICIAL);
   (await cookies()).set(
     COOKIE_SESSAO,
@@ -59,8 +63,10 @@ export async function login(_anterior: EstadoLogin, form: FormData): Promise<Est
   redirect(destinoSeguro(form.get("para")));
 }
 
-/** Encerra a sessão e volta para o login. */
+/** Encerra a sessão (e esquece a visão admin/usuário) e volta para o login. */
 export async function logout(): Promise<void> {
-  (await cookies()).delete(COOKIE_SESSAO);
+  const jar = await cookies();
+  jar.delete(COOKIE_SESSAO);
+  jar.delete(COOKIE_VISAO);
   redirect("/login");
 }

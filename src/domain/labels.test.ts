@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  ACAO_ADMIN,
   ESCOLARIDADE,
   ESFERA,
   FASE,
+  PAPEL,
   SITUACAO_FASE,
   STATUS,
   TIPO_EVENTO,
@@ -12,9 +14,11 @@ import {
 import {
   DESCRICAO_STATUS,
   opcoes,
+  ROTULO_ACAO_ADMIN,
   ROTULO_ESCOLARIDADE,
   ROTULO_ESFERA,
   ROTULO_FASE,
+  ROTULO_PAPEL,
   ROTULO_SITUACAO_FASE,
   ROTULO_STATUS,
   ROTULO_TIPO_EVENTO,
@@ -32,6 +36,8 @@ const pares: [string, readonly string[], Readonly<Record<string, string>>][] = [
   ["Fase", FASE, ROTULO_FASE],
   ["SituacaoFase", SITUACAO_FASE, ROTULO_SITUACAO_FASE],
   ["UF", UF, ROTULO_UF],
+  ["Papel", PAPEL, ROTULO_PAPEL],
+  ["AcaoAdmin", ACAO_ADMIN, ROTULO_ACAO_ADMIN],
 ];
 
 describe("labels", () => {

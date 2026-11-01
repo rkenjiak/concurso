@@ -1,6 +1,7 @@
 import { CalendarCheck, Eye, EyeOff, Plus } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { BadgeStatus } from "@/components/concurso/badge-status";
 import { ListaPrazos } from "@/components/dashboard/lista-prazos";
@@ -19,6 +20,7 @@ import { ehAtivo } from "@/domain/status";
 import { formatarData } from "@/lib/format";
 import { hojeSP } from "@/lib/tz";
 import { exigirUsuarioPagina } from "@/server/auth/acesso";
+import { visaoAtual } from "@/server/auth/admin";
 import { getDb } from "@/server/db/client";
 import { obterDashboard } from "@/server/queries/dashboard";
 
@@ -57,7 +59,10 @@ export default async function DashboardPage({ searchParams }: PageProps<"/">) {
   await connection();
   const hoje = hojeSP();
   const mostrarOcultos = (await searchParams)[PARAM_OCULTOS] === "1";
-  const { id: usuarioId } = await exigirUsuarioPagina();
+  const usuario = await exigirUsuarioPagina();
+  // Admin na visão admin (#50): o início é o painel.
+  if ((await visaoAtual(usuario)) === "admin") redirect("/admin");
+  const usuarioId = usuario.id;
   const dashboard = await obterDashboard(getDb(), usuarioId, hoje);
   const { porStatus, totalConcursos, ocultos } = dashboard;
   const prazos = mostrarOcultos ? dashboard.prazos : semOcultos(dashboard.prazos);

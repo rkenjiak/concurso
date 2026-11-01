@@ -3,9 +3,11 @@
  * SNAKE_CASE diretamente: sempre passa por estes mapas.
  */
 import type {
+  AcaoAdmin,
   Escolaridade,
   Esfera,
   Fase,
+  Papel,
   SituacaoFase,
   Status,
   TipoEvento,
@@ -144,6 +146,20 @@ export const ROTULO_UF: Readonly<Record<Uf, string>> = {
   SP: "São Paulo",
   SE: "Sergipe",
   TO: "Tocantins",
+};
+
+export const ROTULO_PAPEL: Readonly<Record<Papel, string>> = {
+  USUARIO: "Usuário",
+  ADMIN: "Admin",
+};
+
+export const ROTULO_ACAO_ADMIN: Readonly<Record<AcaoAdmin, string>> = {
+  PROMOVER_ADMIN: "Promoveu a admin",
+  REBAIXAR_ADMIN: "Rebaixou a usuário",
+  BLOQUEAR_USUARIO: "Bloqueou",
+  DESBLOQUEAR_USUARIO: "Desbloqueou",
+  PERMITIR_EMAIL: "Liberou o acesso de",
+  REMOVER_EMAIL: "Retirou da lista de acesso",
 };
 
 /** Lista `{ valor, rotulo }` na ordem do enum (para `<select>`). */

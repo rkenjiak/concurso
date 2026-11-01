@@ -124,3 +124,14 @@ export type Uf = (typeof UF)[number];
 /** Papel do usuário (#49): `ADMIN` gerencia a instância (painel, #50). */
 export const PAPEL = ["USUARIO", "ADMIN"] as const;
 export type Papel = (typeof PAPEL)[number];
+
+/** Ações administrativas registradas na auditoria (#50). */
+export const ACAO_ADMIN = [
+  "PROMOVER_ADMIN",
+  "REBAIXAR_ADMIN",
+  "BLOQUEAR_USUARIO",
+  "DESBLOQUEAR_USUARIO",
+  "PERMITIR_EMAIL",
+  "REMOVER_EMAIL",
+] as const;
+export type AcaoAdmin = (typeof ACAO_ADMIN)[number];

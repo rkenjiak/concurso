@@ -4,6 +4,7 @@ import { ArrowRight, CalendarDays, Clock, MapPin } from "lucide-react";
 import Link from "next/link";
 import type { ReactElement } from "react";
 import { BadgeStatus } from "@/components/concurso/badge-status";
+import { MarcadorConcurso } from "@/components/concurso/marcador-concurso";
 import { nomePrazo } from "@/components/dashboard/lista-prazos";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -52,8 +53,11 @@ export function DetalhesEvento({
       <DialogContent>
         <DialogHeader className="pr-8">
           <DialogTitle className={item.concluido ? "line-through" : undefined}>{nome}</DialogTitle>
-          <DialogDescription>
-            {item.concurso.orgao} — {item.concurso.cargo}
+          <DialogDescription className="flex items-center gap-1.5">
+            <MarcadorConcurso cor={item.concurso.cor} icone={item.concurso.icone} rotulado />
+            <span>
+              {item.concurso.orgao} — {item.concurso.cargo}
+            </span>
           </DialogDescription>
         </DialogHeader>
 

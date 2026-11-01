@@ -1,5 +1,6 @@
 import { AlertTriangle, Check, Clock } from "lucide-react";
 import { DetalhesEvento } from "@/components/calendario/detalhes-evento";
+import { MarcadorConcurso } from "@/components/concurso/marcador-concurso";
 import { BORDA_CRITICIDADE, nomePrazo } from "@/components/dashboard/lista-prazos";
 import {
   agruparPorData,
@@ -58,6 +59,12 @@ function ItemGrade({
             item.concluido && "line-through",
           )}
         >
+          <MarcadorConcurso
+            cor={item.concurso.cor}
+            icone={item.concurso.icone}
+            tamanho="sm"
+            className="mr-1"
+          />
           {item.hora ? <span className="tabular-nums">{item.hora} </span> : null}
           {nomePrazo(item)} · {item.concurso.orgao}
         </button>
@@ -203,8 +210,11 @@ export function AgendaMes({ itens, hoje }: { itens: readonly ItemDoCalendario[];
                         ) : null}
                         {nomePrazo(item)}
                       </p>
-                      <p className="truncate text-muted-foreground text-sm">
-                        {item.concurso.orgao} — {item.concurso.cargo}
+                      <p className="flex items-center gap-1.5 text-muted-foreground text-sm">
+                        <MarcadorConcurso cor={item.concurso.cor} icone={item.concurso.icone} />
+                        <span className="min-w-0 truncate">
+                          {item.concurso.orgao} — {item.concurso.cargo}
+                        </span>
                       </p>
                     </div>
                     {item.hora ? (
@@ -221,5 +231,31 @@ export function AgendaMes({ itens, hoje }: { itens: readonly ItemDoCalendario[];
         </li>
       ))}
     </ol>
+  );
+}
+
+/** Concursos com itens no mês, sem repetição, na ordem de órgão e cargo. */
+export function concursosDoMes(itens: readonly ItemDoCalendario[]): ItemDoCalendario["concurso"][] {
+  const porId = new Map(itens.map((i) => [i.concurso.id, i.concurso]));
+  return [...porId.values()].sort(
+    (a, b) => a.orgao.localeCompare(b.orgao, "pt-BR") || a.cargo.localeCompare(b.cargo, "pt-BR"),
+  );
+}
+
+/** Legenda cor/ícone → concurso (#46), com os concursos que têm itens no mês. */
+export function LegendaConcursos({ itens }: { itens: readonly ItemDoCalendario[] }) {
+  const concursos = concursosDoMes(itens);
+  if (concursos.length === 0) return null;
+  return (
+    <ul aria-label="Concursos" className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
+      {concursos.map((c) => (
+        <li key={c.id} data-concurso-id={c.id} className="inline-flex min-w-0 items-center gap-1.5">
+          <MarcadorConcurso cor={c.cor} icone={c.icone} rotulado />
+          <span className="truncate">
+            {c.orgao} — {c.cargo}
+          </span>
+        </li>
+      ))}
+    </ul>
   );
 }

@@ -25,6 +25,15 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
   calendário e o MCP continuam listando todos os prazos (`proximos_prazos` informa
   `ocultoNoDashboard`). O backup JSON inclui os novos campos sem mudar o `schemaVersion` (1):
   backups antigos, sem eles, são importados com tudo visível.
+- Cor e ícone por concurso (#46): no formulário, cor de uma paleta pré-definida (azul, ciano,
+  verde-água, verde, violeta, magenta, rosa, cinza) ou “Automática” — derivada do ID, sempre a
+  mesma — e, opcionalmente, um emoji como ícone. Calendário (grade, agenda e diálogo de detalhes),
+  próximos prazos do dashboard, lista, quadro e detalhe do concurso mostram um marcador com a cor
+  e o ícone, sem tirar o destaque vermelho/âmbar dos prazos críticos; o calendário ganha a
+  legenda cor → concurso. A paleta usa tokens CSS com tons próprios para os temas claro e
+  escuro (contraste ≥ 3:1, verificado em teste). Migração `0002_cor_icone_concurso`
+  (`concurso.cor` e `concurso.icone`); backup JSON com os campos opcionais sem mudar o
+  `schemaVersion` (1) e MCP aceitando/retornando `cor` e `icone`.
 
 ### Alterado
 

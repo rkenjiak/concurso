@@ -1,5 +1,6 @@
 /** Leituras do dashboard (RF06). */
 import { and, asc, count, eq, lte, or } from "drizzle-orm";
+import { type CorConcurso, corDoConcurso } from "@/domain/cores";
 import { STATUS, type Status } from "@/domain/enums";
 import {
   contarOcultos,
@@ -23,6 +24,10 @@ export interface ConcursoDoPrazo {
   validadeFim: DataISO | null;
   /** Pseudo-evento de validade oculto do dashboard (#44). */
   validadeOcultaDashboard: boolean;
+  /** Cor exibida (#46): a escolhida ou, se não houver, a automática derivada do ID. */
+  cor: CorConcurso;
+  /** Ícone (emoji) opcional (#46). */
+  icone: string | null;
 }
 
 export interface EventoDoPrazo {
@@ -81,11 +86,14 @@ export async function listarConcursosDoPrazo(db: Db): Promise<ConcursoDoPrazo[]>
       validadeProrrogada: concurso.validadeProrrogada,
       validadeFimManual: concurso.validadeFimManual,
       validadeOcultaDashboard: concurso.validadeOcultaDashboard,
+      cor: concurso.cor,
+      icone: concurso.icone,
     })
     .from(concurso);
   return linhas.map(
     ({ homologacaoData, validadeMeses, validadeProrrogada, validadeFimManual, ...c }) => ({
       ...c,
+      cor: corDoConcurso(c),
       validadeFim: calcularValidadeFim({
         homologacaoData,
         validadeMeses,

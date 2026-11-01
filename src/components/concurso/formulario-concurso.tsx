@@ -3,7 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { Controller, useForm } from "react-hook-form";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Textarea } from "@/components/ui/textarea";
+import { corPadrao, ehCorConcurso, SUGESTOES_ICONE } from "@/domain/cores";
 import { ESCOLARIDADE, ESFERA, STATUS, UF } from "@/domain/enums";
 import {
   opcoes,
@@ -23,8 +24,10 @@ import { VALIDADE_MESES_MAX, VALIDADE_MESES_MIN } from "@/domain/validade";
 import { CAMPOS_CONCURSO, type ConcursoFormValores, concursoSchema } from "@/lib/schemas/concurso";
 import { atualizarConcurso, criarConcurso } from "@/server/actions/concursos";
 import { ariaCampo, Campo } from "./campo";
+import { CampoCorConcurso } from "./campo-cor-concurso";
 import { CampoMoeda } from "./campo-moeda";
 import { CampoTags } from "./campo-tags";
+import { MarcadorConcurso } from "./marcador-concurso";
 
 interface FormularioConcursoProps {
   valoresIniciais: ConcursoFormValores;
@@ -50,6 +53,7 @@ export function FormularioConcurso({
     control,
     handleSubmit,
     getValues,
+    setValue,
     setError,
     formState: { errors },
   } = useForm({
@@ -58,6 +62,9 @@ export function FormularioConcurso({
   });
 
   const erro = (campo: keyof ConcursoFormValores) => errors[campo]?.message;
+  const corAutomatica = editando ? corPadrao(concursoId) : undefined;
+  const [corEscolhida, iconeAtual] = useWatch({ control, name: ["cor", "icone"] });
+  const corPrevia = ehCorConcurso(corEscolhida) ? corEscolhida : corAutomatica;
 
   const enviar = handleSubmit(() => {
     setErroGeral(null);
@@ -152,6 +159,59 @@ export function FormularioConcurso({
               )}
             />
           </Campo>
+          <CampoCorConcurso
+            registro={register("cor")}
+            corAutomatica={corAutomatica}
+            erro={erro("cor")}
+          />
+          <Campo
+            id="icone"
+            rotulo="Ícone (opcional)"
+            dica="Um emoji exibido junto da cor. Deixe vazio para não usar."
+            erro={erro("icone")}
+          >
+            <div className="flex items-center gap-2">
+              <Input
+                {...ariaCampo("icone", erro("icone"), "dica")}
+                className="w-24"
+                autoComplete="off"
+                placeholder="Ex.: ⚖️"
+                {...register("icone")}
+              />
+              {corPrevia ? (
+                <span className="inline-flex items-center gap-1.5 text-muted-foreground text-sm">
+                  Prévia:
+                  <MarcadorConcurso cor={corPrevia} icone={iconeAtual?.trim() || null} rotulado />
+                </span>
+              ) : null}
+            </div>
+          </Campo>
+          <fieldset className="grid gap-1.5">
+            <legend className="mb-1.5 font-medium text-sm leading-none">Sugestões de ícone</legend>
+            <div className="flex flex-wrap gap-1">
+              {SUGESTOES_ICONE.map((sugestao) => (
+                <Button
+                  key={sugestao}
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  aria-label={`Usar ${sugestao} como ícone`}
+                  onClick={() =>
+                    setValue("icone", sugestao, { shouldDirty: true, shouldValidate: true })
+                  }
+                >
+                  {sugestao}
+                </Button>
+              ))}
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setValue("icone", "", { shouldDirty: true, shouldValidate: true })}
+              >
+                Sem ícone
+              </Button>
+            </div>
+          </fieldset>
         </CardContent>
       </Card>
 

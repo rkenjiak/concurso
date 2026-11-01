@@ -44,6 +44,7 @@ Campos:
 | Status | enum (ver RF03) | sim |
 | Tags livres (ex.: "prioridade", "tribunais") | lista | não |
 | Observações gerais | texto longo (markdown) | não |
+| Cor de identificação (paleta pré-definida; padrão automático pelo ID) e ícone (emoji) (#46) | enum + texto | não |
 
 ### RF02 — Links e documentos
 - Cada concurso pode ter N links com rótulo e tipo: edital de abertura, retificação,
@@ -83,6 +84,9 @@ Status sugeridos, em ordem:
 - Ocultar/reexibir eventos individualmente da lista de próximos prazos, com contador de ocultos e
   opção "mostrar ocultos"; a escolha persiste entre sessões (#44).
 - Visão em lista e, desejável, visão em quadro (kanban por status) e calendário.
+- Concursos identificados pela cor/ícone (RF01) no calendário (com legenda cor → concurso), no
+  painel, na lista e no quadro, sem prejudicar o destaque de prazos críticos e com contraste
+  adequado nos temas claro e escuro (#46).
 
 ### RF07 — Busca e filtros
 - Buscar por nome, cargo, banca, tags.

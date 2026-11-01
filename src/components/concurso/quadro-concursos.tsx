@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { type DragEvent, useOptimistic, useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
+import type { CorConcurso } from "@/domain/cores";
 import type { Status } from "@/domain/enums";
 import { DESCRICAO_STATUS, ROTULO_STATUS } from "@/domain/labels";
 import { type ColunaQuadro, montarQuadro } from "@/domain/quadro";
@@ -13,6 +14,7 @@ import { formatarData } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { alterarStatus, desfazerUltimoStatus } from "@/server/actions/status";
 import { ListaTags } from "./lista-tags";
+import { MarcadorConcurso } from "./marcador-concurso";
 
 /** Dados de um cartão do quadro (serializáveis, vindos do servidor). */
 export interface CartaoQuadro {
@@ -23,6 +25,9 @@ export interface CartaoQuadro {
   status: Status;
   proximaData: string | null;
   tags: string[];
+  /** Cor exibida (escolhida ou automática) e ícone do concurso (#46). */
+  cor: CorConcurso;
+  icone: string | null;
   /** Destinos permitidos a partir do status atual (regras de `domain/status`). */
   transicoes: Status[];
 }
@@ -292,9 +297,10 @@ function Cartao({
           <Link
             href={`/concursos/${cartao.id}`}
             draggable={false}
-            className="block truncate font-medium hover:underline focus-visible:outline-2 focus-visible:outline-ring"
+            className="flex items-center gap-1.5 font-medium hover:underline focus-visible:outline-2 focus-visible:outline-ring"
           >
-            {cartao.orgao}
+            <MarcadorConcurso cor={cartao.cor} icone={cartao.icone} />
+            <span className="min-w-0 truncate">{cartao.orgao}</span>
           </Link>
           <p className="truncate text-muted-foreground">{cartao.cargo}</p>
           {cartao.banca ? (

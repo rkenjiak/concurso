@@ -10,6 +10,7 @@
  */
 import { sql } from "drizzle-orm";
 import { index, integer, primaryKey, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { COR_CONCURSO } from "../../domain/cores";
 import {
   ESCOLARIDADE,
   ESFERA,
@@ -69,6 +70,10 @@ export const concurso = sqliteTable(
     validadeOcultaDashboard: integer("validade_oculta_dashboard", { mode: "boolean" })
       .notNull()
       .default(false),
+    /** Cor da paleta (#46); `null` = automática, derivada do ID (`domain/cores`). */
+    cor: text("cor", { enum: COR_CONCURSO }),
+    /** Ícone opcional (um emoji) exibido junto da cor (#46). */
+    icone: text("icone"),
     buscaNormalizada: text("busca_normalizada").notNull().default(""),
     createdAt: criadoEm(),
     updatedAt: atualizadoEm(),

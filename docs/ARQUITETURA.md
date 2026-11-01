@@ -105,6 +105,8 @@ erDiagram
 | validade_prorrogada | boolean | | default false |
 | validade_fim_manual | text (date) | | sobrescreve o cálculo, se o edital dispuser diferente |
 | validade_oculta_dashboard | boolean | | default false; oculta do dashboard o pseudo-evento de validade (#44) |
+| cor | enum `CorConcurso` | | `null` = automática, derivada do ID (§7.4, #46) |
+| icone | text | | um único emoji/símbolo (grafema), opcional (#46) |
 | busca_normalizada | text | ✔ | orgao+cargo+banca+tags em minúsculas sem acento (busca RF07) |
 | created_at / updated_at | integer (UTC) | ✔ | |
 
@@ -147,6 +149,7 @@ erDiagram
 | `TipoEvento` | `PUBLICACAO_EDITAL`, `INICIO_INSCRICOES`, `FIM_INSCRICOES`, `PEDIDO_ISENCAO`, `VENCIMENTO_BOLETO`, `PROVA_OBJETIVA`, `PROVA_DISCURSIVA`, `OUTRA_FASE` (TAF, títulos, psicotécnico, investigação social…), `GABARITO_PRELIMINAR`, `PRAZO_RECURSO`, `RESULTADO_FINAL`, `HOMOLOGACAO`, `CONVOCACAO`, `NOMEACAO`, `POSSE`, `VALIDADE`, `OUTRO` |
 | `Fase` | `OBJETIVA`, `DISCURSIVA`, `TAF`, `TITULOS`, `PSICOTECNICO`, `INVESTIGACAO_SOCIAL`, `ORAL`, `CURSO_FORMACAO`, `OUTRA` |
 | `SituacaoFase` | `PENDENTE`, `APROVADO`, `CLASSIFICADO`, `ELIMINADO`, `SUB_JUDICE` |
+| `CorConcurso` | `AZUL`, `CIANO`, `VERDE_AGUA`, `VERDE`, `VIOLETA`, `MAGENTA`, `ROSA`, `CINZA` (`domain/cores.ts`) |
 
 Semântica: **Aprovado** = dentro das vagas; **Classificado** = fora das vagas (cadastro de reserva);
 **Reprovado** = eliminado/não classificado.
@@ -230,7 +233,7 @@ senão → indefinida
 | `/configuracoes` | Exportar/importar dados, sobre/versão | MVP |
 | `/login` | Senha única (só se auth habilitada) | MVP |
 | `/concursos?visao=quadro` | Quadro por status (kanban; arrastar ou “Mover para” = transição validada) | v1.1 |
-| `/calendario?mes=AAAA-MM` | Visão mensal de eventos (agenda em lista no celular); clique abre os detalhes do evento | v1.1 |
+| `/calendario?mes=AAAA-MM` | Visão mensal de eventos (agenda em lista no celular); clique abre os detalhes do evento; cor/ícone por concurso com legenda (#46) | v1.1 |
 
 Layout responsivo: navegação lateral no desktop, barra inferior no celular. Links externos com
 `target="_blank" rel="noopener noreferrer"`.
@@ -367,6 +370,23 @@ Decisões (issue #39):
   essa classe.
 - Cores sempre por tokens CSS (`globals.css`, `:root` e `.dark`), nunca fixas por tema. Atenção/aviso
   usa `--aviso` (borda/fundo) e `--aviso-foreground` (texto, contraste AA nos dois temas).
+
+### 7.4 Cor e ícone do concurso (#46)
+- Paleta fechada (`CorConcurso`, `domain/cores.ts`) com tokens `--concurso-<cor>` em `globals.css`,
+  um tom escuro no `:root` e um claro no `.dark`. A cor é só marcador (ponto ao lado do nome, nunca
+  fundo de texto), com contraste ≥ 3:1 (WCAG 1.4.11) contra fundo, cartão e `muted` nos dois temas
+  — verificado em teste (`src/app/paleta-concurso.test.ts`). Vermelho e âmbar ficam de fora:
+  são da criticidade dos prazos, que mantém borda esquerda + fundo no calendário e no painel.
+- Sem escolha (`cor = null`), `corPadrao(id)` = `id × 5 mod 8`: determinística e permutação da
+  paleta (IDs consecutivos têm cores diferentes). `corDoConcurso` resolve a cor exibida; as
+  leituras de prazos/calendário já entregam a cor resolvida.
+- Ícone: um único grafema (emoji com modificadores/ZWJ incluído), validado com `Intl.Segmenter`.
+- Exibição via `components/concurso/marcador-concurso.tsx`: itens e diálogo de detalhes do
+  calendário, legenda cor → concurso (concursos com itens no mês), próximos prazos do dashboard,
+  lista, quadro e cabeçalho do detalhe. Formulário: rádios nativos com amostras ("Automática"
+  mostra a cor derivada na edição) e campo de ícone com sugestões.
+- Backup JSON (`schemaVersion` 1): `concursos[].cor`/`icone` opcionais (ausentes = `null`). MCP:
+  `cor`/`icone` em cadastrar/atualizar; a ficha devolve `cor`, `corExibida` e `icone`.
 
 ---
 

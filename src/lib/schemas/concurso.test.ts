@@ -44,6 +44,8 @@ describe("concursoSchema", () => {
       status: "INSCRITO",
       observacoes: "**nota**",
       tags: ["prioridade"],
+      cor: null,
+      icone: null,
       homologacaoData: null,
       validadeMeses: null,
       validadeProrrogada: false,
@@ -175,6 +177,8 @@ describe("valoresDoConcurso", () => {
       vagasCadastroReserva: null,
       vagasCotas: null,
       observacoes: null,
+      cor: null,
+      icone: null,
       homologacaoData: "2026-03-15",
       validadeMeses: 12,
       validadeProrrogada: true,
@@ -192,5 +196,55 @@ describe("valoresDoConcurso", () => {
       validadeProrrogada: true,
       validadeFimManual: null,
     });
+  });
+
+  it("converte cor e ícone (ida e volta); sem cor = automática", () => {
+    const base = {
+      status: "PREVISTO" as const,
+      possuiCadastroReserva: false,
+      orgao: "TRF",
+      cargo: "Analista",
+      banca: null,
+      esfera: null,
+      uf: null,
+      cidade: null,
+      escolaridade: null,
+      remuneracaoCentavos: null,
+      taxaInscricaoCentavos: null,
+      vagasAmpla: null,
+      vagasCadastroReserva: null,
+      vagasCotas: null,
+      observacoes: null,
+    };
+    const valores = valoresDoConcurso({ ...base, cor: "VERDE_AGUA", icone: "⚖️" });
+    expect(valores).toMatchObject({ cor: "VERDE_AGUA", icone: "⚖️" });
+    expect(concursoSchema.parse(valores)).toMatchObject({ cor: "VERDE_AGUA", icone: "⚖️" });
+    const sem = valoresDoConcurso({ ...base, cor: null, icone: null });
+    expect(sem).toMatchObject({ cor: "", icone: "" });
+    expect(concursoSchema.parse(sem)).toMatchObject({ cor: null, icone: null });
+  });
+});
+
+describe("cor e ícone do concurso", () => {
+  const valido = { ...VALORES_INICIAIS_CONCURSO, orgao: "TRF", cargo: "Analista" };
+
+  it.each(["⚖️", "🏛️", "👩🏽‍⚖️", "🇧🇷", "★", "T"])("aceita um único símbolo (%s)", (icone) => {
+    expect(concursoSchema.parse({ ...valido, icone }).icone).toBe(icone);
+  });
+
+  it("apara espaços do ícone", () => {
+    expect(concursoSchema.parse({ ...valido, icone: "  🚓 " }).icone).toBe("🚓");
+  });
+
+  it.each(["⚖️🏛️", "ab", "texto longo"])("rejeita mais de um símbolo (%s)", (icone) => {
+    const r = concursoSchema.safeParse({ ...valido, icone });
+    expect(r.error?.issues).toMatchObject([
+      { path: ["icone"], message: "Use um único emoji ou símbolo." },
+    ]);
+  });
+
+  it("rejeita cor fora da paleta", () => {
+    const r = concursoSchema.safeParse({ ...valido, cor: "VERMELHO" });
+    expect(r.error?.issues).toMatchObject([{ path: ["cor"], message: "Cor inválida." }]);
   });
 });

@@ -7,6 +7,7 @@
  * erros vêm com o caminho do item (ex.: `eventos[2].data`) e nada é gravado.
  */
 
+import { corDoConcurso } from "@/domain/cores";
 import { possiveisDuplicados } from "@/domain/duplicados";
 import type { Esfera, Status, Uf } from "@/domain/enums";
 import { ErroDominio } from "@/domain/erros";
@@ -184,6 +185,10 @@ export async function obterFicha(db: Db, id: number) {
     transicoesPermitidas: status.opcoes.transicoes,
     observacoes: c.observacoes,
     tags: c.tags,
+    // `null` = cor automática (a exibida fica em `corExibida`).
+    cor: c.cor,
+    corExibida: corDoConcurso(c),
+    icone: c.icone,
     homologacaoData: c.homologacaoData,
     validadeMeses: c.validadeMeses,
     validadeProrrogada: c.validadeProrrogada,

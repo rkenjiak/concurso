@@ -514,7 +514,7 @@ pnpm dev        # aplica migrações pendentes (predev) e sobe em http://localho
 ### 9.2 Hospedado (opcional, RNF08)
 | Opção | Custo | Quando |
 |---|---|---|
-| **Vercel (Hobby) + Turso (free)** — recomendada | R$ 0 | Zero manutenção; `DATABASE_URL=libsql://…` + `DATABASE_AUTH_TOKEN`. Migrações rodadas no build. |
+| **Vercel (Hobby) + Turso (free)** — recomendada | R$ 0 | Zero manutenção; `DATABASE_URL=libsql://…` + `DATABASE_AUTH_TOKEN` (ou `TURSO_DATABASE_URL`/`TURSO_AUTH_TOKEN`, da integração do Marketplace). Migrações rodadas no build. |
 | Docker (imagem `standalone`, `Dockerfile` na raiz) em VPS/Fly.io com volume para `data/`; migrações ao iniciar (`MIGRATE_ON_START=true`) | ~US$ 2–5/mês | Se quiser anexos em disco local ou evitar serviço de banco externo. |
 
 O mesmo código atende ambas: só muda `DATABASE_URL` (`file:./data/concurso.db` vs `libsql://…`).
@@ -544,8 +544,9 @@ Cada item = uma branch `feature/*` a partir de `develop`; cada milestone fecha c
 | **Cadastro assistido** → `v1.2.0` | `feature/mcp` (issue #39) | RF10: servidor MCP para cadastrar/atualizar a partir do edital |
 | **Ajustes de uso** → `v1.3.0` | `feature/markdown-tabelas` (#43) · `feature/dashboard-ocultar-eventos` (#44) · `feature/calendario-popup` (#45) · `feature/tema-escuro` (#47) · `feature/cor-concurso` (#46) | Melhorias pedidas no uso diário |
 | **Multiusuário** → `v2.0.0` | `feature/login-google-multiusuario` (#49) · `feature/painel-admin` (#50) | Login Google, dados por usuário, painel admin (RF11) |
-| **M6 — Lembretes** → `v2.1.0` | `feature/exportar-ics` (RF08) · `feature/sugestao-status` · `feature/notificacao-email` (opcional) | RF08 |
-| **M7 — Anexos** → `v2.2.0` | `feature/anexos` | RF02 desejável |
+| **Integração Vercel + Turso** → `v2.1.0` | `feature/turso-env-vercel` (#62) | Lê `TURSO_DATABASE_URL`/`TURSO_AUTH_TOKEN` da integração do Marketplace |
+| **M6 — Lembretes** → `v2.2.0` | `feature/exportar-ics` (RF08) · `feature/sugestao-status` · `feature/notificacao-email` (opcional) | RF08 |
+| **M7 — Anexos** → `v2.3.0` | `feature/anexos` | RF02 desejável |
 
 ---
 

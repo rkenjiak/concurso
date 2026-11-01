@@ -12,9 +12,11 @@ import { sql } from "drizzle-orm";
 import { index, integer, primaryKey, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
 import { COR_CONCURSO } from "../../domain/cores";
 import {
+  ACAO_ADMIN,
   ESCOLARIDADE,
   ESFERA,
   FASE,
+  PAPEL,
   SITUACAO_FASE,
   STATUS,
   TIPO_EVENTO,
@@ -37,11 +39,66 @@ const atualizadoEm = () =>
     .$defaultFn(() => new Date())
     .$onUpdateFn(() => new Date());
 
+/** ID do usuário inicial, criado pela migração multiusuário (#49): dono dos dados anteriores. */
+export const ID_USUARIO_INICIAL = 1;
+
+// usuario (#49). O usuário inicial nasce sem e-mail e é assumido pelo primeiro login Google de
+// um e-mail em `ADMIN_EMAILS`; o login por senha (uso local) entra sempre como ele.
+export const usuario = sqliteTable("usuario", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  /** Minúsculo; `null` só no usuário inicial ainda não assumido. */
+  email: text("email").unique(),
+  /** `sub` do Google (identificador estável da conta). */
+  googleSub: text("google_sub").unique(),
+  nome: text("nome"),
+  avatarUrl: text("avatar_url"),
+  papel: text("papel", { enum: PAPEL }).notNull().default("USUARIO"),
+  /** SHA-256 (hex) do token do MCP por HTTP; o token em si não é guardado. */
+  mcpTokenHash: text("mcp_token_hash").unique(),
+  ultimoAcessoEm: integer("ultimo_acesso_em", { mode: "timestamp_ms" }),
+  /** Bloqueado pelo painel admin (#50): sem acesso por sessão nem por token do MCP. */
+  bloqueadoEm: integer("bloqueado_em", { mode: "timestamp_ms" }),
+  createdAt: criadoEm(),
+});
+
+// email_permitido (#50): allowlist do login Google gerenciada pelo painel admin, somada às
+// variáveis `ADMIN_EMAILS` e `ALLOWED_EMAILS`.
+export const emailPermitido = sqliteTable("email_permitido", {
+  /** Minúsculo. */
+  email: text("email").primaryKey(),
+  adicionadoPor: integer("adicionado_por").references(() => usuario.id, { onDelete: "set null" }),
+  createdAt: criadoEm(),
+});
+
+// auditoria_admin (#50): ações do painel admin. Guarda cópia do e-mail do admin e do alvo para
+// que o registro sobreviva a mudanças e exclusões.
+export const auditoriaAdmin = sqliteTable(
+  "auditoria_admin",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    adminId: integer("admin_id").references(() => usuario.id, { onDelete: "set null" }),
+    /** E-mail (ou descrição) do admin no momento da ação. */
+    admin: text("admin").notNull(),
+    acao: text("acao", { enum: ACAO_ADMIN }).notNull(),
+    alvoUsuarioId: integer("alvo_usuario_id").references(() => usuario.id, {
+      onDelete: "set null",
+    }),
+    /** E-mail (ou descrição) do alvo no momento da ação. */
+    alvo: text("alvo").notNull(),
+    createdAt: criadoEm(),
+  },
+  (t) => [index("auditoria_admin_created_idx").on(t.createdAt)],
+);
+
 // 3.1 concurso (RF01, RF03, RF05)
 export const concurso = sqliteTable(
   "concurso",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
+    /** Dono do concurso (#49); links, eventos etc. pertencem a ele via concurso. */
+    usuarioId: integer("usuario_id")
+      .notNull()
+      .references(() => usuario.id, { onDelete: "cascade" }),
     orgao: text("orgao").notNull(),
     cargo: text("cargo").notNull(),
     banca: text("banca"),
@@ -78,7 +135,10 @@ export const concurso = sqliteTable(
     createdAt: criadoEm(),
     updatedAt: atualizadoEm(),
   },
-  (t) => [index("concurso_status_idx").on(t.status)],
+  (t) => [
+    index("concurso_status_idx").on(t.status),
+    index("concurso_usuario_idx").on(t.usuarioId, t.status),
+  ],
 );
 
 // 3.2 link (RF02)
@@ -204,6 +264,10 @@ export const anexo = sqliteTable(
   (t) => [index("anexo_concurso_idx").on(t.concursoId)],
 );
 
+export type Usuario = typeof usuario.$inferSelect;
+export type NovoUsuario = typeof usuario.$inferInsert;
+export type EmailPermitido = typeof emailPermitido.$inferSelect;
+export type AuditoriaAdmin = typeof auditoriaAdmin.$inferSelect;
 export type Concurso = typeof concurso.$inferSelect;
 export type NovoConcurso = typeof concurso.$inferInsert;
 export type Link = typeof link.$inferSelect;

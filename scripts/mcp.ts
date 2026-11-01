@@ -1,6 +1,7 @@
 /**
  * Servidor MCP por stdio para uso local (`pnpm --silent mcp`; issue #39). Usa o mesmo banco do
- * app (`DATABASE_URL` do `.env.local`/`.env`) e aplica as migrações pendentes ao iniciar.
+ * app (`DATABASE_URL` do `.env.local`/`.env`) e aplica as migrações pendentes ao iniciar. Acessa
+ * os dados do usuário inicial (#49) — quem tem o processo local tem o banco inteiro mesmo.
  *
  * O stdout é o canal do protocolo: nada além dele pode ser escrito ali (logs vão para o stderr).
  * Por isso o `--silent` do pnpm, que omite o cabeçalho do script.
@@ -18,11 +19,12 @@ const { serveStdio } = await import("@modelcontextprotocol/server/stdio");
 const { criarDb } = await import("../src/server/db/client");
 const { aplicarMigracoes } = await import("../src/server/db/migrate");
 const { criarServidorMcp } = await import("../src/server/mcp/servidor");
+const { ID_USUARIO_INICIAL } = await import("../src/server/db/schema");
 
 const { db } = criarDb();
 await aplicarMigracoes(db);
 
-serveStdio(() => criarServidorMcp({ db }), {
+serveStdio(() => criarServidorMcp({ db, usuarioId: ID_USUARIO_INICIAL }), {
   onerror: (erro) => console.error("MCP:", erro),
 });
 console.error(

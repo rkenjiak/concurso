@@ -8,6 +8,7 @@ import {
 } from "@/lib/schemas/concurso";
 import { eventoSchema, VALORES_INICIAIS_EVENTO } from "@/lib/schemas/evento";
 import { type FiltrosConcursos, lerFiltrosConcursos } from "@/lib/schemas/filtros-concursos";
+import { ID_USUARIO_INICIAL as U } from "@/server/db/schema";
 import { criarBancoTeste } from "../db/banco-teste";
 import type { Db } from "../db/client";
 import { concurso } from "../db/schema";
@@ -24,11 +25,17 @@ const HOJE = "2026-10-31";
 const novo = (parcial: Partial<ConcursoFormValores>) =>
   criarConcurso(
     db,
+    U,
     concursoSchema.parse({ ...VALORES_INICIAIS_CONCURSO, cargo: "Analista", ...parcial }),
   );
 
 const evento = (concursoId: number, data: string, concluido = false) =>
-  criarEvento(db, concursoId, eventoSchema.parse({ ...VALORES_INICIAIS_EVENTO, data, concluido }));
+  criarEvento(
+    db,
+    U,
+    concursoId,
+    eventoSchema.parse({ ...VALORES_INICIAIS_EVENTO, data, concluido }),
+  );
 
 const definirCriacao = (id: number, iso: string) =>
   db
@@ -88,7 +95,7 @@ beforeEach(async () => {
 afterEach(() => client.close());
 
 const listar = async (filtros: Partial<FiltrosConcursos>) =>
-  (await listarConcursos(db, filtros, HOJE)).map((c) => c.id);
+  (await listarConcursos(db, U, filtros, HOJE)).map((c) => c.id);
 
 describe("listarConcursos — busca", () => {
   it("ignora acentos e maiúsculas e busca em órgão, cargo, banca e tags", async () => {
@@ -158,7 +165,7 @@ describe("listarConcursos — ordenação", () => {
     await evento(ids.pm, "2026-11-05", true); // concluída: ignorada
     await evento(ids.pm, "2026-11-20");
     await evento(ids.pref, HOJE);
-    const lista = await listarConcursos(db, { ordem: "proxima_data" }, HOJE);
+    const lista = await listarConcursos(db, U, { ordem: "proxima_data" }, HOJE);
     expect(lista.map((c) => [c.id, c.proximaData])).toEqual([
       [ids.pref, HOJE],
       [ids.pm, "2026-11-20"],

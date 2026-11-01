@@ -9,39 +9,65 @@ export const COOKIE_SESSAO = "concurso_sessao";
 export const DURACAO_SESSAO_S = 30 * 24 * 60 * 60;
 
 const ALG = "HS256";
-const ASSUNTO = "dono";
 const EMISSOR = "concurso";
 
-/** Cria o token de sessão (expira em {@link DURACAO_SESSAO_S}). */
-export async function criarTokenSessao(segredo: Uint8Array, agora = new Date()): Promise<string> {
+/** Como a sessão foi aberta: decide as checagens a cada requisição (ver `acesso.ts`). */
+export type MetodoLogin = "senha" | "google";
+
+export interface DadosSessao {
+  usuarioId: number;
+  metodo: MetodoLogin;
+}
+
+/** Cria o token de sessão do usuário (expira em {@link DURACAO_SESSAO_S}). */
+export async function criarTokenSessao(
+  segredo: Uint8Array,
+  { usuarioId, metodo }: DadosSessao,
+  agora = new Date(),
+): Promise<string> {
   const iat = Math.floor(agora.getTime() / 1000);
-  return new SignJWT({})
+  return new SignJWT({ metodo })
     .setProtectedHeader({ alg: ALG })
-    .setSubject(ASSUNTO)
+    .setSubject(String(usuarioId))
     .setIssuer(EMISSOR)
     .setIssuedAt(iat)
     .setExpirationTime(iat + DURACAO_SESSAO_S)
     .sign(segredo);
 }
 
-/** `true` se o token foi assinado com o segredo, é deste app e não expirou. */
+/**
+ * Dados da sessão se o token foi assinado com o segredo, é deste app, não expirou e identifica
+ * um usuário; senão `null`. Tokens do formato antigo (usuário único) deixam de valer.
+ */
+export async function lerSessao(
+  token: string | undefined | null,
+  segredo: Uint8Array,
+  agora = new Date(),
+): Promise<DadosSessao | null> {
+  if (!token) return null;
+  try {
+    const { payload } = await jwtVerify(token, segredo, {
+      algorithms: [ALG],
+      issuer: EMISSOR,
+      currentDate: agora,
+    });
+    const usuarioId = Number(payload.sub);
+    const metodo = payload.metodo;
+    if (!Number.isSafeInteger(usuarioId) || usuarioId <= 0) return null;
+    if (metodo !== "senha" && metodo !== "google") return null;
+    return { usuarioId, metodo };
+  } catch {
+    return null;
+  }
+}
+
+/** `true` se o token é uma sessão válida (checagem barata do `proxy.ts`, sem banco). */
 export async function tokenSessaoValido(
   token: string | undefined | null,
   segredo: Uint8Array,
   agora = new Date(),
 ): Promise<boolean> {
-  if (!token) return false;
-  try {
-    await jwtVerify(token, segredo, {
-      algorithms: [ALG],
-      issuer: EMISSOR,
-      subject: ASSUNTO,
-      currentDate: agora,
-    });
-    return true;
-  } catch {
-    return false;
-  }
+  return (await lerSessao(token, segredo, agora)) !== null;
 }
 
 /** Opções do cookie de sessão: `httpOnly`, `SameSite=Lax`, `secure` em produção, 30 dias. */

@@ -4,7 +4,10 @@ import type { Db } from "../db/client";
 import { type ResultadoFase, resultadoFase } from "../db/schema";
 import type { Executor } from "../repositories/tipos";
 
-/** Resultados do concurso na ordem de cadastro das fases. */
+/**
+ * Resultados do concurso na ordem de cadastro das fases (o chamador garante que o concurso é do
+ * usuário, via `obterConcurso`).
+ */
 export async function listarResultadosFase(
   db: Db | Executor,
   concursoId: number,

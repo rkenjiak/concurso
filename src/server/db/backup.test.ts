@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { concursoSchema, VALORES_INICIAIS_CONCURSO } from "@/lib/schemas/concurso";
+import { ID_USUARIO_INICIAL as U } from "@/server/db/schema";
 import { listarConcursos } from "../queries/concursos";
 import { criarConcurso } from "../repositories/concursos";
 import { caminhoBackup, ehBancoLocal, fazerBackup, podarBackups } from "./backup";
@@ -44,6 +45,7 @@ describe("fazerBackup", () => {
     await aplicarMigracoes(origem.db);
     await criarConcurso(
       origem.db,
+      U,
       concursoSchema.parse({ ...VALORES_INICIAIS_CONCURSO, orgao: "Órgão", cargo: "Cargo" }),
     );
 
@@ -52,7 +54,7 @@ describe("fazerBackup", () => {
     expect(destino).toBe(join(pasta, "backups", "concurso-20261031-1204.db"));
 
     const copia = criarDb({ url: `file:${destino}` });
-    expect((await listarConcursos(copia.db)).map((c) => c.orgao)).toEqual(["Órgão"]);
+    expect((await listarConcursos(copia.db, U)).map((c) => c.orgao)).toEqual(["Órgão"]);
     copia.client.close();
 
     // Segundo backup no mesmo minuto não sobrescreve o primeiro.

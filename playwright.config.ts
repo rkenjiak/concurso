@@ -3,12 +3,12 @@
  * servidor com um banco SQLite temporário em `e2e/.tmp/` recriado a cada execução.
  *
  * - projeto `chromium`: app sem autenticação (`ALLOW_NO_AUTH=true`);
- * - projeto `autenticacao`: app com `APP_PASSWORD` e `MCP_TOKEN`, para o login e o endpoint MCP.
+ * - projeto `autenticacao`: app com `APP_PASSWORD`, para o login e o endpoint MCP (token pessoal).
  *
  * Rode `pnpm e2e` (faz o build antes) ou `pnpm exec playwright test` com um build existente.
  */
 import { defineConfig, devices } from "@playwright/test";
-import { MCP_TOKEN_E2E, SENHA_E2E } from "./e2e/constantes";
+import { SENHA_E2E } from "./e2e/constantes";
 
 const PORTA = 3200;
 const PORTA_AUTH = 3201;
@@ -56,7 +56,6 @@ export default defineConfig({
       APP_PASSWORD: SENHA_E2E,
       AUTH_SECRET: "segredo-somente-para-testes-e2e-0123456789",
       ALLOW_NO_AUTH: "",
-      MCP_TOKEN: MCP_TOKEN_E2E,
     }),
   ],
 });

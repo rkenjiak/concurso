@@ -29,7 +29,7 @@ function descreverResumo(r: ResumoImportacao): string {
   )}, ${plural(r.links, "link", "links")} e ${plural(r.resultadosFase, "resultado", "resultados")}.`;
 }
 
-/** Exportar (JSON/CSV) e importar backup JSON substituindo todos os dados (RF09). */
+/** Exportar (JSON/CSV) e importar backup JSON substituindo todos os dados do usuário (RF09). */
 export function ExportarImportar() {
   const router = useRouter();
   const idArquivo = useId();
@@ -90,7 +90,7 @@ export function ExportarImportar() {
       <section className="space-y-3">
         <h3 className="font-medium">Exportar</h3>
         <p className="text-muted-foreground text-sm">
-          O backup JSON contém todos os dados (concursos, tags, links, eventos, histórico e
+          O backup JSON contém todos os seus dados (concursos, tags, links, eventos, histórico e
           resultados) e pode ser importado depois. O CSV traz só os concursos, para abrir em
           planilhas.
         </p>

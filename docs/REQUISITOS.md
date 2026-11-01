@@ -108,6 +108,15 @@ Status sugeridos, em ordem:
   resultados por fase; consultas a concursos e prazos.
 - Sem operações de exclusão pelo MCP. Uso local por stdio; hospedado por HTTP com token próprio.
 
+### RF11 — Administração da instância (#50)
+- Com multiusuário (#49), usuários com papel admin têm um painel (`/admin`) para listar usuários
+  (nome, e-mail, papel, cadastro, último acesso, nº de concursos), promover/rebaixar admins,
+  bloquear/desbloquear contas, gerenciar a allowlist do login Google e ver totais da instância e o
+  log de auditoria das ações administrativas.
+- O admin alterna entre "Visão admin" e "Visão usuário" sem novo login; na visão usuário vê o mesmo
+  app que qualquer usuário. A autorização é sempre pelo papel no servidor; nunca pode faltar um
+  admin ativo. Sem impersonação: o admin não vê os dados dos outros usuários.
+
 ## 5. Requisitos não funcionais
 
 - **RNF01 — Simplicidade:** stack enxuta, fácil de rodar localmente com um comando.

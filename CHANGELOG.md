@@ -7,6 +7,38 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-11-01
+
+### Adicionado
+
+- Login com Google e multiusuário (#49): OIDC próprio com `jose` (código de autorização + PKCE,
+  `state` e `nonce`), acesso por allowlist (`ADMIN_EMAILS` + `ALLOWED_EMAILS`) conferida no login
+  e a cada requisição. Nova tabela `usuario` e `concurso.usuario_id`: cada usuário vê e altera só
+  os próprios concursos (e links, eventos, histórico, resultados e anexos); tags são um vocabulário
+  compartilhado, mas cada um vê só as suas. Exportar/importar passam a valer só para os dados do
+  usuário, com IDs renumerados na importação. Migração `0003_multiusuario`: o usuário inicial
+  (ID 1, admin) fica dono dos dados existentes e é assumido pelo primeiro login Google de um e-mail
+  de `ADMIN_EMAILS`.
+- Token pessoal do MCP (#49) em Configurações → Token do MCP; o banco guarda só o SHA-256. O MCP
+  por stdio usa o usuário inicial.
+- Painel administrativo (RF11, #50) em `/admin`, para usuários com papel `ADMIN`: seletor
+  “Visão usuário ↔ Visão admin” no novo menu da conta (avatar), sem novo login, salvo no cookie
+  `concurso_visao`, com faixa “Modo admin” na visão admin. Visão geral com totais; lista de
+  usuários (nome, e-mail, papel, cadastro, último acesso, nº de concursos) com promover/rebaixar
+  e bloquear/desbloquear — o bloqueado perde o acesso na hora (login, sessão aberta e token do
+  MCP); e-mails liberados pelo painel (tabela `email_permitido`), somados às env vars; log de
+  auditoria das ações (`auditoria_admin`). A autorização é sempre pelo papel relido do banco, com
+  403 para não admins, e não é possível rebaixar nem bloquear o último admin ativo. Migração
+  `0004_painel_admin`.
+
+### Alterado
+
+- **Incompatível:** `MCP_TOKEN` foi removido; o `/api/mcp` exige o token pessoal do usuário
+  (`Authorization: Bearer`). Gere um novo token em Configurações e atualize os clientes MCP.
+- **Incompatível:** em produção, `APP_PASSWORD` não pode coexistir com o login Google; a senha
+  única fica para uso local. Configure `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` e
+  `ADMIN_EMAILS` (e opcionalmente `ALLOWED_EMAILS`) antes de atualizar (passo a passo no README).
+
 ## [1.3.0] - 2026-11-01
 
 ### Adicionado

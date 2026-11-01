@@ -5,7 +5,7 @@ import { type Evento, evento } from "../db/schema";
 import type { Executor } from "../repositories/tipos";
 
 /**
- * Eventos do concurso por data; no mesmo dia, sem hora ("dia inteiro") primeiro — no SQLite
+ * Eventos do concurso (o chamador garante que é do usuário, via `obterConcurso`) por data; no mesmo dia, sem hora ("dia inteiro") primeiro — no SQLite
  * `NULL` vem antes em ordem crescente.
  */
 export async function listarEventos(db: Db | Executor, concursoId: number): Promise<Evento[]> {

@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ErroDominio } from "@/domain/erros";
 import { concursoSchema, VALORES_INICIAIS_CONCURSO } from "@/lib/schemas/concurso";
 import { ehUrlHttp, type LinkDados, linkSchema, ordemLinksSchema } from "@/lib/schemas/link";
+import { ID_USUARIO_INICIAL as U } from "@/server/db/schema";
 import { criarBancoTeste } from "../db/banco-teste";
 import type { Db } from "../db/client";
 import { listarLinks } from "../queries/links";
@@ -17,6 +18,7 @@ beforeEach(async () => {
   ({ db, client } = await criarBancoTeste());
   concursoId = await criarConcurso(
     db,
+    U,
     concursoSchema.parse({ ...VALORES_INICIAIS_CONCURSO, orgao: "X", cargo: "Y" }),
   );
 });
@@ -28,8 +30,8 @@ const dados = (url: string, rotulo = ""): LinkDados =>
 
 describe("links", () => {
   it("cria links no fim da lista", async () => {
-    await criarLink(db, concursoId, dados("https://a.example", "Edital"));
-    await criarLink(db, concursoId, dados("https://b.example"));
+    await criarLink(db, U, concursoId, dados("https://a.example", "Edital"));
+    await criarLink(db, U, concursoId, dados("https://b.example"));
     const links = await listarLinks(db, concursoId);
     expect(links.map((l) => [l.url, l.rotulo, l.ordem])).toEqual([
       ["https://a.example", "Edital", 0],
@@ -38,12 +40,17 @@ describe("links", () => {
   });
 
   it("rejeita link de concurso inexistente", async () => {
-    await expect(criarLink(db, 999, dados("https://a.example"))).rejects.toThrow(ErroDominio);
+    await expect(criarLink(db, U, 999, dados("https://a.example"))).rejects.toThrow(ErroDominio);
   });
 
   it("atualiza e exclui apenas dentro do concurso", async () => {
-    const id = await criarLink(db, concursoId, dados("https://a.example"));
-    await atualizarLink(db, concursoId, id, {
+    const outro = await criarConcurso(
+      db,
+      U,
+      concursoSchema.parse({ ...VALORES_INICIAIS_CONCURSO, orgao: "Outro", cargo: "Z" }),
+    );
+    const id = await criarLink(db, U, concursoId, dados("https://a.example"));
+    await atualizarLink(db, U, concursoId, id, {
       tipo: "GABARITO",
       rotulo: "Gabarito",
       url: "http://g.example",
@@ -53,27 +60,27 @@ describe("links", () => {
       rotulo: "Gabarito",
       url: "http://g.example",
     });
-    await expect(atualizarLink(db, 999, id, dados("https://x.example"))).rejects.toThrow(
+    await expect(atualizarLink(db, U, outro, id, dados("https://x.example"))).rejects.toThrow(
       "Link não encontrado.",
     );
-    await expect(excluirLink(db, 999, id)).rejects.toThrow("Link não encontrado.");
-    await excluirLink(db, concursoId, id);
+    await expect(excluirLink(db, U, outro, id)).rejects.toThrow("Link não encontrado.");
+    await excluirLink(db, U, concursoId, id);
     expect(await listarLinks(db, concursoId)).toEqual([]);
   });
 
   it("reordena links", async () => {
-    const a = await criarLink(db, concursoId, dados("https://a.example"));
-    const b = await criarLink(db, concursoId, dados("https://b.example"));
-    const c = await criarLink(db, concursoId, dados("https://c.example"));
-    await reordenarLinks(db, concursoId, [c, a, b]);
+    const a = await criarLink(db, U, concursoId, dados("https://a.example"));
+    const b = await criarLink(db, U, concursoId, dados("https://b.example"));
+    const c = await criarLink(db, U, concursoId, dados("https://c.example"));
+    await reordenarLinks(db, U, concursoId, [c, a, b]);
     expect((await listarLinks(db, concursoId)).map((l) => l.id)).toEqual([c, a, b]);
   });
 
   it("rejeita reordenação com conjunto diferente", async () => {
-    const a = await criarLink(db, concursoId, dados("https://a.example"));
-    await criarLink(db, concursoId, dados("https://b.example"));
-    await expect(reordenarLinks(db, concursoId, [a])).rejects.toThrow(ErroDominio);
-    await expect(reordenarLinks(db, concursoId, [a, 999])).rejects.toThrow(ErroDominio);
+    const a = await criarLink(db, U, concursoId, dados("https://a.example"));
+    await criarLink(db, U, concursoId, dados("https://b.example"));
+    await expect(reordenarLinks(db, U, concursoId, [a])).rejects.toThrow(ErroDominio);
+    await expect(reordenarLinks(db, U, concursoId, [a, 999])).rejects.toThrow(ErroDominio);
   });
 });
 
@@ -120,8 +127,8 @@ describe("linkSchema", () => {
 
 describe("salvarLinks", () => {
   it("cria no fim da lista e atualiza, tudo ou nada", async () => {
-    const a = await criarLink(db, concursoId, dados("https://a.example"));
-    const ids = await salvarLinks(db, concursoId, [
+    const a = await criarLink(db, U, concursoId, dados("https://a.example"));
+    const ids = await salvarLinks(db, U, concursoId, [
       { id: null, dados: dados("https://b.example") },
       { id: a, dados: dados("https://a2.example", "Edital") },
     ]);
@@ -132,7 +139,7 @@ describe("salvarLinks", () => {
     ]);
 
     await expect(
-      salvarLinks(db, concursoId, [
+      salvarLinks(db, U, concursoId, [
         { id: null, dados: dados("https://c.example") },
         { id: 999, dados: dados("https://d.example") },
       ]),

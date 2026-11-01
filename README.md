@@ -32,7 +32,7 @@ pnpm build
 ALLOW_NO_AUTH=true pnpm start   # ou defina ALLOW_NO_AUTH=true no .env.local
 ```
 
-Em produção o app **recusa iniciar sem `APP_PASSWORD`**, a menos que `ALLOW_NO_AUTH=true` — veja
+Em produção o app **recusa iniciar sem login configurado**, a menos que `ALLOW_NO_AUTH=true` — veja
 [Autenticação](#autenticação).
 
 ## Variáveis de ambiente
@@ -43,35 +43,71 @@ Copie `.env.example` para `.env.local` e ajuste. Nada é obrigatório para rodar
 |---|---|---|
 | `DATABASE_URL` | `file:./data/concurso.db` | Banco libSQL: arquivo SQLite local ou `libsql://<banco>.turso.io` |
 | `DATABASE_AUTH_TOKEN` | — | Token do Turso (só com `libsql://`) |
-| `APP_PASSWORD` | — | Liga o login por senha única; sem ela, a autenticação fica desligada |
-| `AUTH_SECRET` | — | Segredo (≥ 32 bytes) que assina a sessão; obrigatório com `APP_PASSWORD` |
-| `ALLOW_NO_AUTH` | `false` | `true` permite rodar em produção sem senha (uso local, sem exposição) |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | — | Liga o login com Google (multiusuário) |
+| `ADMIN_EMAILS` | — | E-mails dos admins (obrigatório com o login Google); o primeiro a entrar assume os dados existentes |
+| `ALLOWED_EMAILS` | — | Allowlist: demais e-mails que podem entrar com Google (separados por vírgula) |
+| `APP_PASSWORD` | — | Login por senha única, **para uso local** (entra como o usuário inicial) |
+| `AUTH_SECRET` | — | Segredo (≥ 32 bytes) que assina a sessão; obrigatório com qualquer login |
+| `APP_URL` | — | Origem pública (ex.: `https://concursos.exemplo.com`) para a URL de callback do Google, se o app estiver atrás de proxy |
+| `ALLOW_NO_AUTH` | `false` | `true` permite rodar em produção sem login (uso local, sem exposição) |
 | `MIGRATE_ON_START` | `false` | `true` aplica as migrações ao iniciar o servidor (já ligado na imagem Docker) |
 | `BACKUP_KEEP` | `10` | Quantos backups o `pnpm db:backup` mantém |
-| `MCP_TOKEN` | — | Liga o endpoint MCP `/api/mcp` (≥ 32 caracteres); sem ele o endpoint fica desligado |
 
 ## Autenticação
 
-- **Sem `APP_PASSWORD`**: sem login (uso local).
-- **Com `APP_PASSWORD` e `AUTH_SECRET`**: todas as páginas e APIs exigem login (exceto `/login` e
-  `/api/health`). A sessão fica em um cookie JWT assinado (`httpOnly`, `SameSite=Lax`, `Secure` em
-  produção) válido por 30 dias; "Sair" fica em **Configurações**. Após 5 senhas erradas, novas
+O app é **multiusuário**: cada concurso pertence a um usuário, e cada um vê e altera só os próprios
+dados (inclusive export/import e MCP).
+
+- **Sem login configurado**: sem login (uso local); tudo pertence ao usuário inicial.
+- **Login com Google** (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `ADMIN_EMAILS`, `AUTH_SECRET`):
+  só entram os e-mails de `ADMIN_EMAILS` e `ALLOWED_EMAILS` (allowlist). Os dados que existiam
+  antes do multiusuário pertencem ao **usuário inicial**, que é assumido pelo primeiro login de um
+  e-mail de `ADMIN_EMAILS`. Retirar um e-mail da allowlist encerra as sessões dele na hora.
+- **Painel admin** (`/admin`, só admins): lista os usuários, promove/rebaixa admins, bloqueia
+  contas (sem acesso por sessão nem pelo token do MCP), libera e-mails além dos de `ALLOWED_EMAILS`
+  e registra tudo num log de auditoria. O admin alterna entre "Visão admin" e "Visão usuário" no
+  menu da conta, sem novo login. Os e-mails de `ADMIN_EMAILS` são admins garantidos, e o último
+  admin ativo não pode ser rebaixado nem bloqueado.
+- **Senha única** (`APP_PASSWORD` + `AUTH_SECRET`): para uso local; entra sempre como o usuário
+  inicial. Em produção não pode ser combinada com o login Google. Após 5 senhas erradas, novas
   tentativas do mesmo cliente esperam cada vez mais.
+- Com login, todas as páginas e APIs exigem sessão (exceto `/login`, `/api/health`, o fluxo do
+  Google em `/api/auth/google…` e `/api/mcp`, que usa token). A sessão fica em um cookie JWT
+  assinado (`httpOnly`, `SameSite=Lax`, `Secure` em produção) válido por 30 dias; "Sair" fica em
+  **Configurações**.
 - Gere o segredo com `openssl rand -base64 32` (ou
   `node -e "console.log(crypto.randomBytes(32).toString('base64'))"`). Trocar o `AUTH_SECRET`
   encerra todas as sessões.
-- Em produção (`NODE_ENV=production`) o servidor não inicia sem `APP_PASSWORD`, salvo
-  `ALLOW_NO_AUTH=true`, nem com `AUTH_SECRET` curto.
+- Em produção (`NODE_ENV=production`) o servidor não inicia sem login, salvo `ALLOW_NO_AUTH=true`,
+  nem com `AUTH_SECRET` curto, Google sem `ADMIN_EMAILS` ou Google junto com `APP_PASSWORD`.
 - Hospedado, use sempre HTTPS (o cookie de sessão é `Secure` em produção; `localhost` é exceção
   nos navegadores).
+
+### Configurar o login com Google
+
+1. No [Google Cloud Console](https://console.cloud.google.com), crie (ou escolha) um projeto.
+2. Em **Google Auth Platform → Branding**, preencha nome do app e e-mail de suporte. Em
+   **Audience**, escolha *External*. Enquanto o app estiver em *Testing*, só entram as contas
+   listadas em *Test users* (até 100); para outras pessoas, publique o app (*In production*). Com
+   os escopos básicos (`openid`, `email`, `profile`) não há revisão de verificação.
+3. Em **Clients → Create client**, tipo *Web application*:
+   - *Authorized JavaScript origins*: `http://localhost:3000` e `https://<seu-domínio>`;
+   - *Authorized redirect URIs*: `http://localhost:3000/api/auth/google/callback` e
+     `https://<seu-domínio>/api/auth/google/callback`.
+4. Copie o *Client ID* e o *Client secret* para `GOOGLE_CLIENT_ID` e `GOOGLE_CLIENT_SECRET`, defina
+   `ADMIN_EMAILS` (o seu e-mail) e, se quiser liberar outras pessoas, `ALLOWED_EMAILS`.
+
+O Google não aceita curingas nas redirect URIs: os *preview deploys* da Vercel (URL diferente a
+cada deploy) não conseguem fazer login com Google. Use um domínio fixo de produção.
 
 ## Backup e restauração
 
 **Export/import JSON (qualquer banco).** Em **Configurações**: "Baixar backup (JSON)" gera um
-arquivo versionado com todos os dados (concursos, tags, links, eventos, histórico, resultados);
-"Baixar concursos (CSV)" gera uma planilha (separador `;`). "Importar…" restaura um backup JSON
-**substituindo todos os dados** (com confirmação; tudo ou nada). Também serve para migrar entre
-local ↔ hospedado.
+arquivo versionado com todos os seus dados (concursos, tags, links, eventos, histórico,
+resultados); "Baixar concursos (CSV)" gera uma planilha (separador `;`). "Importar…" restaura um
+backup JSON **substituindo todos os seus dados** (com confirmação; tudo ou nada) — os de outros
+usuários não são tocados, e os IDs são renumerados. Também serve para migrar entre local ↔
+hospedado.
 
 **Cópia do arquivo SQLite (banco local).**
 
@@ -113,8 +149,8 @@ Recursos: `concurso://referencia` (valores aceitos e transições de status) e
 `concurso://concursos/{id}` (ficha). Prompts: `cadastrar_edital` (guia a extração de um cargo) e
 `aplicar_retificacao`.
 
-**Local (stdio)** — usa o mesmo banco do app (`DATABASE_URL` do `.env.local`). O `--silent` é
-necessário: o protocolo usa o stdout.
+**Local (stdio)** — usa o mesmo banco do app (`DATABASE_URL` do `.env.local`), com os dados do
+usuário inicial. O `--silent` é necessário: o protocolo usa o stdout.
 
 ```bash
 # Claude Code
@@ -133,15 +169,16 @@ claude mcp add concurso -- pnpm --silent --dir /caminho/para/concurso mcp
 }
 ```
 
-**Hospedado (HTTP)** — defina `MCP_TOKEN` (gere com `openssl rand -base64 32`) e conecte o cliente a
-`https://<seu-app>/api/mcp` com o header `Authorization: Bearer <MCP_TOKEN>`:
+**Hospedado (HTTP)** — em **Configurações → Token do MCP**, gere o seu token pessoal (ele aparece
+só uma vez) e conecte o cliente a `https://<seu-app>/api/mcp` com o header
+`Authorization: Bearer <token>`:
 
 ```bash
-claude mcp add --transport http concurso https://<seu-app>/api/mcp   --header "Authorization: Bearer $MCP_TOKEN"
+claude mcp add --transport http concurso https://<seu-app>/api/mcp   --header "Authorization: Bearer $TOKEN"
 ```
 
-O token é independente da senha do app; tokens errados seguidos sofrem atraso progressivo. Trocar o
-`MCP_TOKEN` revoga o acesso dos clientes antigos.
+O token dá acesso apenas aos dados de quem o gerou; o banco guarda só o resumo SHA-256. Tokens
+errados seguidos sofrem atraso progressivo. Gerar um novo token ou revogar invalida o anterior.
 
 ## Deploy
 
@@ -151,8 +188,10 @@ O token é independente da senha do app; tokens errados seguidos sofrem atraso p
    `turso db create concurso`, `turso db show concurso --url`, `turso db tokens create concurso`.
 2. Importe o repositório na [Vercel](https://vercel.com) (framework Next.js; sem `vercel.json`).
 3. Em *Settings → Environment Variables* defina `DATABASE_URL` (`libsql://…`),
-   `DATABASE_AUTH_TOKEN`, `APP_PASSWORD`, `AUTH_SECRET` e `ENABLE_EXPERIMENTAL_COREPACK=1` (para a
-   Vercel usar a versão do pnpm do `packageManager`). Em *Settings → General*, Node.js 24.
+   `DATABASE_AUTH_TOKEN`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `ADMIN_EMAILS`,
+   `ALLOWED_EMAILS` (opcional), `AUTH_SECRET` e `ENABLE_EXPERIMENTAL_COREPACK=1` (para a Vercel
+   usar a versão do pnpm do `packageManager`). Não defina `APP_PASSWORD`. Em *Settings → General*,
+   Node.js 24. Veja [Configurar o login com Google](#configurar-o-login-com-google).
 4. Faça o deploy. O `pnpm build` aplica as migrações no Turso antes do `next build` (as variáveis
    do banco precisam estar disponíveis no build).
 

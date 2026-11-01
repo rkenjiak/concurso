@@ -1,5 +1,5 @@
-/** Leituras do dashboard (RF06). */
-import { and, asc, count, eq, lte, or } from "drizzle-orm";
+/** Leituras do dashboard (RF06), restritas aos concursos do usuário (#49). */
+import { and, asc, count, eq, inArray, lte, or } from "drizzle-orm";
 import { type CorConcurso, corDoConcurso } from "@/domain/cores";
 import { STATUS, type Status } from "@/domain/enums";
 import {
@@ -61,10 +61,11 @@ export interface Dashboard {
 }
 
 /** Contagem de concursos por status (somente status presentes), na ordem do enum `STATUS`. */
-export async function contarPorStatus(db: Db): Promise<ContagemStatus[]> {
+export async function contarPorStatus(db: Db, usuarioId: number): Promise<ContagemStatus[]> {
   const linhas = await db
     .select({ status: concurso.status, quantidade: count() })
     .from(concurso)
+    .where(eq(concurso.usuarioId, usuarioId))
     .groupBy(concurso.status);
   const mapa = new Map(linhas.map((l) => [l.status, l.quantidade]));
   return STATUS.filter((s) => (mapa.get(s) ?? 0) > 0).map((status) => ({
@@ -74,7 +75,10 @@ export async function contarPorStatus(db: Db): Promise<ContagemStatus[]> {
 }
 
 /** Concursos com o fim da validade já calculado (§4.3), para prazos e calendário. */
-export async function listarConcursosDoPrazo(db: Db): Promise<ConcursoDoPrazo[]> {
+export async function listarConcursosDoPrazo(
+  db: Db,
+  usuarioId: number,
+): Promise<ConcursoDoPrazo[]> {
   const linhas = await db
     .select({
       id: concurso.id,
@@ -89,7 +93,8 @@ export async function listarConcursosDoPrazo(db: Db): Promise<ConcursoDoPrazo[]>
       cor: concurso.cor,
       icone: concurso.icone,
     })
-    .from(concurso);
+    .from(concurso)
+    .where(eq(concurso.usuarioId, usuarioId));
   return linhas.map(
     ({ homologacaoData, validadeMeses, validadeProrrogada, validadeFimManual, ...c }) => ({
       ...c,
@@ -101,6 +106,14 @@ export async function listarConcursosDoPrazo(db: Db): Promise<ConcursoDoPrazo[]>
         validadeFimManual,
       }),
     }),
+  );
+}
+
+/** Condição: o evento é de um concurso do usuário. */
+export function eventoDoUsuario(db: Db, usuarioId: number) {
+  return inArray(
+    evento.concursoId,
+    db.select({ id: concurso.id }).from(concurso).where(eq(concurso.usuarioId, usuarioId)),
   );
 }
 
@@ -123,20 +136,27 @@ export const COLUNAS_EVENTO_PRAZO = {
  */
 export async function obterDashboard(
   db: Db,
+  usuarioId: number,
   hoje: DataISO,
   janelaDias: number = JANELA_PADRAO_DIAS,
 ): Promise<Dashboard> {
   const limite = somarDias(hoje, janelaDias);
   const [concursos, eventos, porStatus] = await Promise.all([
-    listarConcursosDoPrazo(db),
+    listarConcursosDoPrazo(db, usuarioId),
     db
       .select(COLUNAS_EVENTO_PRAZO)
       .from(evento)
       .where(
-        or(and(eq(evento.concluido, false), lte(evento.data, limite)), eq(evento.tipo, "VALIDADE")),
+        and(
+          eventoDoUsuario(db, usuarioId),
+          or(
+            and(eq(evento.concluido, false), lte(evento.data, limite)),
+            eq(evento.tipo, "VALIDADE"),
+          ),
+        ),
       )
       .orderBy(asc(evento.data), asc(evento.id)),
-    contarPorStatus(db),
+    contarPorStatus(db, usuarioId),
   ]);
   const prazos = proximosPrazos(eventos, concursos, hoje, janelaDias);
   return {

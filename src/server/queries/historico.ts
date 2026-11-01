@@ -6,7 +6,10 @@ import type { Db } from "../db/client";
 import { type StatusHistorico, statusHistorico } from "../db/schema";
 import type { Executor } from "../repositories/tipos";
 
-/** Histórico do concurso em ordem cronológica (mais antigo primeiro). */
+/**
+ * Histórico do concurso em ordem cronológica (mais antigo primeiro). O chamador garante que o
+ * concurso é do usuário.
+ */
 export async function listarHistorico(
   db: Executor,
   concursoId: number,

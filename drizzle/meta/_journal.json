@@ -22,6 +22,20 @@
       "when": 1793555927923,
       "tag": "0002_cor_icone_concurso",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1793564123672,
+      "tag": "0003_multiusuario",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1793569336146,
+      "tag": "0004_painel_admin",
+      "breakpoints": true
     }
   ]
 }

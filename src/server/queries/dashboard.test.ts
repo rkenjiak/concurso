@@ -7,6 +7,7 @@ import {
   eventoSchema,
   VALORES_INICIAIS_EVENTO,
 } from "@/lib/schemas/evento";
+import { ID_USUARIO_INICIAL as U } from "@/server/db/schema";
 import { criarBancoTeste } from "../db/banco-teste";
 import type { Db } from "../db/client";
 import { criarConcurso } from "../repositories/concursos";
@@ -29,19 +30,21 @@ const HOJE = "2026-10-31";
 const novoConcurso = (orgao: string, status: Status) =>
   criarConcurso(
     db,
+    U,
     concursoSchema.parse({ ...VALORES_INICIAIS_CONCURSO, orgao, cargo: "Analista", status }),
   );
 
 const novoEvento = (concursoId: number, parcial: Partial<EventoFormValores>) =>
   criarEvento(
     db,
+    U,
     concursoId,
     eventoSchema.parse({ ...VALORES_INICIAIS_EVENTO, data: HOJE, ...parcial }),
   );
 
 describe("obterDashboard", () => {
   it("banco vazio", async () => {
-    expect(await obterDashboard(db, HOJE)).toEqual({
+    expect(await obterDashboard(db, U, HOJE)).toEqual({
       prazos: { vencidos: [], hoje: [], proximos: [] },
       totalPrazos: 0,
       ocultos: 0,
@@ -61,7 +64,7 @@ describe("obterDashboard", () => {
     await novoEvento(trf, { tipo: "PRAZO_RECURSO", data: "2026-11-02", concluido: true });
     await novoEvento(encerrado, { tipo: "POSSE", data: "2026-11-02" });
 
-    const d = await obterDashboard(db, HOJE);
+    const d = await obterDashboard(db, U, HOJE);
     expect(d.totalPrazos).toBe(3);
     expect(d.prazos.vencidos.map((p) => [p.tipo, p.dias, p.concurso.orgao])).toEqual([
       ["VENCIMENTO_BOLETO", -2, "TRF"],
@@ -82,6 +85,7 @@ describe("obterDashboard", () => {
     const comValidade = (orgao: string, parcial: Record<string, unknown>) =>
       criarConcurso(
         db,
+        U,
         concursoSchema.parse({
           ...VALORES_INICIAIS_CONCURSO,
           orgao,
@@ -114,7 +118,7 @@ describe("obterDashboard", () => {
     });
     await novoEvento(comEvento, { tipo: "VALIDADE", data: "2026-11-25" });
 
-    const d = await obterDashboard(db, HOJE);
+    const d = await obterDashboard(db, U, HOJE);
     expect(d.prazos.hoje.map((p) => [p.concurso.id, p.tipo, p.derivado])).toEqual([
       [manual, "VALIDADE", true],
     ]);
@@ -131,6 +135,7 @@ describe("obterDashboard", () => {
   it("marca prazos ocultos (#44) e não os conta no total", async () => {
     const id = await criarConcurso(
       db,
+      U,
       concursoSchema.parse({
         ...VALORES_INICIAIS_CONCURSO,
         orgao: "TRF",
@@ -141,10 +146,10 @@ describe("obterDashboard", () => {
     );
     const prova = await novoEvento(id, { tipo: "PROVA_OBJETIVA" });
     await novoEvento(id, { tipo: "FIM_INSCRICOES", data: "2026-11-05" });
-    await definirPrazoOculto(db, { tipo: "evento", eventoId: prova }, true);
-    await definirPrazoOculto(db, { tipo: "validade", concursoId: id }, true);
+    await definirPrazoOculto(db, U, { tipo: "evento", eventoId: prova }, true);
+    await definirPrazoOculto(db, U, { tipo: "validade", concursoId: id }, true);
 
-    let d = await obterDashboard(db, HOJE);
+    let d = await obterDashboard(db, U, HOJE);
     expect(d.totalPrazos).toBe(1);
     expect(d.ocultos).toBe(2);
     expect(d.prazos.hoje.map((p) => [p.chave, p.oculto])).toEqual([[`evento-${prova}`, true]]);
@@ -153,8 +158,8 @@ describe("obterDashboard", () => {
       ["VALIDADE", true],
     ]);
 
-    await definirPrazoOculto(db, { tipo: "evento", eventoId: prova }, false);
-    d = await obterDashboard(db, HOJE);
+    await definirPrazoOculto(db, U, { tipo: "evento", eventoId: prova }, false);
+    d = await obterDashboard(db, U, HOJE);
     expect(d.totalPrazos).toBe(2);
     expect(d.ocultos).toBe(1);
   });
@@ -162,8 +167,8 @@ describe("obterDashboard", () => {
   it("respeita a janela informada", async () => {
     const id = await novoConcurso("TRF", "INSCRITO");
     await novoEvento(id, { data: "2026-11-10" });
-    expect((await obterDashboard(db, HOJE, 7)).totalPrazos).toBe(0);
-    expect((await obterDashboard(db, HOJE, 10)).totalPrazos).toBe(1);
+    expect((await obterDashboard(db, U, HOJE, 7)).totalPrazos).toBe(0);
+    expect((await obterDashboard(db, U, HOJE, 10)).totalPrazos).toBe(1);
   });
 
   it("conta concursos por status na ordem do enum", async () => {
@@ -171,12 +176,12 @@ describe("obterDashboard", () => {
     await novoConcurso("B", "PREVISTO");
     await novoConcurso("C", "INSCRITO");
     await novoConcurso("D", "CANCELADO");
-    expect(await contarPorStatus(db)).toEqual([
+    expect(await contarPorStatus(db, U)).toEqual([
       { status: "PREVISTO", quantidade: 1 },
       { status: "INSCRITO", quantidade: 2 },
       { status: "CANCELADO", quantidade: 1 },
     ]);
-    expect((await obterDashboard(db, HOJE)).totalConcursos).toBe(4);
+    expect((await obterDashboard(db, U, HOJE)).totalConcursos).toBe(4);
   });
 });
 
@@ -184,10 +189,10 @@ describe("listarConcursos com filtro de status", () => {
   it("filtra pelo status informado", async () => {
     await novoConcurso("A", "INSCRITO");
     await novoConcurso("B", "PREVISTO");
-    expect((await listarConcursos(db, { status: ["PREVISTO"] })).map((c) => c.orgao)).toEqual([
+    expect((await listarConcursos(db, U, { status: ["PREVISTO"] })).map((c) => c.orgao)).toEqual([
       "B",
     ]);
-    expect(await listarConcursos(db, { status: ["NOMEADO"] })).toEqual([]);
-    expect(await listarConcursos(db, { status: [] })).toHaveLength(2);
+    expect(await listarConcursos(db, U, { status: ["NOMEADO"] })).toEqual([]);
+    expect(await listarConcursos(db, U, { status: [] })).toHaveLength(2);
   });
 });

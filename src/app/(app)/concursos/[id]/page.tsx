@@ -21,6 +21,7 @@ import { ROTULO_ESCOLARIDADE, ROTULO_ESFERA } from "@/domain/labels";
 import { formatarBRL, formatarDataInstante } from "@/lib/format";
 import { idSchema } from "@/lib/schemas/comum";
 import { hojeSP } from "@/lib/tz";
+import { exigirUsuarioPagina } from "@/server/auth/acesso";
 import { getDb } from "@/server/db/client";
 import { obterConcurso } from "@/server/queries/concursos";
 import { listarEventos } from "@/server/queries/eventos";
@@ -31,7 +32,9 @@ import { listarResultadosFase } from "@/server/queries/resultados";
 async function carregar(params: Promise<{ id: string }>) {
   const id = idSchema.safeParse((await params).id);
   if (!id.success) notFound();
-  const concurso = await obterConcurso(getDb(), id.data);
+  const { id: usuarioId } = await exigirUsuarioPagina();
+  // Concurso de outro usuário: 404, como se não existisse.
+  const concurso = await obterConcurso(getDb(), usuarioId, id.data);
   if (!concurso) notFound();
   return concurso;
 }

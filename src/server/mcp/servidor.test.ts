@@ -3,6 +3,7 @@ import { Client, InMemoryTransport } from "@modelcontextprotocol/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { criarBancoTeste } from "../db/banco-teste";
 import type { Db } from "../db/client";
+import { ID_USUARIO_INICIAL } from "../db/schema";
 import { listarEventos } from "../queries/eventos";
 import { criarServidorMcp, textoDosErros } from "./servidor";
 
@@ -14,7 +15,7 @@ let aoAlterar: ReturnType<typeof vi.fn<() => void>>;
 beforeEach(async () => {
   ({ db, client: banco } = await criarBancoTeste());
   aoAlterar = vi.fn<() => void>();
-  const servidor = criarServidorMcp({ db, aoAlterar });
+  const servidor = criarServidorMcp({ db, usuarioId: ID_USUARIO_INICIAL, aoAlterar });
   const [ladoCliente, ladoServidor] = InMemoryTransport.createLinkedPair();
   await servidor.connect(ladoServidor);
   cliente = new Client({ name: "teste", version: "0.0.0" });

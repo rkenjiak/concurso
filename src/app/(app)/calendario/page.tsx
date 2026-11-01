@@ -9,6 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { deslocarMes, lerMes, mesDaData, montarGradeMes } from "@/domain/calendario";
 import { formatarMes } from "@/lib/format";
 import { hojeSP } from "@/lib/tz";
+import { exigirUsuarioPagina } from "@/server/auth/acesso";
 import { getDb } from "@/server/db/client";
 import { obterCalendario } from "@/server/queries/calendario";
 
@@ -20,7 +21,8 @@ export default async function CalendarioPage({ searchParams }: PageProps<"/calen
   await connection();
   const hoje = hojeSP();
   const mes = lerMes((await searchParams).mes, hoje);
-  const itens = await obterCalendario(getDb(), mes, hoje);
+  const { id: usuarioId } = await exigirUsuarioPagina();
+  const itens = await obterCalendario(getDb(), usuarioId, mes, hoje);
   const grade = montarGradeMes(mes, hoje);
   const titulo = formatarMes(mes);
   const anterior = deslocarMes(mes, -1);

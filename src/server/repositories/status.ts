@@ -9,13 +9,15 @@ import { contextoDoHistorico, exigirTransicao, statusAoDesfazer } from "@/domain
 import type { Db } from "../db/client";
 import { concurso, statusHistorico } from "../db/schema";
 import { listarHistorico } from "../queries/historico";
+import { doUsuario } from "./concursos";
 import type { Transacao } from "./tipos";
 
-async function statusAtual(tx: Transacao, id: number): Promise<Status> {
+/** Status atual do concurso do usuário; lança {@link ErroDominio} se não houver. */
+async function statusAtual(tx: Transacao, usuarioId: number, id: number): Promise<Status> {
   const [linha] = await tx
     .select({ status: concurso.status })
     .from(concurso)
-    .where(eq(concurso.id, id));
+    .where(doUsuario(usuarioId, id));
   if (!linha) throw new ErroDominio("Concurso não encontrado.");
   return linha.status;
 }
@@ -23,13 +25,14 @@ async function statusAtual(tx: Transacao, id: number): Promise<Status> {
 /** Altera o status validando a transição. Lança {@link ErroDominio} se não permitida. */
 export async function alterarStatus(
   db: Db,
+  usuarioId: number,
   id: number,
   para: Status,
   observacao: string | null = null,
   agora: Date = new Date(),
 ): Promise<void> {
   await db.transaction(async (tx) => {
-    const de = await statusAtual(tx, id);
+    const de = await statusAtual(tx, usuarioId, id);
     const historico = await listarHistorico(tx, id);
     exigirTransicao(de, para, contextoDoHistorico(historico));
     await tx
@@ -43,9 +46,9 @@ export async function alterarStatus(
  * Desfaz a última mudança: remove o último registro do histórico e restaura o `de`.
  * `status_desde` volta a ser a data do registro que passa a ser o último. Retorna o status restaurado.
  */
-export async function desfazerUltimoStatus(db: Db, id: number): Promise<Status> {
+export async function desfazerUltimoStatus(db: Db, usuarioId: number, id: number): Promise<Status> {
   return db.transaction(async (tx) => {
-    await statusAtual(tx, id);
+    await statusAtual(tx, usuarioId, id);
     const historico = await listarHistorico(tx, id);
     const ultimo = historico.at(-1);
     const restaurado = statusAoDesfazer(ultimo);

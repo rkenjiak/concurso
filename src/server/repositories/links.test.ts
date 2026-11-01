@@ -7,7 +7,7 @@ import { criarBancoTeste } from "../db/banco-teste";
 import type { Db } from "../db/client";
 import { listarLinks } from "../queries/links";
 import { criarConcurso } from "./concursos";
-import { atualizarLink, criarLink, excluirLink, reordenarLinks } from "./links";
+import { atualizarLink, criarLink, excluirLink, reordenarLinks, salvarLinks } from "./links";
 
 let db: Db;
 let client: Client;
@@ -115,5 +115,28 @@ describe("linkSchema", () => {
   it("ordemLinksSchema rejeita IDs repetidos", () => {
     expect(ordemLinksSchema.safeParse([1, 2]).success).toBe(true);
     expect(ordemLinksSchema.safeParse([1, 1]).success).toBe(false);
+  });
+});
+
+describe("salvarLinks", () => {
+  it("cria no fim da lista e atualiza, tudo ou nada", async () => {
+    const a = await criarLink(db, concursoId, dados("https://a.example"));
+    const ids = await salvarLinks(db, concursoId, [
+      { id: null, dados: dados("https://b.example") },
+      { id: a, dados: dados("https://a2.example", "Edital") },
+    ]);
+    expect(ids).toEqual([a + 1, a]);
+    expect((await listarLinks(db, concursoId)).map((l) => [l.url, l.ordem])).toEqual([
+      ["https://a2.example", 0],
+      ["https://b.example", 1],
+    ]);
+
+    await expect(
+      salvarLinks(db, concursoId, [
+        { id: null, dados: dados("https://c.example") },
+        { id: 999, dados: dados("https://d.example") },
+      ]),
+    ).rejects.toThrow(ErroDominio);
+    expect(await listarLinks(db, concursoId)).toHaveLength(2);
   });
 });

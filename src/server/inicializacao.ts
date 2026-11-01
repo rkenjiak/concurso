@@ -2,13 +2,14 @@
  * Tarefas executadas uma vez ao iniciar o servidor (via `src/instrumentation.ts`).
  */
 import { ErroConfigAuth, lerConfigAuth } from "./auth/config";
+import { ErroConfigMcp, lerConfigMcp } from "./mcp/config";
 
 /** Durante `next build` o app não atende requisições: as checagens valem para a execução. */
 const emBuild = () => process.env.NEXT_PHASE === "phase-production-build";
 
 /**
  * Recusa iniciar com a autenticação mal configurada — por exemplo, em produção sem
- * `APP_PASSWORD` e sem `ALLOW_NO_AUTH=true` (ARQUITETURA.md §7.1).
+ * `APP_PASSWORD` e sem `ALLOW_NO_AUTH=true` (ARQUITETURA.md §7.1) — ou com `MCP_TOKEN` curto.
  */
 export function verificarAmbienteAoIniciar(): void {
   if (emBuild()) return;
@@ -17,8 +18,9 @@ export function verificarAmbienteAoIniciar(): void {
     if (!config.habilitada && process.env.NODE_ENV === "production") {
       console.warn("Atenção: autenticação desligada (ALLOW_NO_AUTH=true).");
     }
+    lerConfigMcp();
   } catch (erro) {
-    if (!(erro instanceof ErroConfigAuth)) throw erro;
+    if (!(erro instanceof ErroConfigAuth) && !(erro instanceof ErroConfigMcp)) throw erro;
     console.error(`\nO app não pode iniciar: ${erro.message}\n`);
     process.exit(1);
   }

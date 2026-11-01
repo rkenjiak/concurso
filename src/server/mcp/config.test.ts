@@ -1,22 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { ErroConfigMcp, lerConfigMcp, TAMANHO_MIN_TOKEN, tokenBearer } from "./config";
+import { tokenBearer } from "./config";
 
-const TOKEN = "t".repeat(TAMANHO_MIN_TOKEN);
-
-describe("lerConfigMcp", () => {
-  it("fica desligado sem MCP_TOKEN", () => {
-    expect(lerConfigMcp({})).toEqual({ habilitado: false });
-    expect(lerConfigMcp({ MCP_TOKEN: "  " })).toEqual({ habilitado: false });
-  });
-
-  it("liga com token longo o bastante", () => {
-    expect(lerConfigMcp({ MCP_TOKEN: ` ${TOKEN} ` })).toEqual({ habilitado: true, token: TOKEN });
-  });
-
-  it("recusa token curto", () => {
-    expect(() => lerConfigMcp({ MCP_TOKEN: TOKEN.slice(1) })).toThrow(ErroConfigMcp);
-  });
-});
+const TOKEN = "t".repeat(32);
 
 describe("tokenBearer", () => {
   it("extrai o token do header Authorization", () => {

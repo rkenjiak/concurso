@@ -15,6 +15,7 @@ import {
   ESCOLARIDADE,
   ESFERA,
   FASE,
+  PAPEL,
   SITUACAO_FASE,
   STATUS,
   TIPO_EVENTO,
@@ -37,11 +38,35 @@ const atualizadoEm = () =>
     .$defaultFn(() => new Date())
     .$onUpdateFn(() => new Date());
 
+/** ID do usuário inicial, criado pela migração multiusuário (#49): dono dos dados anteriores. */
+export const ID_USUARIO_INICIAL = 1;
+
+// usuario (#49). O usuário inicial nasce sem e-mail e é assumido pelo primeiro login Google de
+// um e-mail em `ADMIN_EMAILS`; o login por senha (uso local) entra sempre como ele.
+export const usuario = sqliteTable("usuario", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  /** Minúsculo; `null` só no usuário inicial ainda não assumido. */
+  email: text("email").unique(),
+  /** `sub` do Google (identificador estável da conta). */
+  googleSub: text("google_sub").unique(),
+  nome: text("nome"),
+  avatarUrl: text("avatar_url"),
+  papel: text("papel", { enum: PAPEL }).notNull().default("USUARIO"),
+  /** SHA-256 (hex) do token do MCP por HTTP; o token em si não é guardado. */
+  mcpTokenHash: text("mcp_token_hash").unique(),
+  ultimoAcessoEm: integer("ultimo_acesso_em", { mode: "timestamp_ms" }),
+  createdAt: criadoEm(),
+});
+
 // 3.1 concurso (RF01, RF03, RF05)
 export const concurso = sqliteTable(
   "concurso",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
+    /** Dono do concurso (#49); links, eventos etc. pertencem a ele via concurso. */
+    usuarioId: integer("usuario_id")
+      .notNull()
+      .references(() => usuario.id, { onDelete: "cascade" }),
     orgao: text("orgao").notNull(),
     cargo: text("cargo").notNull(),
     banca: text("banca"),
@@ -78,7 +103,10 @@ export const concurso = sqliteTable(
     createdAt: criadoEm(),
     updatedAt: atualizadoEm(),
   },
-  (t) => [index("concurso_status_idx").on(t.status)],
+  (t) => [
+    index("concurso_status_idx").on(t.status),
+    index("concurso_usuario_idx").on(t.usuarioId, t.status),
+  ],
 );
 
 // 3.2 link (RF02)
@@ -204,6 +232,8 @@ export const anexo = sqliteTable(
   (t) => [index("anexo_concurso_idx").on(t.concursoId)],
 );
 
+export type Usuario = typeof usuario.$inferSelect;
+export type NovoUsuario = typeof usuario.$inferInsert;
 export type Concurso = typeof concurso.$inferSelect;
 export type NovoConcurso = typeof concurso.$inferInsert;
 export type Link = typeof link.$inferSelect;

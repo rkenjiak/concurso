@@ -23,6 +23,7 @@ import {
   temFiltros,
 } from "@/lib/schemas/filtros-concursos";
 import { hojeSP } from "@/lib/tz";
+import { exigirUsuarioPagina } from "@/server/auth/acesso";
 import { getDb } from "@/server/db/client";
 import { listarConcursos } from "@/server/queries/concursos";
 import { opcoesStatusPorConcurso } from "@/server/queries/historico";
@@ -36,7 +37,8 @@ export default async function ConcursosPage({ searchParams }: PageProps<"/concur
   const visao = lerVisao(parametros);
   const busca = filtrosParaBusca(filtros);
   const filtrando = temFiltros(filtros);
-  const concursos = await listarConcursos(getDb(), filtros, hojeSP());
+  const { id: usuarioId } = await exigirUsuarioPagina();
+  const concursos = await listarConcursos(getDb(), usuarioId, filtros, hojeSP());
   const limpar = hrefConcursos({ ...FILTROS_VAZIOS, ordem: filtros.ordem }, visao);
   const opcoes = visao === "quadro" ? await opcoesStatusPorConcurso(getDb(), concursos) : null;
 

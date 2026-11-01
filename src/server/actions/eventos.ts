@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { idSchema } from "@/lib/schemas/comum";
 import { concluidoSchema, eventoSchema } from "@/lib/schemas/evento";
-import { verificarAcesso } from "../auth/acesso";
+import { exigirUsuarioAcao } from "../auth/acesso";
 import { getDb } from "../db/client";
 import * as repo from "../repositories/eventos";
 import { executar, falha, falhaValidacao, type ResultadoAcao, sucesso } from "./resultado";
@@ -21,8 +21,9 @@ export async function salvarEvento(
   eventoIdBruto: unknown,
   entrada: unknown,
 ): Promise<ResultadoAcao<{ id: number }>> {
-  const negado = await verificarAcesso();
-  if (negado) return negado;
+  const sessao = await exigirUsuarioAcao();
+  if (!sessao.ok) return sessao;
+  const usuarioId = sessao.usuario.id;
   const concursoId = idSchema.safeParse(concursoIdBruto);
   if (!concursoId.success) return falha("Concurso não encontrado.");
   const eventoId = eventoIdBruto == null ? null : idSchema.safeParse(eventoIdBruto);
@@ -34,9 +35,9 @@ export async function salvarEvento(
     let id: number;
     if (eventoId?.success) {
       id = eventoId.data;
-      await repo.atualizarEvento(db, concursoId.data, id, dados.data);
+      await repo.atualizarEvento(db, usuarioId, concursoId.data, id, dados.data);
     } else {
-      id = await repo.criarEvento(db, concursoId.data, dados.data);
+      id = await repo.criarEvento(db, usuarioId, concursoId.data, dados.data);
     }
     revalidar(concursoId.data);
     return sucesso({ id });
@@ -47,13 +48,14 @@ export async function excluirEvento(
   concursoIdBruto: unknown,
   eventoIdBruto: unknown,
 ): Promise<ResultadoAcao> {
-  const negado = await verificarAcesso();
-  if (negado) return negado;
+  const sessao = await exigirUsuarioAcao();
+  if (!sessao.ok) return sessao;
+  const usuarioId = sessao.usuario.id;
   const concursoId = idSchema.safeParse(concursoIdBruto);
   const eventoId = idSchema.safeParse(eventoIdBruto);
   if (!concursoId.success || !eventoId.success) return falha(INVALIDO);
   return executar(async () => {
-    await repo.excluirEvento(getDb(), concursoId.data, eventoId.data);
+    await repo.excluirEvento(getDb(), usuarioId, concursoId.data, eventoId.data);
     revalidar(concursoId.data);
     return sucesso(null);
   });
@@ -65,15 +67,16 @@ export async function alternarConcluido(
   eventoIdBruto: unknown,
   concluidoBruto: unknown,
 ): Promise<ResultadoAcao> {
-  const negado = await verificarAcesso();
-  if (negado) return negado;
+  const sessao = await exigirUsuarioAcao();
+  if (!sessao.ok) return sessao;
+  const usuarioId = sessao.usuario.id;
   const concursoId = idSchema.safeParse(concursoIdBruto);
   const eventoId = idSchema.safeParse(eventoIdBruto);
   if (!concursoId.success || !eventoId.success) return falha(INVALIDO);
   const concluido = concluidoSchema.safeParse(concluidoBruto);
   if (!concluido.success) return falhaValidacao(concluido.error);
   return executar(async () => {
-    await repo.definirConcluido(getDb(), concursoId.data, eventoId.data, concluido.data);
+    await repo.definirConcluido(getDb(), usuarioId, concursoId.data, eventoId.data, concluido.data);
     revalidar(concursoId.data);
     return sucesso(null);
   });

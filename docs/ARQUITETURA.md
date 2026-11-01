@@ -70,6 +70,7 @@ Convenções:
 
 ```mermaid
 erDiagram
+  USUARIO ||--o{ CONCURSO : "é dono"
   CONCURSO ||--o{ LINK : tem
   CONCURSO ||--o{ EVENTO : tem
   CONCURSO ||--o{ STATUS_HISTORICO : registra
@@ -78,6 +79,13 @@ erDiagram
   TAG ||--o{ CONCURSO_TAG : ""
   CONCURSO ||--o{ ANEXO : "pós-MVP"
 ```
+
+### 3.0 `usuario` (#49)
+
+`id`, `email` (único, minúsculo; nulo só no usuário inicial não assumido), `google_sub` (único),
+`nome`, `avatar_url`, `papel` (`USUARIO`/`ADMIN`), `mcp_token_hash` (SHA-256 do token do MCP),
+`ultimo_acesso_em`, `created_at`. `concurso.usuario_id` → `usuario.id` (`ON DELETE CASCADE`;
+obrigatório, garantido por triggers porque a coluna foi adicionada com `ALTER TABLE`).
 
 ### 3.1 `concurso` (RF01, RF03, RF05)
 
@@ -260,21 +268,25 @@ Retorno padronizado `{ ok: true, data } | { ok: false, erros }`.
 | `GET /api/export?formato=json\|csv` | RF09 (CSV = um arquivo por entidade em `.zip`, ou só concursos) |
 | `POST /api/import` | RF09 — importa JSON (substituir tudo ou mesclar; valida com Zod e versão do schema) |
 | `GET /api/health` | health check do deploy |
-| `POST/GET/DELETE /api/mcp` | RF10 — servidor MCP (Streamable HTTP); desligado sem `MCP_TOKEN`, exige `Authorization: Bearer` |
+| `POST/GET/DELETE /api/mcp` | RF10 — servidor MCP (Streamable HTTP); exige `Authorization: Bearer <token pessoal>` |
+| `GET /api/auth/google` e `/api/auth/google/callback` | #49 — login com Google (OIDC, código + PKCE) |
 | `GET /api/calendario.ics?token=…` | RF08, pós-MVP (assinável no Google Calendar) |
 
 ### 5.4 Servidor MCP (`src/server/mcp`, RF10)
 
 Uma LLM com acesso ao edital cadastra e atualiza concursos pelo
 [Model Context Protocol](https://modelcontextprotocol.io). A mesma fábrica `criarServidorMcp({ db,
-aoAlterar })` serve dois transportes:
+usuarioId, aoAlterar })` serve dois transportes; cada instância só enxerga os dados do usuário
+(#49):
 
-- **stdio** — `pnpm --silent mcp` (`scripts/mcp.ts`), uso local; muda para a raiz do projeto, carrega
-  o `.env`, aplica migrações e só escreve no stdout pelo protocolo.
+- **stdio** — `pnpm --silent mcp` (`scripts/mcp.ts`), uso local, com os dados do usuário inicial;
+  muda para a raiz do projeto, carrega o `.env`, aplica migrações e só escreve no stdout pelo
+  protocolo.
 - **HTTP** — `app/api/mcp/route.ts` com `createMcpHandler` (web-standard, stateless; uma instância
-  do servidor por requisição). Pública no `proxy.ts` porque se autentica sozinha: `MCP_TOKEN`
-  (≥ 32 caracteres) comparado em tempo constante, com o mesmo atraso progressivo do login. Sem
-  `MCP_TOKEN` responde 404; token curto impede o app de iniciar. Após escritas, `revalidatePath`.
+  do servidor por requisição, presa ao dono do token via `authInfo`). Pública no `proxy.ts` porque
+  se autentica sozinha: token pessoal gerado em Configurações (`cmcp_…`; o banco guarda só o
+  SHA-256 em `usuario.mcp_token_hash`), com o mesmo atraso progressivo do login. Após escritas,
+  `revalidatePath`.
 
 Camadas:
 
@@ -338,17 +350,34 @@ Decisões (issue #39):
 
 ## 7. Autenticação e locale
 
-### 7.1 Autenticação
-- **Local (padrão):** sem `APP_PASSWORD` definido → auth desligada, app escuta só em `localhost`.
-- **Hospedado:** definir `APP_PASSWORD` e `AUTH_SECRET` (≥ 32 bytes). Login com senha única comparada
-  em tempo constante; sessão em cookie **JWT assinado** (`jose`), `httpOnly`, `secure`, `SameSite=Lax`,
-  30 dias. `proxy.ts` (antigo `middleware.ts` no Next 16) protege tudo exceto `/login` e `/api/health`; Server Actions revalidam a
-  sessão (defesa em profundidade). Atraso progressivo após falhas de login.
-- Em produção (`NODE_ENV=production`) sem `APP_PASSWORD`, o app **recusa iniciar** salvo
+### 7.1 Autenticação e multiusuário (#49)
+- **Multiusuário:** tabela `usuario` (e-mail, `google_sub`, nome, foto, papel `USUARIO`/`ADMIN`,
+  resumo do token MCP, último acesso). `concurso.usuario_id` define o dono; links, eventos,
+  histórico, resultados e anexos pertencem a ele via concurso. `tag` é um vocabulário compartilhado
+  (só nomes): cada usuário vê apenas as tags dos próprios concursos. Toda query e repositório recebe
+  o `usuarioId` e filtra por ele; escritas em filhas exigem antes que o concurso seja do usuário
+  (`exigirConcurso`). Teste dedicado: `src/server/isolamento.test.ts`.
+- **Usuário inicial (ID 1):** criado pela migração `0003_multiusuario` como admin sem e-mail e dono
+  dos dados existentes. É assumido pelo primeiro login Google de um e-mail de `ADMIN_EMAILS`; o
+  login por senha e o modo sem login usam sempre ele.
+- **Local (padrão):** sem login configurado → auth desligada, tudo é do usuário inicial.
+- **Login Google:** OIDC próprio (`server/auth/google.ts`, só `jose`): código de autorização com
+  PKCE, `state` e `nonce` num cookie assinado de 10 min; `id_token` validado pelas chaves públicas
+  do Google (emissor, público, expiração, `nonce`, e-mail verificado). Acesso por allowlist
+  (`ADMIN_EMAILS` + `ALLOWED_EMAILS`), conferida também a cada requisição.
+- **Senha única (`APP_PASSWORD`):** uso local; comparada em tempo constante, com atraso progressivo
+  após falhas. Em produção não pode coexistir com o Google.
+- **Sessão:** cookie **JWT assinado** (`jose`, HS256 com `AUTH_SECRET` ≥ 32 bytes) com o ID do
+  usuário e o método de login; `httpOnly`, `secure`, `SameSite=Lax`, 30 dias. `proxy.ts` confere só
+  a assinatura (sem banco) e protege tudo exceto `/login`, `/api/health`, `/api/auth/google…` e
+  `/api/mcp`; páginas, Server Actions e Route Handlers obtêm o usuário em `auth/acesso.ts`
+  (`exigirUsuarioPagina/Acao/Rota`), que relê o usuário no banco.
+- Em produção (`NODE_ENV=production`) sem login, o app **recusa iniciar** salvo
   `ALLOW_NO_AUTH=true` explícito — evita expor dados por esquecimento.
-- Sem biblioteca de auth completa (NextAuth etc.): um usuário não justifica o custo.
-- **MCP (§5.4):** `/api/mcp` não usa o cookie de sessão; exige `Authorization: Bearer <MCP_TOKEN>`
-  e fica desligado sem a variável.
+- Sem biblioteca de auth completa (NextAuth, Better Auth): um provedor só não justifica a
+  dependência, e o fluxo OIDC cabe em poucas funções testáveis.
+- **MCP (§5.4):** `/api/mcp` não usa o cookie de sessão; exige `Authorization: Bearer <token>` com o
+  token pessoal do usuário.
 
 ### 7.2 Locale (RNF04)
 - `<html lang="pt-BR">`; toda a UI em pt-BR (sem i18n framework — strings diretas + `labels.ts`).

@@ -1,17 +1,22 @@
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type { Client } from "@libsql/client";
 import { eq, sql } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { criarDb, type Db } from "./client";
-import { aplicarMigracoes } from "./migrate";
+import { aplicarMigracoes, PASTA_MIGRACOES } from "./migrate";
 import {
   anexo,
   concurso,
   concursoTag,
   evento,
+  ID_USUARIO_INICIAL,
   link,
   resultadoFase,
   statusHistorico,
   tag,
+  usuario,
 } from "./schema";
 
 let db: Db;
@@ -30,6 +35,7 @@ async function inserirConcurso(): Promise<number> {
   const [linha] = await db
     .insert(concurso)
     .values({
+      usuarioId: ID_USUARIO_INICIAL,
       orgao: "TRF 3ª Região",
       cargo: "Analista Judiciário",
       status: "PREVISTO",
@@ -54,7 +60,47 @@ describe("migrações", () => {
       "resultado_fase",
       "status_historico",
       "tag",
+      "usuario",
     ]);
+  });
+
+  it("multiusuário: dados anteriores passam ao usuário inicial e usuario_id é obrigatório", async () => {
+    // Banco no estado anterior à migração 0003, com um concurso já cadastrado.
+    const pasta = mkdtempSync(join(tmpdir(), "concurso-mig-"));
+    try {
+      mkdirSync(join(pasta, "meta"));
+      const diario = JSON.parse(readFileSync(join(PASTA_MIGRACOES, "meta/_journal.json"), "utf8"));
+      const anteriores = diario.entries.filter((e: { idx: number }) => e.idx < 3);
+      for (const e of anteriores) {
+        copyFileSync(join(PASTA_MIGRACOES, `${e.tag}.sql`), join(pasta, `${e.tag}.sql`));
+      }
+      writeFileSync(
+        join(pasta, "meta/_journal.json"),
+        JSON.stringify({ ...diario, entries: anteriores }),
+      );
+      const antigo = criarDb({ url: ":memory:" });
+      await aplicarMigracoes(antigo.db, pasta);
+      await antigo.client.execute(
+        "INSERT INTO concurso (orgao, cargo, status, status_desde) VALUES ('A', 'B', 'PREVISTO', 0)",
+      );
+      await aplicarMigracoes(antigo.db);
+      const [c] = await antigo.db.select().from(concurso);
+      expect(c?.usuarioId).toBe(ID_USUARIO_INICIAL);
+      expect(await antigo.db.select().from(usuario)).toMatchObject([
+        { id: ID_USUARIO_INICIAL, email: null, papel: "ADMIN" },
+      ]);
+      await expect(
+        antigo.client.execute(
+          "INSERT INTO concurso (orgao, cargo, status, status_desde) VALUES ('C', 'D', 'PREVISTO', 0)",
+        ),
+      ).rejects.toThrow(/usuario_id/);
+      await expect(antigo.client.execute("UPDATE concurso SET usuario_id = NULL")).rejects.toThrow(
+        /usuario_id/,
+      );
+      antigo.client.close();
+    } finally {
+      rmSync(pasta, { recursive: true, force: true });
+    }
   });
 
   it("são idempotentes", async () => {
@@ -94,7 +140,7 @@ describe("schema", () => {
 
   it("usa default de banco para created_at quando inserido via SQL puro", async () => {
     await client.execute(
-      "INSERT INTO concurso (orgao, cargo, status, status_desde) VALUES ('X', 'Y', 'PREVISTO', 0)",
+      "INSERT INTO concurso (usuario_id, orgao, cargo, status, status_desde) VALUES (1, 'X', 'Y', 'PREVISTO', 0)",
     );
     const r = await client.execute("SELECT created_at FROM concurso");
     expect(Number(r.rows[0]?.created_at)).toBeGreaterThan(Date.UTC(2020, 0, 1));
@@ -168,6 +214,7 @@ describe("schema", () => {
     await expect(
       db.transaction(async (tx) => {
         await tx.insert(concurso).values({
+          usuarioId: ID_USUARIO_INICIAL,
           orgao: "A",
           cargo: "B",
           status: "PREVISTO",

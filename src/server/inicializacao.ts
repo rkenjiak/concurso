@@ -2,14 +2,13 @@
  * Tarefas executadas uma vez ao iniciar o servidor (via `src/instrumentation.ts`).
  */
 import { ErroConfigAuth, lerConfigAuth } from "./auth/config";
-import { ErroConfigMcp, lerConfigMcp } from "./mcp/config";
 
 /** Durante `next build` o app não atende requisições: as checagens valem para a execução. */
 const emBuild = () => process.env.NEXT_PHASE === "phase-production-build";
 
 /**
- * Recusa iniciar com a autenticação mal configurada — por exemplo, em produção sem
- * `APP_PASSWORD` e sem `ALLOW_NO_AUTH=true` (ARQUITETURA.md §7.1) — ou com `MCP_TOKEN` curto.
+ * Recusa iniciar com a autenticação mal configurada — por exemplo, em produção sem login e sem
+ * `ALLOW_NO_AUTH=true`, ou com o login Google sem `ADMIN_EMAILS` (ARQUITETURA.md §7.1).
  */
 export function verificarAmbienteAoIniciar(): void {
   if (emBuild()) return;
@@ -18,9 +17,13 @@ export function verificarAmbienteAoIniciar(): void {
     if (!config.habilitada && process.env.NODE_ENV === "production") {
       console.warn("Atenção: autenticação desligada (ALLOW_NO_AUTH=true).");
     }
-    lerConfigMcp();
+    if (process.env.MCP_TOKEN) {
+      console.warn(
+        "Atenção: MCP_TOKEN não é mais usado. Gere um token pessoal em Configurações (#49).",
+      );
+    }
   } catch (erro) {
-    if (!(erro instanceof ErroConfigAuth) && !(erro instanceof ErroConfigMcp)) throw erro;
+    if (!(erro instanceof ErroConfigAuth)) throw erro;
     console.error(`\nO app não pode iniciar: ${erro.message}\n`);
     process.exit(1);
   }

@@ -1,5 +1,5 @@
-/** Leituras do calendário mensal (RF04/RF06). */
-import { asc, between, eq, or } from "drizzle-orm";
+/** Leituras do calendário mensal (RF04/RF06), restritas aos concursos do usuário (#49). */
+import { and, asc, between, eq, or } from "drizzle-orm";
 import {
   type ItemCalendario,
   itensCalendario,
@@ -14,6 +14,7 @@ import {
   COLUNAS_EVENTO_PRAZO,
   type ConcursoDoPrazo,
   type EventoDoPrazo,
+  eventoDoUsuario,
   listarConcursosDoPrazo,
 } from "./dashboard";
 
@@ -25,17 +26,23 @@ export type ItemDoCalendario = ItemCalendario<EventoDoPrazo, ConcursoDoPrazo>;
  */
 export async function obterCalendario(
   db: Db,
+  usuarioId: number,
   mes: MesISO,
   hoje: DataISO,
 ): Promise<ItemDoCalendario[]> {
   const inicio = primeiroDia(mes);
   const fim = ultimoDia(mes);
   const [concursos, eventos] = await Promise.all([
-    listarConcursosDoPrazo(db),
+    listarConcursosDoPrazo(db, usuarioId),
     db
       .select(COLUNAS_EVENTO_PRAZO)
       .from(evento)
-      .where(or(between(evento.data, inicio, fim), eq(evento.tipo, "VALIDADE")))
+      .where(
+        and(
+          eventoDoUsuario(db, usuarioId),
+          or(between(evento.data, inicio, fim), eq(evento.tipo, "VALIDADE")),
+        ),
+      )
       .orderBy(asc(evento.data), asc(evento.id)),
   ]);
   return itensCalendario(eventos, concursos, inicio, fim, hoje);

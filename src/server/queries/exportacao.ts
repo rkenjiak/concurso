@@ -1,5 +1,8 @@
-/** Exportação de todos os dados (RF09): backup JSON versionado e CSV de concursos. */
-import { asc, eq, getTableColumns } from "drizzle-orm";
+/**
+ * Exportação de todos os dados do usuário (RF09, #49): backup JSON versionado e CSV de
+ * concursos. O dono (`usuario_id`) não entra no arquivo: a importação grava no usuário que importa.
+ */
+import { asc, eq, getTableColumns, inArray } from "drizzle-orm";
 import { ROTULO_ESCOLARIDADE, ROTULO_ESFERA, ROTULO_STATUS } from "@/domain/labels";
 import { centavosCsv, gerarCsv } from "@/lib/csv";
 import { formatarData, formatarDataHora } from "@/lib/format";
@@ -28,22 +31,48 @@ function serializar<T extends Record<string, unknown>>(
   ) as never;
 }
 
-/** Lê todas as tabelas e monta o backup JSON (ordenado por ID, para diffs estáveis). */
+/** Lê os dados do usuário e monta o backup JSON (ordenado por ID, para diffs estáveis). */
 export async function exportarDados(
   db: Db | Executor,
+  usuarioId: number,
   agora: Date = new Date(),
 ): Promise<BackupJson> {
-  const { buscaNormalizada: _, ...colunasConcurso } = getTableColumns(concurso);
+  const { buscaNormalizada: _, usuarioId: __, ...colunasConcurso } = getTableColumns(concurso);
+  const doUsuario = db
+    .select({ id: concurso.id })
+    .from(concurso)
+    .where(eq(concurso.usuarioId, usuarioId));
   const [concursos, tags, concursoTags, links, eventos, historico, resultados, anexos] =
     await Promise.all([
-      db.select(colunasConcurso).from(concurso).orderBy(asc(concurso.id)),
-      db.select().from(tag).orderBy(asc(tag.id)),
-      db.select().from(concursoTag).orderBy(asc(concursoTag.concursoId), asc(concursoTag.tagId)),
-      db.select().from(link).orderBy(asc(link.id)),
-      db.select().from(evento).orderBy(asc(evento.id)),
-      db.select().from(statusHistorico).orderBy(asc(statusHistorico.id)),
-      db.select().from(resultadoFase).orderBy(asc(resultadoFase.id)),
-      db.select().from(anexo).orderBy(asc(anexo.id)),
+      db
+        .select(colunasConcurso)
+        .from(concurso)
+        .where(eq(concurso.usuarioId, usuarioId))
+        .orderBy(asc(concurso.id)),
+      db
+        .selectDistinct({ id: tag.id, nome: tag.nome })
+        .from(tag)
+        .innerJoin(concursoTag, eq(concursoTag.tagId, tag.id))
+        .where(inArray(concursoTag.concursoId, doUsuario))
+        .orderBy(asc(tag.id)),
+      db
+        .select()
+        .from(concursoTag)
+        .where(inArray(concursoTag.concursoId, doUsuario))
+        .orderBy(asc(concursoTag.concursoId), asc(concursoTag.tagId)),
+      db.select().from(link).where(inArray(link.concursoId, doUsuario)).orderBy(asc(link.id)),
+      db.select().from(evento).where(inArray(evento.concursoId, doUsuario)).orderBy(asc(evento.id)),
+      db
+        .select()
+        .from(statusHistorico)
+        .where(inArray(statusHistorico.concursoId, doUsuario))
+        .orderBy(asc(statusHistorico.id)),
+      db
+        .select()
+        .from(resultadoFase)
+        .where(inArray(resultadoFase.concursoId, doUsuario))
+        .orderBy(asc(resultadoFase.id)),
+      db.select().from(anexo).where(inArray(anexo.concursoId, doUsuario)).orderBy(asc(anexo.id)),
     ]);
 
   return {
@@ -90,14 +119,16 @@ const CABECALHO_CSV = [
   "Atualizado em",
 ] as const;
 
-/** CSV dos concursos (uma linha por concurso, tags separadas por vírgula). */
-export async function exportarConcursosCsv(db: Db | Executor): Promise<string> {
+/** CSV dos concursos do usuário (uma linha por concurso, tags separadas por vírgula). */
+export async function exportarConcursosCsv(db: Db | Executor, usuarioId: number): Promise<string> {
   const [concursos, tags] = await Promise.all([
-    db.select().from(concurso).orderBy(asc(concurso.id)),
+    db.select().from(concurso).where(eq(concurso.usuarioId, usuarioId)).orderBy(asc(concurso.id)),
     db
       .select({ concursoId: concursoTag.concursoId, nome: tag.nome })
       .from(concursoTag)
       .innerJoin(tag, eq(tag.id, concursoTag.tagId))
+      .innerJoin(concurso, eq(concurso.id, concursoTag.concursoId))
+      .where(eq(concurso.usuarioId, usuarioId))
       .orderBy(asc(tag.nome)),
   ]);
   const tagsPorConcurso = new Map<number, string[]>();

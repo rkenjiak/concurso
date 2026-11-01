@@ -1,14 +1,22 @@
 /**
  * Proteção das rotas (ARQUITETURA.md §7.1). Com a autenticação ligada, exige sessão válida em
- * todas as rotas, exceto `/login`, `/api/health`, `/api/mcp` (autenticada pelo próprio handler
- * com `MCP_TOKEN`) e os arquivos estáticos (ver `matcher`).
- * Server Actions e Route Handlers checam a sessão de novo (defesa em profundidade).
+ * todas as rotas, exceto `/login`, `/api/health`, o fluxo do login Google (`/api/auth/google…`),
+ * `/api/mcp` (autenticada pelo próprio handler com o token do usuário) e os arquivos estáticos
+ * (ver `matcher`). Aqui só se confere a assinatura do cookie (sem banco); páginas, Server Actions
+ * e Route Handlers obtêm o usuário de novo (`auth/acesso.ts`), o que também barra sessões de
+ * e-mails retirados da allowlist.
  */
 import { type NextRequest, NextResponse } from "next/server";
 import { type ConfigAuth, lerConfigAuth } from "./server/auth/config";
 import { COOKIE_SESSAO, tokenSessaoValido } from "./server/auth/sessao";
 
-const ROTAS_PUBLICAS = new Set(["/api/health", "/api/mcp"]);
+const ROTAS_PUBLICAS = new Set([
+  "/login",
+  "/api/health",
+  "/api/mcp",
+  "/api/auth/google",
+  "/api/auth/google/callback",
+]);
 
 export async function proxy(request: NextRequest) {
   let config: ConfigAuth;
@@ -29,9 +37,6 @@ export async function proxy(request: NextRequest) {
     request.cookies.get(COOKIE_SESSAO)?.value,
     config.segredo,
   );
-  if (pathname === "/login") {
-    return autenticado ? NextResponse.redirect(new URL("/", request.url)) : NextResponse.next();
-  }
   if (autenticado) return NextResponse.next();
 
   if (pathname.startsWith("/api/")) {

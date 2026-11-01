@@ -1,15 +1,24 @@
-/** Leituras de tags (RF01). */
+/**
+ * Leituras de tags (RF01). A tabela `tag` é um vocabulário compartilhado (só nomes); cada usuário
+ * enxerga apenas as tags usadas nos próprios concursos (#49).
+ */
 import { asc, eq, inArray } from "drizzle-orm";
 import type { Db } from "../db/client";
-import { concursoTag, tag } from "../db/schema";
+import { concurso, concursoTag, tag } from "../db/schema";
 
-/** Todas as tags existentes, em ordem alfabética (sugestões no formulário). */
-export async function listarTags(db: Db): Promise<string[]> {
-  const linhas = await db.select({ nome: tag.nome }).from(tag).orderBy(asc(tag.nome));
+/** Tags usadas nos concursos do usuário, em ordem alfabética (sugestões no formulário). */
+export async function listarTags(db: Db, usuarioId: number): Promise<string[]> {
+  const linhas = await db
+    .selectDistinct({ nome: tag.nome })
+    .from(tag)
+    .innerJoin(concursoTag, eq(concursoTag.tagId, tag.id))
+    .innerJoin(concurso, eq(concurso.id, concursoTag.concursoId))
+    .where(eq(concurso.usuarioId, usuarioId))
+    .orderBy(asc(tag.nome));
   return linhas.map((l) => l.nome);
 }
 
-/** Tags agrupadas por concurso, em ordem alfabética. */
+/** Tags agrupadas por concurso, em ordem alfabética (IDs já restritos ao usuário). */
 export async function tagsPorConcurso(
   db: Db,
   concursoIds: readonly number[],

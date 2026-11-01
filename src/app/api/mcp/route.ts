@@ -1,31 +1,39 @@
 /**
- * `/api/mcp` (issue #39): servidor MCP por Streamable HTTP para uso hospedado. Desligado (404)
- * sem `MCP_TOKEN`; com ele, exige `Authorization: Bearer <MCP_TOKEN>` — independente do login por
- * senha, por isso a rota é pública no `proxy.ts`. Falhas de token seguidas sofrem atraso
- * progressivo, como o login. Localmente, prefira o `pnpm mcp` (stdio).
+ * `/api/mcp` (issues #39, #49): servidor MCP por Streamable HTTP para uso hospedado. Exige
+ * `Authorization: Bearer <token>` com o token pessoal do usuário (gerado em Configurações); o
+ * servidor só enxerga os dados do dono do token. Independente do login (clientes MCP não têm o
+ * cookie de sessão), por isso a rota é pública no `proxy.ts`. Falhas de token seguidas sofrem
+ * atraso progressivo, como o login. Localmente, prefira o `pnpm mcp` (stdio).
  */
 import { createMcpHandler, type McpHttpHandler } from "@modelcontextprotocol/server";
 import { revalidatePath } from "next/cache";
 import { chaveCliente } from "@/server/auth/acesso";
 import { LimitadorTentativas } from "@/server/auth/limitador";
-import { senhaConfere } from "@/server/auth/senha";
 import { getDb } from "@/server/db/client";
-import { type ConfigMcp, lerConfigMcp, tokenBearer } from "@/server/mcp/config";
+import { tokenBearer } from "@/server/mcp/config";
 import { criarServidorMcp } from "@/server/mcp/servidor";
+import { usuarioDoTokenMcp } from "@/server/repositories/usuarios";
 
 const limitador = new LimitadorTentativas();
 
 let handler: McpHttpHandler | undefined;
 
-/** Handler criado sob demanda; cada requisição recebe uma instância nova do servidor. */
+/**
+ * Handler criado sob demanda; cada requisição recebe uma instância nova do servidor, presa ao
+ * usuário do token (repassado em `authInfo.extra.usuarioId`).
+ */
 function obterHandler(): McpHttpHandler {
   handler ??= createMcpHandler(
-    () =>
-      criarServidorMcp({
+    ({ authInfo }) => {
+      const usuarioId = authInfo?.extra?.usuarioId;
+      if (typeof usuarioId !== "number") throw new Error("Requisição MCP sem usuário.");
+      return criarServidorMcp({
         db: getDb(),
+        usuarioId,
         // Dados mudaram: todas as páginas leem do banco.
         aoAlterar: () => revalidatePath("/", "layout"),
-      }),
+      });
+    },
     { onerror: (erro) => console.error("MCP:", erro) },
   );
   return handler;
@@ -42,15 +50,6 @@ const texto = (corpo: string, status: number, headers: Record<string, string> = 
   });
 
 async function atender(request: Request): Promise<Response> {
-  let config: ConfigMcp;
-  try {
-    config = lerConfigMcp();
-  } catch (erro) {
-    console.error(erro);
-    return texto("Configuração do MCP inválida. Veja os logs do servidor.", 500);
-  }
-  if (!config.habilitado) return texto("Não encontrado.", 404);
-
   const chave = await chaveCliente();
   const espera = limitador.esperaMs(chave);
   if (espera > 0) {
@@ -59,12 +58,20 @@ async function atender(request: Request): Promise<Response> {
     });
   }
   const token = tokenBearer(request.headers.get("authorization"));
-  if (token === null || !senhaConfere(token, config.token)) {
+  const usuario = token === null ? null : await usuarioDoTokenMcp(getDb(), token);
+  if (token === null || usuario === null) {
     limitador.registrarFalha(chave);
     return texto("Token ausente ou inválido.", 401, { "WWW-Authenticate": 'Bearer realm="mcp"' });
   }
   limitador.registrarSucesso(chave);
-  return obterHandler().fetch(request);
+  return obterHandler().fetch(request, {
+    authInfo: {
+      token,
+      clientId: `usuario-${usuario.id}`,
+      scopes: [],
+      extra: { usuarioId: usuario.id },
+    },
+  });
 }
 
 export const GET = atender;

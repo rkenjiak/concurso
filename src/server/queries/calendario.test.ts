@@ -8,6 +8,7 @@ import {
   eventoSchema,
   VALORES_INICIAIS_EVENTO,
 } from "@/lib/schemas/evento";
+import { ID_USUARIO_INICIAL as U } from "@/server/db/schema";
 import { criarBancoTeste } from "../db/banco-teste";
 import type { Db } from "../db/client";
 import { criarConcurso } from "../repositories/concursos";
@@ -28,6 +29,7 @@ const HOJE = "2026-10-31";
 const novoConcurso = (orgao: string, status: Status, extra: Record<string, unknown> = {}) =>
   criarConcurso(
     db,
+    U,
     concursoSchema.parse({
       ...VALORES_INICIAIS_CONCURSO,
       orgao,
@@ -40,13 +42,14 @@ const novoConcurso = (orgao: string, status: Status, extra: Record<string, unkno
 const novoEvento = (concursoId: number, parcial: Partial<EventoFormValores>) =>
   criarEvento(
     db,
+    U,
     concursoId,
     eventoSchema.parse({ ...VALORES_INICIAIS_EVENTO, data: HOJE, ...parcial }),
   );
 
 describe("obterCalendario", () => {
   it("banco vazio", async () => {
-    expect(await obterCalendario(db, "2026-11", HOJE)).toEqual([]);
+    expect(await obterCalendario(db, U, "2026-11", HOJE)).toEqual([]);
   });
 
   it("traz a cor escolhida ou a automática e o ícone do concurso (#46)", async () => {
@@ -54,7 +57,7 @@ describe("obterCalendario", () => {
     const automatica = await novoConcurso("TJ", "INSCRITO");
     await novoEvento(escolhida, { tipo: "OUTRO", data: "2026-11-05" });
     await novoEvento(automatica, { tipo: "OUTRO", data: "2026-11-06" });
-    const itens = await obterCalendario(db, "2026-11", HOJE);
+    const itens = await obterCalendario(db, U, "2026-11", HOJE);
     expect(itens.map((i) => [i.concurso.id, i.concurso.cor, i.concurso.icone])).toEqual([
       [escolhida, "VERDE", "⚖️"],
       [automatica, corPadrao(automatica), null],
@@ -81,7 +84,7 @@ describe("obterCalendario", () => {
     await novoEvento(trf, { tipo: "OUTRO", data: "2026-12-01" });
     await novoEvento(tj, { tipo: "POSSE", data: "2026-11-30" });
 
-    const itens = await obterCalendario(db, "2026-11", HOJE);
+    const itens = await obterCalendario(db, U, "2026-11", HOJE);
     expect(
       itens.map((i) => [i.concurso.orgao, i.tipo, i.data, i.esmaecido, i.criticidade]),
     ).toEqual([

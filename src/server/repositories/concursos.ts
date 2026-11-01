@@ -1,8 +1,9 @@
 /**
  * Escritas de concurso (RF01). Todas as funções recebem o banco por parâmetro (testáveis com
- * `:memory:`) e mantêm `busca_normalizada` atualizada (órgão + cargo + banca + tags).
+ * `:memory:`) e o ID do usuário dono (#49): só alteram concursos dele. Mantêm
+ * `busca_normalizada` atualizada (órgão + cargo + banca + tags).
  */
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { montarBuscaNormalizada } from "@/lib/normalize";
 import type { ConcursoDados, ConcursoEdicaoDados } from "@/lib/schemas/concurso";
 import type { EventoDados } from "@/lib/schemas/evento";
@@ -13,6 +14,10 @@ import { inserirEvento } from "./eventos";
 import { inserirLink } from "./links";
 import { removerTagsOrfas, sincronizarTags } from "./tags";
 import type { Transacao } from "./tipos";
+
+/** Condição: o concurso `id` pertence ao usuário. */
+export const doUsuario = (usuarioId: number, id: number) =>
+  and(eq(concurso.id, id), eq(concurso.usuarioId, usuarioId));
 
 function colunas(dados: ConcursoEdicaoDados) {
   return {
@@ -43,12 +48,13 @@ function colunas(dados: ConcursoEdicaoDados) {
 /** Insere o concurso, suas tags e o registro inicial do histórico numa transação aberta. */
 export async function inserirConcurso(
   tx: Transacao,
+  usuarioId: number,
   dados: ConcursoDados,
   agora: Date,
 ): Promise<number> {
   const [linha] = await tx
     .insert(concurso)
-    .values({ ...colunas(dados), status: dados.status, statusDesde: agora })
+    .values({ ...colunas(dados), usuarioId, status: dados.status, statusDesde: agora })
     .returning({ id: concurso.id });
   if (!linha) throw new Error("Falha ao inserir o concurso.");
   await tx
@@ -61,10 +67,11 @@ export async function inserirConcurso(
 /** Cria o concurso, suas tags e o registro inicial do histórico (`de = null`). Retorna o ID. */
 export async function criarConcurso(
   db: Db,
+  usuarioId: number,
   dados: ConcursoDados,
   agora: Date = new Date(),
 ): Promise<number> {
-  return db.transaction((tx) => inserirConcurso(tx, dados, agora));
+  return db.transaction((tx) => inserirConcurso(tx, usuarioId, dados, agora));
 }
 
 /**
@@ -73,13 +80,14 @@ export async function criarConcurso(
  */
 export async function criarConcursoCompleto(
   db: Db,
+  usuarioId: number,
   dados: ConcursoDados,
   eventos: readonly EventoDados[],
   links: readonly LinkDados[],
   agora: Date = new Date(),
 ): Promise<number> {
   return db.transaction(async (tx) => {
-    const id = await inserirConcurso(tx, dados, agora);
+    const id = await inserirConcurso(tx, usuarioId, dados, agora);
     for (const e of eventos) await inserirEvento(tx, id, e, agora);
     for (const l of links) await inserirLink(tx, id, l);
     return id;
@@ -92,6 +100,7 @@ export async function criarConcursoCompleto(
  */
 export async function atualizarConcurso(
   db: Db,
+  usuarioId: number,
   id: number,
   dados: ConcursoEdicaoDados,
 ): Promise<boolean> {
@@ -99,7 +108,7 @@ export async function atualizarConcurso(
     const linhas = await tx
       .update(concurso)
       .set(colunas(dados))
-      .where(eq(concurso.id, id))
+      .where(doUsuario(usuarioId, id))
       .returning({ id: concurso.id });
     if (linhas.length === 0) return false;
     await sincronizarTags(tx, id, dados.tags);
@@ -108,11 +117,11 @@ export async function atualizarConcurso(
 }
 
 /** Exclui o concurso (links, eventos, histórico etc. em cascata) e as tags que ficarem órfãs. */
-export async function excluirConcurso(db: Db, id: number): Promise<boolean> {
+export async function excluirConcurso(db: Db, usuarioId: number, id: number): Promise<boolean> {
   return db.transaction(async (tx) => {
     const linhas = await tx
       .delete(concurso)
-      .where(eq(concurso.id, id))
+      .where(doUsuario(usuarioId, id))
       .returning({ id: concurso.id });
     if (linhas.length === 0) return false;
     await removerTagsOrfas(tx);

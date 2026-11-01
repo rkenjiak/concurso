@@ -1,5 +1,6 @@
 import { existsSync } from "node:fs";
 import { defineConfig } from "drizzle-kit";
+import { tokenDoBanco, urlDoBanco } from "./src/server/db/url";
 
 for (const arquivo of [".env.local", ".env"]) {
   if (existsSync(arquivo)) process.loadEnvFile(arquivo);
@@ -10,8 +11,8 @@ export default defineConfig({
   schema: "./src/server/db/schema.ts",
   out: "./drizzle",
   dbCredentials: {
-    url: process.env.DATABASE_URL ?? "file:./data/concurso.db",
-    authToken: process.env.DATABASE_AUTH_TOKEN || undefined,
+    url: urlDoBanco(),
+    authToken: tokenDoBanco(),
   },
   strict: true,
   verbose: true,

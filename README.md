@@ -43,6 +43,7 @@ Copie `.env.example` para `.env.local` e ajuste. Nada é obrigatório para rodar
 |---|---|---|
 | `DATABASE_URL` | `file:./data/concurso.db` | Banco libSQL: arquivo SQLite local ou `libsql://<banco>.turso.io` |
 | `DATABASE_AUTH_TOKEN` | — | Token do Turso (só com `libsql://`) |
+| `TURSO_DATABASE_URL` / `TURSO_AUTH_TOKEN` | — | Alternativas a `DATABASE_URL` / `DATABASE_AUTH_TOKEN` (que têm prioridade), já injetadas pela integração do Turso na Vercel |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | — | Liga o login com Google (multiusuário) |
 | `ADMIN_EMAILS` | — | E-mails dos admins (obrigatório com o login Google); o primeiro a entrar assume os dados existentes |
 | `ALLOWED_EMAILS` | — | Allowlist: demais e-mails que podem entrar com Google (separados por vírgula) |
@@ -184,18 +185,24 @@ errados seguidos sofrem atraso progressivo. Gerar um novo token ou revogar inval
 
 ### Vercel + Turso (recomendado, gratuito)
 
-1. Crie um banco no [Turso](https://turso.tech) e gere um token:
-   `turso db create concurso`, `turso db show concurso --url`, `turso db tokens create concurso`.
-2. Importe o repositório na [Vercel](https://vercel.com) (framework Next.js; sem `vercel.json`).
-3. Em *Settings → Environment Variables* defina `DATABASE_URL` (`libsql://…`),
-   `DATABASE_AUTH_TOKEN`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `ADMIN_EMAILS`,
+1. Importe o repositório na [Vercel](https://vercel.com) (framework Next.js; sem `vercel.json`).
+2. Crie o banco pela integração do **Turso** no Marketplace da Vercel (*Storage*/*Integrations*) e
+   conecte-o ao projeto. Ela já injeta `TURSO_DATABASE_URL` e `TURSO_AUTH_TOKEN` (com rotação do
+   token), que o app usa direto. Deixe-as só em *Production*: se ficarem também em *Preview*, os
+   builds de outras branches aplicam migrações no banco de produção.
+   Alternativa sem a integração: crie o banco na [CLI do Turso](https://turso.tech)
+   (`turso db create concurso`, `turso db show concurso --url`, `turso db tokens create concurso`)
+   e defina `DATABASE_URL` (`libsql://…`) e `DATABASE_AUTH_TOKEN`, que têm prioridade sobre as
+   `TURSO_*`.
+3. Em *Settings → Environment Variables* defina `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `ADMIN_EMAILS`,
    `ALLOWED_EMAILS` (opcional), `AUTH_SECRET` e `ENABLE_EXPERIMENTAL_COREPACK=1` (para a Vercel
    usar a versão do pnpm do `packageManager`). Não defina `APP_PASSWORD`. Em *Settings → General*,
    Node.js 24. Veja [Configurar o login com Google](#configurar-o-login-com-google).
 4. Faça o deploy. O `pnpm build` aplica as migrações no Turso antes do `next build` (as variáveis
    do banco precisam estar disponíveis no build).
 
-Nunca use `DATABASE_URL=file:` na Vercel: o sistema de arquivos é efêmero.
+Nunca use `DATABASE_URL=file:` na Vercel (nem deixe o banco sem configurar, o que cai no SQLite
+local): o sistema de arquivos é efêmero.
 
 ### Docker (VPS, Fly.io…)
 
@@ -225,7 +232,7 @@ Coloque um proxy com HTTPS na frente (Caddy, Traefik, Fly.io…). A imagem tem `
 | `pnpm typecheck` | checagem de tipos (`tsc --noEmit`) |
 | `pnpm test` | testes unitários/integração (Vitest, em `TZ=UTC`) |
 | `pnpm e2e` | build + testes e2e (Playwright/Chromium, bancos temporários) |
-| `pnpm db:migrate` | aplica migrações pendentes no banco de `DATABASE_URL` |
+| `pnpm db:migrate` | aplica migrações pendentes no banco de `DATABASE_URL` (ou `TURSO_DATABASE_URL`) |
 | `pnpm db:generate` | gera nova migração a partir de `src/server/db/schema.ts` |
 | `pnpm db:seed` | insere concursos fictícios se o banco estiver vazio |
 | `pnpm db:backup` | cópia do banco local em `backups/` (mantém as últimas N) |

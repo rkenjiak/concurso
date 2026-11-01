@@ -7,6 +7,16 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-11-01
+
+### Adicionado
+
+- Suporte às variáveis `TURSO_DATABASE_URL` e `TURSO_AUTH_TOKEN` (#62), injetadas pela integração
+  do Turso no Marketplace da Vercel, como alternativa a `DATABASE_URL`/`DATABASE_AUTH_TOKEN`. A
+  prioridade é `DATABASE_*` > `TURSO_*` > SQLite local (string vazia conta como não definida), e
+  vale para o app, `pnpm db:migrate` (que roda no build), `db:backup`, `mcp` e `drizzle-kit`.
+  Antes, com só as `TURSO_*` definidas, o app caía no SQLite local, que é efêmero na Vercel.
+
 ## [2.0.0] - 2026-11-01
 
 ### Adicionado

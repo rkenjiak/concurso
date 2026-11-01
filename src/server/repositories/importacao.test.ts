@@ -11,6 +11,7 @@ import type { Db } from "../db/client";
 import { listarConcursos, obterConcurso } from "../queries/concursos";
 import { exportarConcursosCsv, exportarDados } from "../queries/exportacao";
 import { criarConcurso } from "./concursos";
+import { definirPrazoOculto } from "./dashboard";
 import { criarEvento } from "./eventos";
 import { substituirTudo } from "./importacao";
 import { criarLink } from "./links";
@@ -75,7 +76,7 @@ async function popular(db: Db) {
     a,
     linkSchema.parse({ tipo: "EDITAL_ABERTURA", rotulo: "Edital", url: "https://ex.com/e.pdf" }),
   );
-  await criarEvento(
+  const evento = await criarEvento(
     db,
     a,
     eventoSchema.parse({
@@ -88,6 +89,9 @@ async function popular(db: Db) {
     }),
     T1,
   );
+  // Preferências de exibição do dashboard (#44) também fazem parte do backup.
+  await definirPrazoOculto(db, { tipo: "evento", eventoId: evento }, true);
+  await definirPrazoOculto(db, { tipo: "validade", concursoId: a }, true);
   await criarResultadoFase(
     db,
     a,
@@ -118,6 +122,8 @@ describe("exportar → importar", () => {
     expect(exportado.dados.eventos).toHaveLength(1);
     expect(exportado.dados.statusHistorico).toHaveLength(3);
     expect(exportado.dados.resultadosFase).toHaveLength(1);
+    expect(exportado.dados.eventos[0]?.ocultoDashboard).toBe(true);
+    expect(exportado.dados.concursos.map((c) => c.validadeOcultaDashboard)).toEqual([true, false]);
 
     const resumo = await substituirTudo(destino.db, validarBackup(viaArquivo(exportado)));
     expect(resumo).toMatchObject({ concursos: 2, tags: 2, eventos: 1, statusHistorico: 3 });
@@ -245,6 +251,24 @@ describe("validarBackup", () => {
     expect(mensagem({ ...b, dados: { ...b.dados, tags: [] } })).toMatch(
       /referencia uma tag inexistente/,
     );
+  });
+
+  it("aceita backup antigo, sem os campos de prazos ocultos do dashboard", async () => {
+    const b = await base();
+    const antigo = {
+      ...b,
+      dados: {
+        ...b.dados,
+        concursos: b.dados.concursos.map(({ validadeOcultaDashboard: _, ...c }) => c),
+        eventos: b.dados.eventos.map(({ ocultoDashboard: _, ...e }) => e),
+      },
+    };
+    const backup = validarBackup(antigo);
+    expect(backup.dados.concursos.map((c) => c.validadeOcultaDashboard)).toEqual([false, false]);
+    expect(backup.dados.eventos.map((e) => e.ocultoDashboard)).toEqual([false]);
+    await substituirTudo(destino.db, backup);
+    const reexportado = await exportarDados(destino.db, T1);
+    expect(reexportado.dados.eventos[0]?.ocultoDashboard).toBe(false);
   });
 
   it("aceita backup sem a lista de anexos", async () => {

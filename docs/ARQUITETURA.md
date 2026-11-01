@@ -104,6 +104,7 @@ erDiagram
 | validade_meses | integer | | 1–24 |
 | validade_prorrogada | boolean | | default false |
 | validade_fim_manual | text (date) | | sobrescreve o cálculo, se o edital dispuser diferente |
+| validade_oculta_dashboard | boolean | | default false; oculta do dashboard o pseudo-evento de validade (#44) |
 | busca_normalizada | text | ✔ | orgao+cargo+banca+tags em minúsculas sem acento (busca RF07) |
 | created_at / updated_at | integer (UTC) | ✔ | |
 
@@ -114,8 +115,9 @@ erDiagram
 ### 3.3 `evento` (RF04)
 `id`, `concurso_id` FK, `tipo` enum `TipoEvento`, `titulo` text (opcional; default = rótulo do tipo),
 `data` text `YYYY-MM-DD` ✔, `hora` text `HH:mm` (opcional), `local` text, `observacao` text,
-`concluido` boolean (default false), `concluido_em` integer (UTC), `created_at`, `updated_at`.
-Índice: `(data, concluido)`.
+`concluido` boolean (default false), `concluido_em` integer (UTC), `oculto_dashboard` boolean
+(default false; oculta o evento da lista de próximos prazos do dashboard, #44), `created_at`,
+`updated_at`. Índice: `(data, concluido)`.
 
 ### 3.4 `status_historico` (RF03)
 `id`, `concurso_id` FK, `de` enum `Status` (null na criação), `para` enum `Status` ✔,
@@ -190,6 +192,13 @@ PROVA_REALIZADA(5) → AGUARDANDO_RESULTADO(6)`.
 5. **Criticidade**: tipos críticos = `FIM_INSCRICOES`, `PEDIDO_ISENCAO`, `VENCIMENTO_BOLETO`,
    `PROVA_*`, `OUTRA_FASE`, `PRAZO_RECURSO`, `POSSE`. Destaque: ≤ 3 dias = alta, ≤ 7 = média.
 6. Ordenação: `data` asc, depois `hora` (sem hora = "dia inteiro", vem primeiro), depois criticidade.
+7. **Ocultos** (#44): cada prazo carrega `oculto` (de `evento.oculto_dashboard` ou, para o
+   pseudo-evento, `concurso.validade_oculta_dashboard`). O agrupamento não os remove;
+   `semOcultos(grupos)` filtra e `contarOcultos(grupos)` alimenta o contador "N ocultos". O
+   dashboard esconde os ocultos por padrão e os mostra esmaecidos com `/?ocultos=1`. A preferência
+   é só de exibição: calendário e MCP continuam listando todos os prazos (o MCP informa
+   `ocultoNoDashboard`), e ocultar/reexibir não altera `updated_at`. App de usuário único: a
+   preferência fica no próprio registro (por usuário quando houver multiusuário, #49).
 
 `proximaData(concurso)` = menor `data >= hoje` entre eventos não concluídos → usado na ordenação RF07.
 
@@ -213,7 +222,7 @@ senão → indefinida
 
 | Rota | Tela | Fase |
 |---|---|---|
-| `/` | **Dashboard**: próximos prazos (vencidos/hoje/30 dias), contagem por status, atalhos | MVP |
+| `/` | **Dashboard**: próximos prazos (vencidos/hoje/30 dias), contagem por status, atalhos; ocultar/reexibir prazos, `?ocultos=1` mostra os ocultos | MVP |
 | `/concursos` | **Lista** com busca, filtros e ordenação em `searchParams` (URL compartilhável) | MVP |
 | `/concursos/novo` | **Formulário** de cadastro | MVP |
 | `/concursos/[id]` | **Detalhe** em abas: Visão geral · Eventos · Links · Resultados · Histórico | MVP |
@@ -234,6 +243,7 @@ Layout responsivo: navegação lateral no desktop, barra inferior no celular. Li
 | `alterarStatus(id, para, obs?)`, `desfazerUltimoStatus(id)` | RF03, usa `domain/status` |
 | `salvarLink`, `excluirLink`, `reordenarLinks` | RF02 |
 | `salvarEvento`, `excluirEvento`, `alternarConcluido` | RF04 |
+| `alternarPrazoOculto(chave, oculto)` | RF06 — oculta/reexibe um prazo do dashboard (`evento-<id>` ou `validade-<concursoId>`, #44) |
 | `salvarResultadoFase`, `excluirResultadoFase` | RF05 |
 | `login`, `logout` | Auth |
 

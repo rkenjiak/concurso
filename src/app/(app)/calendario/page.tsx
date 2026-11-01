@@ -65,7 +65,7 @@ export default async function CalendarioPage({ searchParams }: PageProps<"/calen
           </nav>
 
           <div className="hidden md:block">
-            <GradeMes grade={grade} itens={itens} titulo={titulo} />
+            <GradeMes grade={grade} itens={itens} titulo={titulo} hoje={hoje} />
           </div>
           <div className="md:hidden">
             <AgendaMes itens={itens} hoje={hoje} />

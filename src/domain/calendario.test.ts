@@ -11,6 +11,7 @@ import {
   mesDaData,
   montarGradeMes,
   primeiroDia,
+  proximosDoConcurso,
   ultimoDia,
 } from "./calendario";
 import type { Status, TipoEvento } from "./enums";
@@ -227,6 +228,34 @@ describe("itensCalendario", () => {
       esmaecido: false,
       dias: 15,
     });
+  });
+
+  it("proximosDoConcurso: pendentes do mesmo concurso a partir de hoje, sem o próprio item", () => {
+    const itens = itensCalendario(
+      [
+        evento(1, "2026-10-05"),
+        evento(1, "2026-10-31", "OUTRO", { concluido: true }),
+        evento(1, "2026-10-31"),
+        evento(2, "2026-10-31"),
+        evento(1, "2026-10-31", "OUTRO", { hora: "10:00" }),
+        evento(1, "2026-10-31", "OUTRO", { hora: "11:00" }),
+        evento(1, "2026-10-31", "OUTRO", { hora: "12:00" }),
+      ],
+      [concurso(1, "INSCRITO"), concurso(2, "INSCRITO")],
+      "2026-10-01",
+      "2026-10-31",
+      HOJE,
+    );
+    const [passado, , atual, , h10, h11, h12] = itens;
+    if (!passado || !atual || !h10 || !h11 || !h12) throw new Error("itens ausentes");
+    expect(itens.filter((i) => i.concurso.id === 1)).toHaveLength(6);
+    expect(proximosDoConcurso(itens, passado, HOJE).map((i) => i.chave)).toEqual(
+      [atual, h10, h11].map((i) => i.chave),
+    );
+    expect(proximosDoConcurso(itens, atual, HOJE, 2).map((i) => i.chave)).toEqual(
+      [h10, h11].map((i) => i.chave),
+    );
+    expect(proximosDoConcurso(itens, h12, HOJE, 0)).toEqual([]);
   });
 
   it("rejeita datas inválidas", () => {

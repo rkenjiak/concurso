@@ -7,6 +7,14 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 
 ## [Unreleased]
 
+### Alterado
+
+- Calendário (#45): clicar num evento (grade do mês ou agenda em lista no celular) abre um diálogo
+  com os detalhes em vez de navegar — nome, data e horário, local, concurso (órgão, cargo e
+  status), situação (concluído, urgente, vencido) e os próximos eventos pendentes do concurso no
+  mês — e o botão “Ir para o concurso”. Fecha com Esc, clique fora ou botão Fechar, devolvendo o
+  foco ao evento; acessível por teclado (Radix Dialog).
+
 ## [1.2.0] - 2026-11-01
 
 ### Adicionado

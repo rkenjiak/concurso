@@ -7,6 +7,8 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-11-01
+
 ### Adicionado
 
 - Tema claro, escuro e do sistema (#47): seletor Claro / Escuro / Sistema na navegação (lateral no

@@ -465,8 +465,9 @@ Cada item = uma branch `feature/*` a partir de `develop`; cada milestone fecha c
 | **M4 — Backup e hospedagem** → **`v1.0.0` (MVP)** | `feature/export-import` (RF09) · `feature/autenticacao` · `feature/e2e-playwright` · `feature/deploy` (Vercel+Turso, Dockerfile, `db:backup`, README) | MVP pronto para uso diário |
 | **M5 — Visões** → `v1.1.0` | `feature/kanban` · `feature/calendario` | RF06 desejáveis |
 | **Cadastro assistido** → `v1.2.0` | `feature/mcp` (issue #39) | RF10: servidor MCP para cadastrar/atualizar a partir do edital |
-| **M6 — Lembretes** → `v1.3.0` | `feature/exportar-ics` (RF08) · `feature/sugestao-status` · `feature/notificacao-email` (opcional) | RF08 |
-| **M7 — Anexos** → `v1.4.0` | `feature/anexos` | RF02 desejável |
+| **Ajustes de uso** → `v1.3.0` | `feature/markdown-tabelas` (#43) · `feature/dashboard-ocultar-eventos` (#44) · `feature/calendario-popup` (#45) · `feature/tema-escuro` (#47) · `feature/cor-concurso` (#46) | Melhorias pedidas no uso diário |
+| **M6 — Lembretes** → `v1.4.0` | `feature/exportar-ics` (RF08) · `feature/sugestao-status` · `feature/notificacao-email` (opcional) | RF08 |
+| **M7 — Anexos** → `v1.5.0` | `feature/anexos` | RF02 desejável |
 
 ---
 

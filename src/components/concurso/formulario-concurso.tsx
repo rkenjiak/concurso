@@ -352,7 +352,7 @@ export function FormularioConcurso({
           <Campo
             id="observacoes"
             rotulo="Observações gerais"
-            dica="Aceita markdown: **negrito**, listas com -, [links](https://…)."
+            dica="Aceita markdown: **negrito**, listas com -, [links](https://…) e tabelas (| a | b |)."
             erro={erro("observacoes")}
           >
             <Textarea

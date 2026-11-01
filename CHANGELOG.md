@@ -15,7 +15,15 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
   aplicada por um script inline no `<head>` antes da primeira pintura, sem flash de tema errado.
   O tema escuro passa a usar a classe `dark` no `<html>`, e os destaques de atenção (prazo da
   semana, validade vencendo, suspenso, sub judice) usam os tokens `--aviso`/`--aviso-foreground`,
-  com contraste adequado nos dois temas.
+  com contraste adequado nos dois temas; o fundo dos diálogos escurece mais no tema escuro.
+
+### Alterado
+
+- Calendário (#45): clicar num evento (grade do mês ou agenda em lista no celular) abre um diálogo
+  com os detalhes em vez de navegar — nome, data e horário, local, concurso (órgão, cargo e
+  status), situação (concluído, urgente, vencido) e os próximos eventos pendentes do concurso no
+  mês — e o botão “Ir para o concurso”. Fecha com Esc, clique fora ou botão Fechar, devolvendo o
+  foco ao evento; acessível por teclado (Radix Dialog).
 
 ### Corrigido
 

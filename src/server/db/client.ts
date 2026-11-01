@@ -3,11 +3,11 @@ import { dirname } from "node:path";
 import { type Client, createClient } from "@libsql/client";
 import { drizzle, type LibSQLDatabase } from "drizzle-orm/libsql";
 import * as schema from "./schema";
+import { tokenDoBanco, urlDoBanco } from "./url";
+
+export { DATABASE_URL_PADRAO, tokenDoBanco, urlDoBanco } from "./url";
 
 export type Db = LibSQLDatabase<typeof schema>;
-
-/** Banco local padrão (ARQUITETURA.md §9.1). */
-export const DATABASE_URL_PADRAO = "file:./data/concurso.db";
 
 export interface OpcoesDb {
   /** `file:./caminho.db`, `:memory:` ou `libsql://…` (Turso). */
@@ -28,8 +28,8 @@ function garantirDiretorio(url: string): void {
  * o app usa o singleton de {@link getDb}.
  */
 export function criarDb(opcoes: OpcoesDb = {}): { db: Db; client: Client } {
-  const url = opcoes.url ?? process.env.DATABASE_URL ?? DATABASE_URL_PADRAO;
-  const authToken = opcoes.authToken ?? (process.env.DATABASE_AUTH_TOKEN || undefined);
+  const url = opcoes.url ?? urlDoBanco();
+  const authToken = opcoes.authToken ?? tokenDoBanco();
   garantirDiretorio(url);
   const client = createClient({ url, authToken });
   const db = drizzle(client, { schema });
@@ -39,7 +39,10 @@ export function criarDb(opcoes: OpcoesDb = {}): { db: Db; client: Client } {
 // Mantém uma única conexão entre recargas do servidor de desenvolvimento (HMR).
 const globalDb = globalThis as typeof globalThis & { __concursoDb?: Db };
 
-/** Instância compartilhada do banco configurada por `DATABASE_URL`/`DATABASE_AUTH_TOKEN`. */
+/**
+ * Instância compartilhada do banco configurada por `DATABASE_URL`/`DATABASE_AUTH_TOKEN` (ou
+ * `TURSO_DATABASE_URL`/`TURSO_AUTH_TOKEN`; veja {@link urlDoBanco}).
+ */
 export function getDb(): Db {
   globalDb.__concursoDb ??= criarDb().db;
   return globalDb.__concursoDb;

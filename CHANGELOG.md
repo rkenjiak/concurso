@@ -17,6 +17,14 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
   semana, validade vencendo, suspenso, sub judice) usam os tokens `--aviso`/`--aviso-foreground`,
   com contraste adequado nos dois temas.
 
+### Corrigido
+
+- Observações do concurso: tabelas em markdown voltam a ser renderizadas como tabela (#43), em vez
+  de texto cru (`| a | b |`). O `react-markdown` passa a usar `remark-gfm`, o que também habilita
+  tachado, listas de tarefas e autolinks. A tabela tem bordas, padding e cabeçalho destacado com as
+  cores do tema, e tabelas largas rolam na horizontal sem quebrar o layout. HTML bruto continua
+  descartado (`skipHtml`) e URLs perigosas continuam neutralizadas.
+
 ## [1.2.0] - 2026-11-01
 
 ### Adicionado

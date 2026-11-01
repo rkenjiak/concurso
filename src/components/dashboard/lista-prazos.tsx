@@ -11,7 +11,7 @@ type PrazoDashboard = Prazo<EventoDoPrazo, ConcursoDoPrazo>;
 
 export const BORDA_CRITICIDADE: Readonly<Record<Criticidade, string>> = {
   ALTA: "border-l-destructive",
-  MEDIA: "border-l-amber-500",
+  MEDIA: "border-l-aviso",
   NORMAL: "border-l-transparent",
 };
 
@@ -32,9 +32,7 @@ function BadgeCriticidade({ prazo }: { prazo: PrazoDashboard }) {
   if (prazo.dias < 0) return <Badge variant="destructive">Vencido</Badge>;
   if (prazo.criticidade === "ALTA") return <Badge variant="destructive">Urgente</Badge>;
   if (prazo.criticidade === "MEDIA") {
-    return (
-      <Badge className="bg-amber-500/15 text-amber-800 dark:text-amber-300">Esta semana</Badge>
-    );
+    return <Badge className="bg-aviso/15 text-aviso-foreground">Esta semana</Badge>;
   }
   return prazo.critico ? <Badge variant="outline">Prazo crítico</Badge> : null;
 }

@@ -48,7 +48,7 @@ const COR_SITUACAO: Readonly<Record<SituacaoFase, string>> = {
   APROVADO: "bg-emerald-600 text-white",
   CLASSIFICADO: "bg-sky-600 text-white",
   ELIMINADO: "bg-destructive/10 text-destructive",
-  SUB_JUDICE: "bg-amber-500/15 text-amber-700 dark:text-amber-400",
+  SUB_JUDICE: "bg-aviso/15 text-aviso-foreground",
 };
 
 const nomeResultado = (r: Pick<ResultadoFaseItem, "fase" | "descricao">) =>

@@ -303,7 +303,8 @@ Decisões (issue #39):
 │   ├── app/                        # rotas (páginas, layouts, api/)
 │   ├── components/
 │   │   ├── ui/                     # shadcn/ui
-│   │   └── concurso/               # formulários, cards, tabelas, badges de status
+│   │   ├── concurso/               # formulários, cards, tabelas, badges de status
+│   │   └── tema/                   # seletor de tema (claro/escuro/sistema)
 │   ├── domain/                     # regras puras + testes *.test.ts ao lado
 │   │   ├── enums.ts  labels.ts
 │   │   ├── status.ts  prazos.ts  validade.ts
@@ -346,6 +347,16 @@ Decisões (issue #39):
   (nativo, bom no celular) exibindo `dd/mm/aaaa` nos textos.
 - Busca sem acento/maiúsculas via `busca_normalizada` (`normalize('NFD')` + remoção de diacríticos).
 - Testes rodam com `TZ=UTC` para garantir que o código não depende do fuso da máquina.
+
+### 7.3 Tema claro/escuro
+- Preferência **Claro / Escuro / Sistema** (padrão: Sistema, via `prefers-color-scheme`), salva no
+  `localStorage` (`concurso:tema`). Seletor na navegação (lateral e cabeçalho do celular) e em
+  Configurações (`components/tema/seletor-tema.tsx`); no modo Sistema acompanha mudanças do SO.
+- Sem flash: script inline no `<head>` do layout raiz (`SCRIPT_TEMA`, `lib/tema.ts`) aplica a classe
+  `dark` e o `color-scheme` no `<html>` antes da primeira pintura; o variant `dark:` do Tailwind usa
+  essa classe.
+- Cores sempre por tokens CSS (`globals.css`, `:root` e `.dark`), nunca fixas por tema. Atenção/aviso
+  usa `--aviso` (borda/fundo) e `--aviso-foreground` (texto, contraste AA nos dois temas).
 
 ---
 

@@ -7,6 +7,16 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 
 ## [Unreleased]
 
+### Adicionado
+
+- Tema claro, escuro e do sistema (#47): seletor Claro / Escuro / Sistema na navegação (lateral no
+  desktop, cabeçalho no celular) e em Configurações → Aparência. Padrão Sistema (segue
+  `prefers-color-scheme`, inclusive mudanças ao vivo); a escolha fica salva no navegador e é
+  aplicada por um script inline no `<head>` antes da primeira pintura, sem flash de tema errado.
+  O tema escuro passa a usar a classe `dark` no `<html>`, e os destaques de atenção (prazo da
+  semana, validade vencendo, suspenso, sub judice) usam os tokens `--aviso`/`--aviso-foreground`,
+  com contraste adequado nos dois temas.
+
 ## [1.2.0] - 2026-11-01
 
 ### Adicionado

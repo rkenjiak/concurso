@@ -58,6 +58,45 @@ export async function contarPorStatus(db: Db): Promise<ContagemStatus[]> {
   }));
 }
 
+/** Concursos com o fim da validade já calculado (§4.3), para prazos e calendário. */
+export async function listarConcursosDoPrazo(db: Db): Promise<ConcursoDoPrazo[]> {
+  const linhas = await db
+    .select({
+      id: concurso.id,
+      orgao: concurso.orgao,
+      cargo: concurso.cargo,
+      status: concurso.status,
+      homologacaoData: concurso.homologacaoData,
+      validadeMeses: concurso.validadeMeses,
+      validadeProrrogada: concurso.validadeProrrogada,
+      validadeFimManual: concurso.validadeFimManual,
+    })
+    .from(concurso);
+  return linhas.map(
+    ({ homologacaoData, validadeMeses, validadeProrrogada, validadeFimManual, ...c }) => ({
+      ...c,
+      validadeFim: calcularValidadeFim({
+        homologacaoData,
+        validadeMeses,
+        validadeProrrogada,
+        validadeFimManual,
+      }),
+    }),
+  );
+}
+
+/** Colunas de evento usadas por prazos e calendário. */
+export const COLUNAS_EVENTO_PRAZO = {
+  id: evento.id,
+  concursoId: evento.concursoId,
+  tipo: evento.tipo,
+  titulo: evento.titulo,
+  data: evento.data,
+  hora: evento.hora,
+  local: evento.local,
+  concluido: evento.concluido,
+};
+
 /**
  * Dados do dashboard para o dia `hoje` (America/Sao_Paulo). Lê só eventos pendentes até o fim da
  * janela (e todos os de validade, que suprimem o pseudo-evento); o agrupamento fica no domínio.
@@ -69,29 +108,9 @@ export async function obterDashboard(
 ): Promise<Dashboard> {
   const limite = somarDias(hoje, janelaDias);
   const [concursos, eventos, porStatus] = await Promise.all([
+    listarConcursosDoPrazo(db),
     db
-      .select({
-        id: concurso.id,
-        orgao: concurso.orgao,
-        cargo: concurso.cargo,
-        status: concurso.status,
-        homologacaoData: concurso.homologacaoData,
-        validadeMeses: concurso.validadeMeses,
-        validadeProrrogada: concurso.validadeProrrogada,
-        validadeFimManual: concurso.validadeFimManual,
-      })
-      .from(concurso),
-    db
-      .select({
-        id: evento.id,
-        concursoId: evento.concursoId,
-        tipo: evento.tipo,
-        titulo: evento.titulo,
-        data: evento.data,
-        hora: evento.hora,
-        local: evento.local,
-        concluido: evento.concluido,
-      })
+      .select(COLUNAS_EVENTO_PRAZO)
       .from(evento)
       .where(
         or(and(eq(evento.concluido, false), lte(evento.data, limite)), eq(evento.tipo, "VALIDADE")),
@@ -99,22 +118,7 @@ export async function obterDashboard(
       .orderBy(asc(evento.data), asc(evento.id)),
     contarPorStatus(db),
   ]);
-  const prazos = proximosPrazos(
-    eventos,
-    concursos.map(
-      ({ homologacaoData, validadeMeses, validadeProrrogada, validadeFimManual, ...c }) => ({
-        ...c,
-        validadeFim: calcularValidadeFim({
-          homologacaoData,
-          validadeMeses,
-          validadeProrrogada,
-          validadeFimManual,
-        }),
-      }),
-    ),
-    hoje,
-    janelaDias,
-  );
+  const prazos = proximosPrazos(eventos, concursos, hoje, janelaDias);
   return {
     prazos,
     totalPrazos: totalPrazos(prazos),

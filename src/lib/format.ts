@@ -145,3 +145,29 @@ export function parseDecimal(texto: string | null | undefined): number | null {
   const valor = Number(`${m[1]}.${m[2] ?? "0"}`);
   return Number.isFinite(valor) ? valor : null;
 }
+
+const mesFmt = new Intl.DateTimeFormat("pt-BR", {
+  month: "long",
+  year: "numeric",
+  timeZone: "UTC",
+});
+
+/** Mês `AAAA-MM` → "outubro de 2026" (sem conversão de fuso). */
+export function formatarMes(mes: string): string {
+  const m = /^(\d{4})-(0[1-9]|1[0-2])$/.exec(mes);
+  if (!m) throw new RangeError(`Mês inválido (esperado AAAA-MM): "${mes}"`);
+  return mesFmt.format(Date.UTC(Number(m[1]), Number(m[2]) - 1, 15, 12));
+}
+
+const dataLongaFmt = new Intl.DateTimeFormat("pt-BR", {
+  weekday: "long",
+  day: "numeric",
+  month: "long",
+  timeZone: "UTC",
+});
+
+/** Data `YYYY-MM-DD` → "sábado, 31 de outubro" (sem conversão de fuso). */
+export function formatarDataLonga(data: DataISO): string {
+  if (!ehDataISO(data)) throw new RangeError(`Data inválida (esperado YYYY-MM-DD): "${data}"`);
+  return dataLongaFmt.format(new Date(`${data}T12:00:00Z`));
+}

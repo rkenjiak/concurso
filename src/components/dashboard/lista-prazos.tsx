@@ -9,7 +9,7 @@ import type { ConcursoDoPrazo, EventoDoPrazo } from "@/server/queries/dashboard"
 
 type PrazoDashboard = Prazo<EventoDoPrazo, ConcursoDoPrazo>;
 
-const BORDA: Readonly<Record<Criticidade, string>> = {
+export const BORDA_CRITICIDADE: Readonly<Record<Criticidade, string>> = {
   ALTA: "border-l-destructive",
   MEDIA: "border-l-amber-500",
   NORMAL: "border-l-transparent",
@@ -22,7 +22,8 @@ function diaDaSemana(data: string): string {
   return DIA_SEMANA.format(new Date(`${data}T12:00:00Z`));
 }
 
-function nomePrazo(p: PrazoDashboard): string {
+/** Nome exibido: título do evento, rótulo do tipo ou "Fim da validade" (pseudo-evento). */
+export function nomePrazo(p: Pick<PrazoDashboard, "derivado" | "titulo" | "tipo">): string {
   if (p.derivado) return "Fim da validade do concurso";
   return p.titulo ?? ROTULO_TIPO_EVENTO[p.tipo];
 }
@@ -45,7 +46,7 @@ export function ListaPrazos({ prazos }: { prazos: readonly PrazoDashboard[] }) {
       {prazos.map((p) => {
         const nome = nomePrazo(p);
         return (
-          <li key={p.chave} className={cn("border-l-4", BORDA[p.criticidade])}>
+          <li key={p.chave} className={cn("border-l-4", BORDA_CRITICIDADE[p.criticidade])}>
             <Link
               href={`/concursos/${p.concurso.id}`}
               className="flex gap-3 p-3 transition-colors hover:bg-accent/50 focus-visible:outline-2 focus-visible:outline-ring"

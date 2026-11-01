@@ -17,6 +17,13 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
   “Mover para” de cada cartão (teclado e celular) — usa a mesma ação da troca de status: transição
   validada pelo domínio (mensagem quando não permitida), histórico gravado e botão “Desfazer”.
   Rolagem horizontal no celular.
+- Calendário mensal de eventos (RF04/RF06) em `/calendario`, com item na navegação: semana de
+  domingo a sábado, mês na URL (`?mes=AAAA-MM`) com navegação anterior/hoje/próximo, dia de hoje
+  destacado (horário de Brasília), prazos críticos destacados como no dashboard (vencidos e até 3
+  dias em vermelho, até 7 dias em âmbar), eventos concluídos e de concursos encerrados esmaecidos e
+  fim de validade calculado incluído. Cada evento leva ao concurso. No celular, vira uma agenda do
+  mês em lista. Grade do mês pura e testada em `domain/calendario.ts` (anos bissextos, meses
+  começando em qualquer dia da semana, 4 a 6 semanas).
 
 ## [1.0.0] - 2026-10-31
 

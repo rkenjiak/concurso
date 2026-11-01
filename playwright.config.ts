@@ -3,15 +3,16 @@
  * servidor com um banco SQLite temporário em `e2e/.tmp/` recriado a cada execução.
  *
  * - projeto `chromium`: app sem autenticação (`ALLOW_NO_AUTH=true`);
- * - projeto `autenticacao`: app com `APP_PASSWORD`, para o fluxo de login.
+ * - projeto `autenticacao`: app com `APP_PASSWORD` e `MCP_TOKEN`, para o login e o endpoint MCP.
  *
  * Rode `pnpm e2e` (faz o build antes) ou `pnpm exec playwright test` com um build existente.
  */
 import { defineConfig, devices } from "@playwright/test";
-import { SENHA_E2E } from "./e2e/constantes";
+import { MCP_TOKEN_E2E, SENHA_E2E } from "./e2e/constantes";
 
 const PORTA = 3200;
 const PORTA_AUTH = 3201;
+const SPECS_AUTH = /(login|mcp)\.spec\.ts/;
 
 const servidor = (porta: number, banco: string, env: Record<string, string>) => ({
   command: `pnpm exec tsx e2e/servidor.ts ${porta} ${banco}`,
@@ -40,12 +41,12 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
-      testIgnore: /login\.spec\.ts/,
+      testIgnore: SPECS_AUTH,
       use: { baseURL: `http://localhost:${PORTA}` },
     },
     {
       name: "autenticacao",
-      testMatch: /login\.spec\.ts/,
+      testMatch: SPECS_AUTH,
       use: { baseURL: `http://localhost:${PORTA_AUTH}` },
     },
   ],
@@ -55,6 +56,7 @@ export default defineConfig({
       APP_PASSWORD: SENHA_E2E,
       AUTH_SECRET: "segredo-somente-para-testes-e2e-0123456789",
       ALLOW_NO_AUTH: "",
+      MCP_TOKEN: MCP_TOKEN_E2E,
     }),
   ],
 });

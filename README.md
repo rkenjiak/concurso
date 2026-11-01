@@ -5,6 +5,7 @@
 App pessoal para cadastrar e acompanhar concursos públicos — do "radar" até a posse: dados do
 edital, status com histórico, datas importantes (inscrição, boleto, provas, recursos), dashboard de
 próximos prazos, busca e filtros, resultados por fase, validade do concurso e backup/restauração.
+Com o [servidor MCP](#cadastro-pelo-edital-com-uma-llm-mcp), uma LLM lê o edital e faz o cadastro.
 
 Feito para **um usuário**: roda localmente com um comando (SQLite em arquivo) e, se quiser, pode ser
 hospedado de graça (Vercel + Turso) ou em um container Docker, com login por senha.
@@ -47,6 +48,7 @@ Copie `.env.example` para `.env.local` e ajuste. Nada é obrigatório para rodar
 | `ALLOW_NO_AUTH` | `false` | `true` permite rodar em produção sem senha (uso local, sem exposição) |
 | `MIGRATE_ON_START` | `false` | `true` aplica as migrações ao iniciar o servidor (já ligado na imagem Docker) |
 | `BACKUP_KEEP` | `10` | Quantos backups o `pnpm db:backup` mantém |
+| `MCP_TOKEN` | — | Liga o endpoint MCP `/api/mcp` (≥ 32 caracteres); sem ele o endpoint fica desligado |
 
 ## Autenticação
 
@@ -85,6 +87,61 @@ para `data/concurso.db` (ou o caminho de `DATABASE_URL`).
 No Docker o banco fica no volume: com o container parado, `docker cp concurso:/app/data/concurso.db .`
 copia o arquivo (e o caminho inverso restaura); ou use o export JSON. No Turso, use o point-in-time
 restore do serviço e o export JSON periódico.
+
+## Cadastro pelo edital com uma LLM (MCP)
+
+O app é também um servidor [MCP](https://modelcontextprotocol.io): conectado a um cliente como o
+Claude Desktop ou o Claude Code, a LLM lê o edital (PDF anexado na conversa ou texto), você escolhe
+o cargo e ela cadastra o concurso de uma vez — dados do cargo, cronograma (eventos), links e tags —,
+mostrando um resumo para você confirmar antes de gravar. Também aplica retificações, muda o status
+(com histórico), registra resultados e responde sobre prazos e concursos cadastrados.
+
+**Não há ferramentas de exclusão**: excluir concursos, eventos, links ou resultados é só pela
+interface. A LLM não baixa o edital sozinha: anexe-o (ou cole o texto) na conversa.
+
+| Ferramenta | O que faz |
+|---|---|
+| `cadastrar_concurso` | Concurso (um cargo) + eventos + links + tags, tudo ou nada; `simular: true` só valida e mostra |
+| `verificar_duplicado` | Procura concursos com órgão e cargo parecidos (o cadastro também recusa duplicados) |
+| `atualizar_concurso` | Altera só os campos informados (`null` limpa) |
+| `alterar_status` | Troca de status validada, com histórico (informa os status permitidos quando recusa) |
+| `salvar_eventos` / `salvar_links` | Cria e altera em lote (ex.: cronograma de uma retificação) |
+| `registrar_resultado` | Nota, corte, classificação e situação em uma fase |
+| `listar_concursos` / `obter_concurso` / `proximos_prazos` | Consultas |
+
+Recursos: `concurso://referencia` (valores aceitos e transições de status) e
+`concurso://concursos/{id}` (ficha). Prompts: `cadastrar_edital` (guia a extração de um cargo) e
+`aplicar_retificacao`.
+
+**Local (stdio)** — usa o mesmo banco do app (`DATABASE_URL` do `.env.local`). O `--silent` é
+necessário: o protocolo usa o stdout.
+
+```bash
+# Claude Code
+claude mcp add concurso -- pnpm --silent --dir /caminho/para/concurso mcp
+```
+
+```json
+// Claude Desktop (claude_desktop_config.json)
+{
+  "mcpServers": {
+    "concurso": {
+      "command": "pnpm",
+      "args": ["--silent", "--dir", "/caminho/para/concurso", "mcp"]
+    }
+  }
+}
+```
+
+**Hospedado (HTTP)** — defina `MCP_TOKEN` (gere com `openssl rand -base64 32`) e conecte o cliente a
+`https://<seu-app>/api/mcp` com o header `Authorization: Bearer <MCP_TOKEN>`:
+
+```bash
+claude mcp add --transport http concurso https://<seu-app>/api/mcp   --header "Authorization: Bearer $MCP_TOKEN"
+```
+
+O token é independente da senha do app; tokens errados seguidos sofrem atraso progressivo. Trocar o
+`MCP_TOKEN` revoga o acesso dos clientes antigos.
 
 ## Deploy
 
@@ -134,6 +191,7 @@ Coloque um proxy com HTTPS na frente (Caddy, Traefik, Fly.io…). A imagem tem `
 | `pnpm db:seed` | insere concursos fictícios se o banco estiver vazio |
 | `pnpm db:backup` | cópia do banco local em `backups/` (mantém as últimas N) |
 | `pnpm db:studio` | abre o Drizzle Studio |
+| `pnpm --silent mcp` | servidor MCP por stdio (para clientes como Claude Desktop/Code) |
 
 Antes do primeiro `pnpm e2e`, instale o navegador: `pnpm exec playwright install chromium`.
 

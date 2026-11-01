@@ -1,13 +1,14 @@
 /**
  * Proteção das rotas (ARQUITETURA.md §7.1). Com a autenticação ligada, exige sessão válida em
- * todas as rotas, exceto `/login`, `/api/health` e os arquivos estáticos (ver `matcher`).
+ * todas as rotas, exceto `/login`, `/api/health`, `/api/mcp` (autenticada pelo próprio handler
+ * com `MCP_TOKEN`) e os arquivos estáticos (ver `matcher`).
  * Server Actions e Route Handlers checam a sessão de novo (defesa em profundidade).
  */
 import { type NextRequest, NextResponse } from "next/server";
 import { type ConfigAuth, lerConfigAuth } from "./server/auth/config";
 import { COOKIE_SESSAO, tokenSessaoValido } from "./server/auth/sessao";
 
-const ROTAS_PUBLICAS = new Set(["/api/health"]);
+const ROTAS_PUBLICAS = new Set(["/api/health", "/api/mcp"]);
 
 export async function proxy(request: NextRequest) {
   let config: ConfigAuth;

@@ -17,7 +17,8 @@ deixar claro "o que vem a seguir" em cada concurso.
 
 **Fora do escopo (por enquanto)**
 - Multiusuário / compartilhamento.
-- Raspagem automática de sites de bancas ou importação de editais.
+- Raspagem automática de sites de bancas ou importação automática de editais (o cadastro
+  assistido por LLM do RF10 parte do edital que o usuário fornece).
 - Plano de estudos detalhado (cronograma por matéria, questões, etc.).
 - App mobile nativo (a web deve ser responsiva).
 
@@ -92,6 +93,14 @@ Status sugeridos, em ordem:
 
 ### RF09 — Exportação / backup
 - Exportar todos os dados em JSON e/ou CSV; importar a partir do JSON.
+
+### RF10 — Cadastro assistido por LLM (MCP)
+- Servidor MCP para que uma LLM com acesso ao edital (anexado pelo usuário) cadastre e atualize
+  concursos: o usuário escolhe o cargo e a LLM preenche os dados daquele cargo, o cronograma
+  (eventos), links e tags numa única operação, após mostrar um resumo para confirmação.
+- Atualizações: retificações (eventos existentes alterados sem duplicar), status com histórico,
+  resultados por fase; consultas a concursos e prazos.
+- Sem operações de exclusão pelo MCP. Uso local por stdio; hospedado por HTTP com token próprio.
 
 ## 5. Requisitos não funcionais
 

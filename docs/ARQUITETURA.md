@@ -20,6 +20,7 @@
 | Formulários | **react-hook-form** + `@hookform/resolvers/zod` | Formulários grandes (RF01) com pouca re-renderização. |
 | Datas | **date-fns** + **@date-fns/tz** | Cálculo de "hoje" e prazos em `America/Sao_Paulo`. |
 | Markdown | **react-markdown** (sem HTML bruto) | Observações (RF01) renderizadas com segurança. |
+| MCP | **`@modelcontextprotocol/server`** (SDK v2) | Servidor MCP (RF10) com stdio e HTTP web-standard (`fetch`) a partir da mesma definição; só depende de Zod. |
 | Testes | **Vitest** (unit/integração) + **Playwright** (e2e smoke) | Rápidos; Vitest roda o domínio puro e o banco em memória. |
 | Lint/format | **Biome** | Uma ferramenta só para lint + format, rápida, configuração mínima. |
 | Pacotes | **pnpm** (via Corepack) | Rápido, lockfile determinístico. |
@@ -38,7 +39,10 @@ flowchart LR
   MW --> RSC[Server Components<br/>páginas / leitura]
   MW --> SA[Server Actions<br/>mutações]
   MW --> RH[Route Handlers<br/>export/import, .ics, health]
+  LLM[Cliente MCP<br/>LLM + edital] -->|stdio ou HTTP + token| MCP[server/mcp<br/>ferramentas]
   RSC --> Q[server/queries]
+  MCP --> Q
+  MCP --> R
   SA --> D[domain/*<br/>regras puras]
   SA --> R[server/repositories]
   Q --> DB[(SQLite / libSQL<br/>arquivo local ou Turso)]
@@ -243,7 +247,42 @@ Retorno padronizado `{ ok: true, data } | { ok: false, erros }`.
 | `GET /api/export?formato=json\|csv` | RF09 (CSV = um arquivo por entidade em `.zip`, ou só concursos) |
 | `POST /api/import` | RF09 — importa JSON (substituir tudo ou mesclar; valida com Zod e versão do schema) |
 | `GET /api/health` | health check do deploy |
+| `POST/GET/DELETE /api/mcp` | RF10 — servidor MCP (Streamable HTTP); desligado sem `MCP_TOKEN`, exige `Authorization: Bearer` |
 | `GET /api/calendario.ics?token=…` | RF08, pós-MVP (assinável no Google Calendar) |
+
+### 5.4 Servidor MCP (`src/server/mcp`, RF10)
+
+Uma LLM com acesso ao edital cadastra e atualiza concursos pelo
+[Model Context Protocol](https://modelcontextprotocol.io). A mesma fábrica `criarServidorMcp({ db,
+aoAlterar })` serve dois transportes:
+
+- **stdio** — `pnpm --silent mcp` (`scripts/mcp.ts`), uso local; muda para a raiz do projeto, carrega
+  o `.env`, aplica migrações e só escreve no stdout pelo protocolo.
+- **HTTP** — `app/api/mcp/route.ts` com `createMcpHandler` (web-standard, stateless; uma instância
+  do servidor por requisição). Pública no `proxy.ts` porque se autentica sozinha: `MCP_TOKEN`
+  (≥ 32 caracteres) comparado em tempo constante, com o mesmo atraso progressivo do login. Sem
+  `MCP_TOKEN` responde 404; token curto impede o app de iniciar. Após escritas, `revalidatePath`.
+
+Camadas:
+
+| Arquivo | Papel |
+|---|---|
+| `entradas.ts` | Schemas Zod do JSON da LLM (reais, `null` limpa, omitido mantém) → JSON Schema das ferramentas; conversores para os valores crus dos formulários |
+| `operacoes.ts` | Valida com os **mesmos** schemas da UI (`lib/schemas/*`) e grava pelos repositórios; retorno `{ ok, data }` ou `{ ok, erros }`, com o caminho do item nos lotes (`eventos[2].data`) |
+| `servidor.ts` | Registra ferramentas, recursos (`concurso://referencia`, `concurso://concursos/{id}`) e prompts (`cadastrar_edital`, `aplicar_retificacao`); erros viram `isError` com texto para a LLM corrigir |
+| `textos.ts` | Instruções, guias dos prompts e referência dos enums com rótulos pt-BR |
+
+Decisões (issue #39):
+- **Sem ferramentas destrutivas** — nada é excluído pelo MCP; exclusões só pela UI. Todas as
+  ferramentas anunciam `destructiveHint: false`.
+- **Um concurso = um cargo** — o usuário escolhe o cargo no edital e a LLM preenche só os dados dele.
+- **Tudo ou nada** — `cadastrar_concurso` grava concurso + eventos + links + tags numa transação
+  (`criarConcursoCompleto`); `salvar_eventos`/`salvar_links` idem (`salvarEventos`/`salvarLinks`).
+  Valida tudo antes de abrir a transação e devolve todos os erros de uma vez.
+- **Duplicados** — `domain/duplicados.ts` compara órgão e cargo por Jaccard de palavras (sem acento
+  nem palavras vazias; números diferentes distinguem órgãos). O cadastro recusa parecidos salvo
+  `ignorarDuplicados`.
+- **Leitura do edital no cliente** — o servidor não baixa PDFs (sem `ler_edital(url)` por ora).
 
 ---
 
@@ -259,7 +298,7 @@ Retorno padronizado `{ ok: true, data } | { ok: false, erros }`.
 ├── drizzle/                        # migrações SQL geradas (versionadas)
 ├── data/                           # concurso.db local (gitignored)
 ├── e2e/                            # testes Playwright
-├── scripts/                        # backup.ts, seed.ts
+├── scripts/                        # backup.ts, seed.ts, mcp.ts (stdio)
 ├── src/
 │   ├── app/                        # rotas (páginas, layouts, api/)
 │   ├── components/
@@ -273,6 +312,7 @@ Retorno padronizado `{ ok: true, data } | { ok: false, erros }`.
 │   │   ├── queries/                # leituras (lista, dashboard, detalhe)
 │   │   ├── repositories/           # escritas transacionais
 │   │   ├── actions/                # Server Actions
+│   │   ├── mcp/                    # servidor MCP (ferramentas, entradas, textos)
 │   │   └── auth/                   # sessão, senha
 │   ├── lib/                        # format.ts (BRL, datas), tz.ts, normalize.ts, schemas zod
 │   └── proxy.ts
@@ -293,6 +333,8 @@ Retorno padronizado `{ ok: true, data } | { ok: false, erros }`.
 - Em produção (`NODE_ENV=production`) sem `APP_PASSWORD`, o app **recusa iniciar** salvo
   `ALLOW_NO_AUTH=true` explícito — evita expor dados por esquecimento.
 - Sem biblioteca de auth completa (NextAuth etc.): um usuário não justifica o custo.
+- **MCP (§5.4):** `/api/mcp` não usa o cookie de sessão; exige `Authorization: Bearer <MCP_TOKEN>`
+  e fica desligado sem a variável.
 
 ### 7.2 Locale (RNF04)
 - `<html lang="pt-BR">`; toda a UI em pt-BR (sem i18n framework — strings diretas + `labels.ts`).
@@ -313,8 +355,8 @@ Retorno padronizado `{ ok: true, data } | { ok: false, erros }`.
 | Nível | Ferramenta | Escopo | Meta |
 |---|---|---|---|
 | Unitário | Vitest | `domain/*` (transições, prazos, validade, criticidade), `lib/format`, parsers BRL, schemas Zod | cobertura ≥ 90% em `domain/` |
-| Integração | Vitest + libSQL `:memory:` + migrações | repositories/queries (transação de status, tags, filtros, export→import ida e volta) | casos principais |
-| E2E | Playwright (Chromium) | smoke: criar concurso → evento → aparece no dashboard → mudar status → exportar; login quando auth ativa | poucos fluxos |
+| Integração | Vitest + libSQL `:memory:` + migrações | repositories/queries (transação de status, tags, filtros, export→import ida e volta); servidor MCP com cliente em memória (`InMemoryTransport`) | casos principais |
+| E2E | Playwright (Chromium) | smoke: criar concurso → evento → aparece no dashboard → mudar status → exportar; login quando auth ativa; `/api/mcp` com token → concurso visível no app | poucos fluxos |
 
 Datas sempre fixadas (`vi.setSystemTime` / `hoje` injetado).
 
@@ -381,8 +423,9 @@ Cada item = uma branch `feature/*` a partir de `develop`; cada milestone fecha c
 | **M3 — Busca e pós-prova** → `v0.4.0` | `feature/busca-filtros` (RF07) · `feature/resultados-fases` (RF05) · `feature/validade-concurso` | Ciclo completo até nomeação |
 | **M4 — Backup e hospedagem** → **`v1.0.0` (MVP)** | `feature/export-import` (RF09) · `feature/autenticacao` · `feature/e2e-playwright` · `feature/deploy` (Vercel+Turso, Dockerfile, `db:backup`, README) | MVP pronto para uso diário |
 | **M5 — Visões** → `v1.1.0` | `feature/kanban` · `feature/calendario` | RF06 desejáveis |
-| **M6 — Lembretes** → `v1.2.0` | `feature/exportar-ics` (RF08) · `feature/sugestao-status` · `feature/notificacao-email` (opcional) | RF08 |
-| **M7 — Anexos** → `v1.3.0` | `feature/anexos` | RF02 desejável |
+| **Cadastro assistido** → `v1.2.0` | `feature/mcp` (issue #39) | RF10: servidor MCP para cadastrar/atualizar a partir do edital |
+| **M6 — Lembretes** → `v1.3.0` | `feature/exportar-ics` (RF08) · `feature/sugestao-status` · `feature/notificacao-email` (opcional) | RF08 |
+| **M7 — Anexos** → `v1.4.0` | `feature/anexos` | RF02 desejável |
 
 ---
 

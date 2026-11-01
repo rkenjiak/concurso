@@ -6,11 +6,19 @@ import {
   concursoSchema,
   VALORES_INICIAIS_CONCURSO,
 } from "@/lib/schemas/concurso";
+import { eventoSchema, VALORES_INICIAIS_EVENTO } from "@/lib/schemas/evento";
+import { linkSchema } from "@/lib/schemas/link";
 import { criarBancoTeste } from "../db/banco-teste";
 import type { Db } from "../db/client";
 import { concurso, link, statusHistorico } from "../db/schema";
 import { listarConcursos, obterConcurso } from "../queries/concursos";
-import { atualizarConcurso, criarConcurso, excluirConcurso } from "./concursos";
+import { listarEventos } from "../queries/eventos";
+import {
+  atualizarConcurso,
+  criarConcurso,
+  criarConcursoCompleto,
+  excluirConcurso,
+} from "./concursos";
 
 let db: Db;
 let client: Client;
@@ -112,5 +120,30 @@ describe("queries", () => {
 
   it("obterConcurso retorna null quando não existe", async () => {
     expect(await obterConcurso(db, 42)).toBeNull();
+  });
+});
+
+describe("criarConcursoCompleto", () => {
+  const evento = eventoSchema.parse({ ...VALORES_INICIAIS_EVENTO, data: "2026-12-01" });
+  const edital = linkSchema.parse({
+    tipo: "EDITAL_ABERTURA",
+    rotulo: "",
+    url: "https://e.example",
+  });
+
+  it("grava concurso, histórico, eventos e links na mesma transação", async () => {
+    const id = await criarConcursoCompleto(db, dados(), [evento, evento], [edital], AGORA);
+    expect(await obterConcurso(db, id)).toMatchObject({ statusDesde: AGORA });
+    expect(await listarEventos(db, id)).toHaveLength(2);
+    expect(await db.select().from(link).where(eq(link.concursoId, id))).toHaveLength(1);
+  });
+
+  it("desfaz tudo se uma inserção falhar", async () => {
+    const quebrado = { ...evento, data: null } as unknown as typeof evento;
+    await expect(
+      criarConcursoCompleto(db, dados(), [evento, quebrado], [edital]),
+    ).rejects.toThrow();
+    expect(await listarConcursos(db)).toEqual([]);
+    expect(await db.select().from(statusHistorico)).toEqual([]);
   });
 });

@@ -12,7 +12,13 @@ import { criarBancoTeste } from "../db/banco-teste";
 import type { Db } from "../db/client";
 import { listarEventos } from "../queries/eventos";
 import { criarConcurso, excluirConcurso } from "./concursos";
-import { atualizarEvento, criarEvento, definirConcluido, excluirEvento } from "./eventos";
+import {
+  atualizarEvento,
+  criarEvento,
+  definirConcluido,
+  excluirEvento,
+  salvarEventos,
+} from "./eventos";
 
 let db: Db;
 let client: Client;
@@ -155,5 +161,49 @@ describe("eventoSchema", () => {
     expect(
       eventoSchema.safeParse({ ...VALORES_INICIAIS_EVENTO, data: "2026-11-10", tipo: "X" }).success,
     ).toBe(false);
+  });
+});
+
+describe("salvarEventos", () => {
+  it("cria e atualiza em lote, devolvendo os IDs na ordem", async () => {
+    const existente = await criarEvento(db, concursoId, dados({ tipo: "PROVA_OBJETIVA" }));
+    const ids = await salvarEventos(
+      db,
+      concursoId,
+      [
+        { id: null, dados: dados({ tipo: "PRAZO_RECURSO", data: "2026-11-20" }) },
+        {
+          id: existente,
+          dados: dados({ tipo: "PROVA_OBJETIVA", data: "2026-12-05", concluido: true }),
+        },
+      ],
+      T1,
+    );
+    expect(ids).toEqual([existente + 1, existente]);
+    const eventos = await listarEventos(db, concursoId);
+    expect(eventos.map((e) => [e.tipo, e.data, e.concluidoEm])).toEqual([
+      ["PRAZO_RECURSO", "2026-11-20", null],
+      ["PROVA_OBJETIVA", "2026-12-05", T1],
+    ]);
+  });
+
+  it("é tudo ou nada: evento de outro concurso desfaz o lote", async () => {
+    const outro = await criarConcurso(
+      db,
+      concursoSchema.parse({ ...VALORES_INICIAIS_CONCURSO, orgao: "Z", cargo: "W" }),
+    );
+    const alheio = await criarEvento(db, outro, dados({}));
+    await expect(
+      salvarEventos(db, concursoId, [
+        { id: null, dados: dados({}) },
+        { id: alheio, dados: dados({ data: "2027-01-01" }) },
+      ]),
+    ).rejects.toThrow(ErroDominio);
+    expect(await listarEventos(db, concursoId)).toEqual([]);
+    expect((await listarEventos(db, outro))[0]?.data).toBe("2026-11-10");
+  });
+
+  it("rejeita concurso inexistente", async () => {
+    await expect(salvarEventos(db, 999, [])).rejects.toThrow("Concurso não encontrado.");
   });
 });

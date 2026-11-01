@@ -1,8 +1,11 @@
-/** Usuários (#49): cadastro pelo login Google, último acesso e token do MCP. */
+/**
+ * Usuários (#49): cadastro pelo login Google, último acesso, token do MCP e allowlist do painel
+ * admin (#50).
+ */
 import { createHash, randomBytes } from "node:crypto";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, or } from "drizzle-orm";
 import type { Db } from "../db/client";
-import { ID_USUARIO_INICIAL, type Usuario, usuario } from "../db/schema";
+import { emailPermitido, ID_USUARIO_INICIAL, type Usuario, usuario } from "../db/schema";
 import type { Executor } from "./tipos";
 
 export interface PerfilLogin {
@@ -15,6 +18,28 @@ export interface PerfilLogin {
 export async function obterUsuario(db: Executor, id: number): Promise<Usuario | null> {
   const [linha] = await db.select().from(usuario).where(eq(usuario.id, id));
   return linha ?? null;
+}
+
+/** Usuário já cadastrado para o login Google: pela conta (`sub`) ou, sem ela, pelo e-mail. */
+export async function buscarUsuarioGoogle(
+  db: Executor,
+  sub: string,
+  email: string,
+): Promise<Usuario | null> {
+  const linhas = await db
+    .select()
+    .from(usuario)
+    .where(or(eq(usuario.googleSub, sub), eq(usuario.email, email)));
+  return linhas.find((u) => u.googleSub === sub) ?? linhas[0] ?? null;
+}
+
+/** `true` se o e-mail (já normalizado) foi liberado pelo painel admin (#50). */
+export async function emailNaAllowlist(db: Executor, email: string): Promise<boolean> {
+  const [linha] = await db
+    .select({ email: emailPermitido.email })
+    .from(emailPermitido)
+    .where(eq(emailPermitido.email, email));
+  return linha !== undefined;
 }
 
 /**
@@ -106,11 +131,11 @@ export async function revogarTokenMcp(db: Db, usuarioId: number): Promise<void> 
   await db.update(usuario).set({ mcpTokenHash: null }).where(eq(usuario.id, usuarioId));
 }
 
-/** Usuário dono do token do MCP, ou `null`. */
+/** Usuário dono do token do MCP, ou `null` (também se ele estiver bloqueado, #50). */
 export async function usuarioDoTokenMcp(db: Db, token: string): Promise<Usuario | null> {
   const [linha] = await db
     .select()
     .from(usuario)
-    .where(eq(usuario.mcpTokenHash, resumoTokenMcp(token)));
+    .where(and(eq(usuario.mcpTokenHash, resumoTokenMcp(token)), isNull(usuario.bloqueadoEm)));
   return linha ?? null;
 }

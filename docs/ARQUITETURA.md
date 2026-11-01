@@ -71,6 +71,8 @@ Convenções:
 ```mermaid
 erDiagram
   USUARIO ||--o{ CONCURSO : "é dono"
+  USUARIO ||--o{ EMAIL_PERMITIDO : "liberou"
+  USUARIO ||--o{ AUDITORIA_ADMIN : "executou"
   CONCURSO ||--o{ LINK : tem
   CONCURSO ||--o{ EVENTO : tem
   CONCURSO ||--o{ STATUS_HISTORICO : registra
@@ -84,8 +86,16 @@ erDiagram
 
 `id`, `email` (único, minúsculo; nulo só no usuário inicial não assumido), `google_sub` (único),
 `nome`, `avatar_url`, `papel` (`USUARIO`/`ADMIN`), `mcp_token_hash` (SHA-256 do token do MCP),
-`ultimo_acesso_em`, `created_at`. `concurso.usuario_id` → `usuario.id` (`ON DELETE CASCADE`;
+`ultimo_acesso_em`, `bloqueado_em` (#50; nulo = ativo), `created_at`. `concurso.usuario_id` → `usuario.id` (`ON DELETE CASCADE`;
 obrigatório, garantido por triggers porque a coluna foi adicionada com `ALTER TABLE`).
+
+**Painel admin (#50, migração `0004_painel_admin`):**
+- `email_permitido`: `email` (PK, minúsculo), `adicionado_por` → `usuario.id` (`SET NULL`),
+  `created_at`. Allowlist do login Google gerenciada pelo painel, somada às variáveis de ambiente.
+- `auditoria_admin`: `id`, `admin_id` e `alvo_usuario_id` → `usuario.id` (`SET NULL`), `admin` e
+  `alvo` (cópias do e-mail/descrição no momento da ação, para o registro sobreviver a mudanças),
+  `acao` (`PROMOVER_ADMIN`, `REBAIXAR_ADMIN`, `BLOQUEAR_USUARIO`, `DESBLOQUEAR_USUARIO`,
+  `PERMITIR_EMAIL`, `REMOVER_EMAIL`), `created_at` (índice).
 
 ### 3.1 `concurso` (RF01, RF03, RF05)
 
@@ -239,11 +249,16 @@ senão → indefinida
 | `/concursos/[id]` | **Detalhe** em abas: Visão geral · Eventos · Links · Resultados · Histórico | MVP |
 | `/concursos/[id]/editar` | Formulário de edição | MVP |
 | `/configuracoes` | Exportar/importar dados, sobre/versão | MVP |
-| `/login` | Senha única (só se auth habilitada) | MVP |
+| `/login` | Login Google e/ou senha única (só se auth habilitada) | MVP |
+| `/admin` | **Painel admin** (#50, só papel `ADMIN`; 403 para os demais): visão geral com totais de usuários, concursos e eventos e ações recentes | v1.4 |
+| `/admin/usuarios` | Usuários (nome, e-mail, papel, cadastro, último acesso, nº de concursos); promover/rebaixar, bloquear/desbloquear | v1.4 |
+| `/admin/acesso` | Allowlist do login Google: e-mails das variáveis (só leitura) e liberados no painel (adicionar/retirar) | v1.4 |
+| `/admin/auditoria` | Log das ações administrativas (últimas 200) | v1.4 |
 | `/concursos?visao=quadro` | Quadro por status (kanban; arrastar ou “Mover para” = transição validada) | v1.1 |
 | `/calendario?mes=AAAA-MM` | Visão mensal de eventos (agenda em lista no celular); clique abre os detalhes do evento; cor/ícone por concurso com legenda (#46) | v1.1 |
 
-Layout responsivo: navegação lateral no desktop, barra inferior no celular. Links externos com
+Layout responsivo: navegação lateral no desktop, barra inferior no celular; menu da conta (avatar)
+com Configurações, Sair e, só para admins, o seletor de visão (§7.1). Links externos com
 `target="_blank" rel="noopener noreferrer"`.
 
 ### 5.2 Server Actions (`src/server/actions`)
@@ -257,6 +272,10 @@ Layout responsivo: navegação lateral no desktop, barra inferior no celular. Li
 | `alternarPrazoOculto(chave, oculto)` | RF06 — oculta/reexibe um prazo do dashboard (`evento-<id>` ou `validade-<concursoId>`, #44) |
 | `salvarResultadoFase`, `excluirResultadoFase` | RF05 |
 | `login`, `logout` | Auth |
+| `gerarTokenMcpAcao`, `revogarTokenMcpAcao` | Token pessoal do MCP (#49) |
+| `alternarVisaoAcao(visao)` | #50 — "usuario" ou "admin" (só admins); grava o cookie da visão e leva a `/` ou `/admin` |
+| `definirPapelAcao(id, papel)`, `definirBloqueioAcao(id, bloqueado)` | #50 — admin; protege o último admin ativo e os de `ADMIN_EMAILS` |
+| `adicionarEmailPermitidoAcao(email)`, `removerEmailPermitidoAcao(email)` | #50 — admin; allowlist do painel |
 
 Todas: validação Zod → checagem de sessão (quando auth ativa) → transação → `revalidatePath`.
 Retorno padronizado `{ ok: true, data } | { ok: false, erros }`.
@@ -329,6 +348,8 @@ Decisões (issue #39):
 │   ├── components/
 │   │   ├── ui/                     # shadcn/ui
 │   │   ├── concurso/               # formulários, cards, tabelas, badges de status
+│   │   ├── admin/                  # painel admin (#50)
+│   │   ├── layout/                 # casca, navegação, menu da conta
 │   │   └── tema/                   # seletor de tema (claro/escuro/sistema)
 │   ├── domain/                     # regras puras + testes *.test.ts ao lado
 │   │   ├── enums.ts  labels.ts
@@ -339,7 +360,7 @@ Decisões (issue #39):
 │   │   ├── repositories/           # escritas transacionais
 │   │   ├── actions/                # Server Actions
 │   │   ├── mcp/                    # servidor MCP (ferramentas, entradas, textos)
-│   │   └── auth/                   # sessão, senha
+│   │   └── auth/                   # sessão, senha, Google, autorização, visão admin
 │   ├── lib/                        # format.ts (BRL, datas), tz.ts, normalize.ts, schemas zod
 │   └── proxy.ts
 ├── biome.json  drizzle.config.ts  next.config.ts  vitest.config.ts  playwright.config.ts
@@ -363,8 +384,8 @@ Decisões (issue #39):
 - **Local (padrão):** sem login configurado → auth desligada, tudo é do usuário inicial.
 - **Login Google:** OIDC próprio (`server/auth/google.ts`, só `jose`): código de autorização com
   PKCE, `state` e `nonce` num cookie assinado de 10 min; `id_token` validado pelas chaves públicas
-  do Google (emissor, público, expiração, `nonce`, e-mail verificado). Acesso por allowlist
-  (`ADMIN_EMAILS` + `ALLOWED_EMAILS`), conferida também a cada requisição.
+  do Google (emissor, público, expiração, `nonce`, e-mail verificado). Acesso por allowlist,
+  conferida também a cada requisição (`auth/autorizacao.ts`, ver "Painel admin" abaixo).
 - **Senha única (`APP_PASSWORD`):** uso local; comparada em tempo constante, com atraso progressivo
   após falhas. Em produção não pode coexistir com o Google.
 - **Sessão:** cookie **JWT assinado** (`jose`, HS256 com `AUTH_SECRET` ≥ 32 bytes) com o ID do
@@ -377,7 +398,34 @@ Decisões (issue #39):
 - Sem biblioteca de auth completa (NextAuth, Better Auth): um provedor só não justifica a
   dependência, e o fluxo OIDC cabe em poucas funções testáveis.
 - **MCP (§5.4):** `/api/mcp` não usa o cookie de sessão; exige `Authorization: Bearer <token>` com o
-  token pessoal do usuário.
+  token pessoal do usuário (recusado se o usuário estiver bloqueado).
+
+**Painel admin (#50):**
+- **Quem entra com Google** (`auth/autorizacao.ts`): quem não está bloqueado e (a) tem o e-mail em
+  `ADMIN_EMAILS` ou `ALLOWED_EMAILS`, (b) tem o e-mail liberado no painel (`email_permitido`) ou
+  (c) já é admin no banco. As variáveis continuam valendo e só mudam na configuração do servidor; o
+  painel soma e-mails a elas. A regra é a mesma no login e a cada requisição, então retirar um
+  e-mail ou bloquear vale na hora, inclusive para sessões abertas.
+- **Admins:** `ADMIN_EMAILS` são admins garantidos (promovidos a cada login, não podem ser
+  rebaixados nem bloqueados pelo painel). Outros usuários podem ser promovidos no painel; o papel dá
+  acesso por si só, então para tirar um admin rebaixa-se ou bloqueia-se.
+- **Último admin:** sempre resta um admin ativo (papel `ADMIN`, não bloqueado). Rebaixar ou
+  bloquear um admin só acontece se existir outro admin ativo, conferido no próprio `UPDATE`
+  (`WHERE … AND EXISTS (outro admin ativo)`), sem janela de corrida. Ninguém bloqueia a própria
+  conta; quem se rebaixa volta para a visão usuário.
+- **Bloqueio:** `usuario.bloqueado_em`. Barra o login (Google e senha), a sessão existente
+  (relida a cada requisição) e o token do MCP; os dados e o token ficam guardados e voltam a valer
+  ao desbloquear. Sem login configurado (uso local), o bloqueio não se aplica.
+- **Visão admin ↔ visão usuário:** seletor no menu da conta, só para admins, sem novo login. A
+  escolha fica no cookie `concurso_visao` (`auth/visao.ts`) e decide o início (`/` redireciona a
+  `/admin` na visão admin). A visão usuário é o app comum, sem nenhum item de admin; a visão admin
+  usa outra navegação e a faixa "Modo admin". A visão **nunca** concede acesso: páginas `/admin`
+  chamam `exigirAdminPagina()` (papel relido do banco; `forbidden()` → 403, com
+  `experimental.authInterrupts`) e as ações, `exigirAdminAcao()` ("Acesso restrito a
+  administradores").
+- **Auditoria:** toda alteração do painel grava em `auditoria_admin` na mesma transação.
+- **Privacidade:** o painel mostra só totais e metadados das contas; não há impersonação nem acesso
+  aos concursos de outros usuários.
 
 ### 7.2 Locale (RNF04)
 - `<html lang="pt-BR">`; toda a UI em pt-BR (sem i18n framework — strings diretas + `labels.ts`).

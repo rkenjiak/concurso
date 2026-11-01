@@ -53,8 +53,10 @@ describe("migrações", () => {
     );
     expect(resultado.rows.map((r) => r.name)).toEqual([
       "anexo",
+      "auditoria_admin",
       "concurso",
       "concurso_tag",
+      "email_permitido",
       "evento",
       "link",
       "resultado_fase",

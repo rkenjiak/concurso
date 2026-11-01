@@ -9,9 +9,8 @@ import { cache } from "react";
 import type { Papel } from "@/domain/enums";
 import { type ErrosAcao, falha } from "../actions/resultado";
 import { getDb } from "../db/client";
-import { ID_USUARIO_INICIAL } from "../db/schema";
-import { obterUsuario } from "../repositories/usuarios";
-import { emailPermitido, lerConfigAuth } from "./config";
+import { usuarioDaSessao } from "./autorizacao";
+import { lerConfigAuth } from "./config";
 import { COOKIE_SESSAO, lerSessao } from "./sessao";
 
 export const MENSAGEM_SESSAO_EXPIRADA = "Sessão expirada. Entre novamente para continuar.";
@@ -26,32 +25,16 @@ export interface UsuarioSessao {
 
 /**
  * Usuário autenticado, ou `null`. Sem login configurado, é sempre o usuário inicial (uso local).
- * A sessão só vale enquanto o método usado continuar permitido: login Google com o e-mail ainda
- * autorizado; login por senha com `APP_PASSWORD` ainda definido (e sempre como usuário inicial).
- * Memorizado por requisição.
+ * A sessão só vale enquanto o método usado continuar permitido e o usuário não estiver bloqueado
+ * (regras em `autorizacao.ts`). Memorizado por requisição.
  */
 export const usuarioAtual = cache(async (): Promise<UsuarioSessao | null> => {
   const config = lerConfigAuth();
   const sessao = config.habilitada
     ? await lerSessao((await cookies()).get(COOKIE_SESSAO)?.value, config.segredo)
     : null;
-  if (config.habilitada) {
-    if (!sessao) return null;
-    const valida =
-      sessao.metodo === "senha"
-        ? config.senha !== null && sessao.usuarioId === ID_USUARIO_INICIAL
-        : config.google !== null;
-    if (!valida) return null;
-  }
-  const u = await obterUsuario(getDb(), sessao?.usuarioId ?? ID_USUARIO_INICIAL);
-  if (!u) {
-    if (!config.habilitada) throw new Error("Usuário inicial ausente: aplique as migrações.");
-    return null;
-  }
-  // Conta Google: o e-mail precisa continuar autorizado (a allowlist pode ter mudado).
-  if (config.habilitada && sessao?.metodo === "google") {
-    if (u.email === null || !emailPermitido(config, u.email)) return null;
-  }
+  const u = await usuarioDaSessao(getDb(), config, sessao);
+  if (!u) return null;
   return { id: u.id, email: u.email, nome: u.nome, avatarUrl: u.avatarUrl, papel: u.papel };
 });
 

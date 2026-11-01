@@ -6,7 +6,8 @@
 import { NextResponse } from "next/server";
 import { getDb } from "../db/client";
 import { entrarComGoogle } from "../repositories/usuarios";
-import { type ConfigAuth, ErroConfigAuth, emailPermitido, lerConfigAuth } from "./config";
+import { decidirLoginGoogle } from "./autorizacao";
+import { type ConfigAuth, ErroConfigAuth, lerConfigAuth } from "./config";
 import {
   aleatorio,
   CAMINHO_CALLBACK,
@@ -25,6 +26,7 @@ import { COOKIE_SESSAO, criarTokenSessao, destinoSeguro, opcoesCookieSessao } fr
 export const MENSAGENS_ERRO_LOGIN = {
   nao_autorizado:
     "Esta conta Google não tem acesso. Peça ao administrador para incluir o seu e-mail.",
+  bloqueado: "Esta conta foi bloqueada pelo administrador.",
   google: "Não foi possível entrar com o Google. Tente novamente.",
   cancelado: "Login com o Google cancelado.",
   expirado: "O login demorou demais ou foi aberto em outra aba. Tente novamente.",
@@ -97,7 +99,7 @@ export async function iniciarLoginGoogle(request: { nextUrl: URL }): Promise<Nex
 
 /**
  * `GET /api/auth/google/callback?code&state`: confere o estado, valida o `id_token`, aplica a
- * allowlist, encontra/cria o usuário e abre a sessão.
+ * allowlist (variáveis e painel admin) e o bloqueio, encontra/cria o usuário e abre a sessão.
  */
 export async function concluirLoginGoogle(request: {
   nextUrl: URL;
@@ -119,9 +121,10 @@ export async function concluirLoginGoogle(request: {
     const redirectUri = new URL(CAMINHO_CALLBACK, origem).toString();
     const idToken = await trocarCodigo(config.google, redirectUri, code, estado.verificador);
     const perfil = await validarIdToken(idToken, config.google, estado.nonce);
-    if (!emailPermitido(config, perfil.email)) {
-      console.warn(`Login Google recusado (fora da allowlist): ${perfil.email}`);
-      return irParaLogin(origem, "nao_autorizado");
+    const decisao = await decidirLoginGoogle(getDb(), config, perfil);
+    if (decisao !== "ok") {
+      console.warn(`Login Google recusado (${decisao}): ${perfil.email}`);
+      return irParaLogin(origem, decisao);
     }
     const usuario = await entrarComGoogle(getDb(), perfil, config.emailsAdmin.has(perfil.email));
     const resposta = NextResponse.redirect(new URL(estado.para, origem));

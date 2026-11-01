@@ -8,6 +8,8 @@ const nextConfig: NextConfig = {
   // Saída enxuta para a imagem Docker (`NEXT_OUTPUT=standalone`, ver Dockerfile). Fora dela, o
   // build padrão (Vercel, `pnpm start`).
   output: process.env.NEXT_OUTPUT === "standalone" ? "standalone" : undefined,
+  // `forbidden()` (403) no painel admin (#50).
+  experimental: { authInterrupts: true },
 };
 
 export default nextConfig;

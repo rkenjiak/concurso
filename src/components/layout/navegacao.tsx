@@ -1,12 +1,18 @@
 "use client";
 
-import { ClipboardList, LayoutDashboard, type LucideIcon, Settings } from "lucide-react";
+import {
+  CalendarDays,
+  ClipboardList,
+  LayoutDashboard,
+  type LucideIcon,
+  Settings,
+} from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 
 interface ItemNavegacao {
-  href: "/" | "/concursos" | "/configuracoes";
+  href: "/" | "/concursos" | "/calendario" | "/configuracoes";
   rotulo: string;
   icone: LucideIcon;
 }
@@ -14,6 +20,7 @@ interface ItemNavegacao {
 export const ITENS_NAVEGACAO: readonly ItemNavegacao[] = [
   { href: "/", rotulo: "Dashboard", icone: LayoutDashboard },
   { href: "/concursos", rotulo: "Concursos", icone: ClipboardList },
+  { href: "/calendario", rotulo: "Calendário", icone: CalendarDays },
   { href: "/configuracoes", rotulo: "Configurações", icone: Settings },
 ];
 
@@ -57,7 +64,7 @@ export function NavegacaoInferior() {
       aria-label="Navegação principal"
       className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden"
     >
-      <ul className="grid grid-cols-3">
+      <ul className="grid grid-cols-4">
         {ITENS_NAVEGACAO.map(({ href, rotulo, icone: Icone }) => {
           const ativo = estaAtivo(pathname, href);
           return (

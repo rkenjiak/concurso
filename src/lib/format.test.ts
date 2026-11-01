@@ -5,6 +5,8 @@ import {
   formatarData,
   formatarDataHora,
   formatarDataInstante,
+  formatarDataLonga,
+  formatarMes,
   formatarNota,
   mascararBRL,
   notaParaEntrada,
@@ -165,5 +167,15 @@ describe("notas", () => {
     for (const invalido of [null, undefined, "", "-1", "7,1234", "1.234,5", "abc", "1,"]) {
       expect(parseDecimal(invalido)).toBeNull();
     }
+  });
+});
+
+describe("formatarMes / formatarDataLonga", () => {
+  it("formata mês e data por extenso em pt-BR", () => {
+    expect(formatarMes("2026-10")).toBe("outubro de 2026");
+    expect(formatarMes("2027-01")).toBe("janeiro de 2027");
+    expect(() => formatarMes("2026-13")).toThrow(RangeError);
+    expect(formatarDataLonga("2026-10-31")).toBe("sábado, 31 de outubro");
+    expect(() => formatarDataLonga("2026-02-30")).toThrow(RangeError);
   });
 });

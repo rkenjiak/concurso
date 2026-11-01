@@ -16,13 +16,15 @@ import {
   contarFiltrosAvancados,
   FILTROS_VAZIOS,
   type FiltrosConcursos,
-  filtrosParaBusca,
+  hrefConcursos,
   lerFiltrosConcursos,
   ORDENACOES,
+  PARAM_VISAO,
   PARAMS,
   parametrosDeEntradas,
   ROTULO_ORDENACAO,
   temFiltros,
+  type Visao,
 } from "@/lib/schemas/filtros-concursos";
 import { CampoMoeda } from "./campo-moeda";
 
@@ -30,10 +32,16 @@ const CAMINHO = "/concursos";
 
 /**
  * Busca, filtros e ordenação da lista (RF07). Sem JavaScript é um formulário GET comum; com JS,
- * navega para a URL canônica (sem parâmetros vazios). Remonte com `key` a cada mudança de URL
+ * navega para a URL canônica (sem parâmetros vazios), mantendo a visão (lista/quadro). Remonte com `key` a cada mudança de URL
  * para sincronizar os campos.
  */
-export function FiltrosConcursosForm({ filtros }: { filtros: FiltrosConcursos }) {
+export function FiltrosConcursosForm({
+  filtros,
+  visao = "lista",
+}: {
+  filtros: FiltrosConcursos;
+  visao?: Visao;
+}) {
   const router = useRouter();
   const [pendente, iniciar] = useTransition();
   const [remMin, setRemMin] = useState(centavosParaEntrada(filtros.remuneracaoMin));
@@ -44,7 +52,7 @@ export function FiltrosConcursosForm({ filtros }: { filtros: FiltrosConcursos })
     e.preventDefault();
     const dados = new FormData(e.currentTarget);
     const novos = lerFiltrosConcursos(parametrosDeEntradas(dados.entries()));
-    iniciar(() => router.push(`${CAMINHO}${filtrosParaBusca(novos)}`));
+    iniciar(() => router.push(hrefConcursos(novos, visao)));
   }
 
   return (
@@ -56,6 +64,7 @@ export function FiltrosConcursosForm({ filtros }: { filtros: FiltrosConcursos })
         aria-busy={pendente}
         className="space-y-3"
       >
+        {visao !== "lista" ? <input type="hidden" name={PARAM_VISAO} value={visao} /> : null}
         <div className="flex flex-col gap-2 sm:flex-row">
           <div className="relative flex-1">
             <Search
@@ -189,9 +198,7 @@ export function FiltrosConcursosForm({ filtros }: { filtros: FiltrosConcursos })
 
         {temFiltros(filtros) ? (
           <Button asChild variant="ghost" size="sm">
-            <Link
-              href={`${CAMINHO}${filtrosParaBusca({ ...FILTROS_VAZIOS, ordem: filtros.ordem })}`}
-            >
+            <Link href={hrefConcursos({ ...FILTROS_VAZIOS, ordem: filtros.ordem }, visao)}>
               <X aria-hidden />
               Limpar filtros
             </Link>

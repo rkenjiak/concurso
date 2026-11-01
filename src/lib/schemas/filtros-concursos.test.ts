@@ -4,7 +4,9 @@ import {
   FILTROS_VAZIOS,
   type FiltrosConcursos,
   filtrosParaBusca,
+  hrefConcursos,
   lerFiltrosConcursos,
+  lerVisao,
   MAX_BUSCA,
   parametrosDeEntradas,
   temFiltros,
@@ -134,5 +136,22 @@ describe("contarFiltrosAvancados / temFiltros", () => {
     };
     expect(contarFiltrosAvancados(f)).toBe(3);
     expect(temFiltros(f)).toBe(true);
+  });
+});
+
+describe("visão (lista/quadro)", () => {
+  it("lerVisao: padrão lista; aceita quadro; ignora inválidos", () => {
+    expect(lerVisao({})).toBe("lista");
+    expect(lerVisao({ visao: "quadro" })).toBe("quadro");
+    expect(lerVisao({ visao: ["quadro", "lista"] })).toBe("quadro");
+    expect(lerVisao({ visao: "tabela" })).toBe("lista");
+  });
+
+  it("hrefConcursos preserva filtros e omite a visão padrão", () => {
+    expect(hrefConcursos(FILTROS_VAZIOS)).toBe("/concursos");
+    expect(hrefConcursos(FILTROS_VAZIOS, "quadro")).toBe("/concursos?visao=quadro");
+    const filtros: FiltrosConcursos = { ...FILTROS_VAZIOS, busca: "trf", status: ["INSCRITO"] };
+    expect(hrefConcursos(filtros, "lista")).toBe("/concursos?q=trf&status=INSCRITO");
+    expect(hrefConcursos(filtros, "quadro")).toBe("/concursos?q=trf&status=INSCRITO&visao=quadro");
   });
 });

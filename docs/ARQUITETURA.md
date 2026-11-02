@@ -615,6 +615,7 @@ Cada item = uma branch `feature/*` a partir de `develop`; cada milestone fecha c
 | **Ajustes de uso** → `v1.3.0` | `feature/markdown-tabelas` (#43) · `feature/dashboard-ocultar-eventos` (#44) · `feature/calendario-popup` (#45) · `feature/tema-escuro` (#47) · `feature/cor-concurso` (#46) | Melhorias pedidas no uso diário |
 | **Multiusuário** → `v2.0.0` | `feature/login-google-multiusuario` (#49) · `feature/painel-admin` (#50) | Login Google, dados por usuário, painel admin (RF11) |
 | **Integração Vercel + Turso** → `v2.1.0` | `feature/turso-env-vercel` (#62) | Lê `TURSO_DATABASE_URL`/`TURSO_AUTH_TOKEN` da integração do Marketplace |
+| **PWA e celular** → `v2.2.0` | `feature/pwa-mobile` (#66, #48) | App instalável (manifest, ícones) e responsividade em 360 px |
 | **M6 — Lembretes** → `v2.2.0` | `feature/lembretes` (#65): feed/download .ics, notificações no app com regras configuráveis, sugestão de status. E-mail descartado (2026-11-01) | RF08 |
 | **M7 — Anexos** → `v2.3.0` | `feature/anexos` | RF02 desejável |
 

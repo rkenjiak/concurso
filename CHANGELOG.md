@@ -7,6 +7,8 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 
 ## [Unreleased]
 
+## [2.2.0] - 2026-11-01
+
 ### Adicionado
 
 - Lembretes (RF08, #65), sem e-mail (decisão: o resumo diário por e-mail não será desenvolvido):

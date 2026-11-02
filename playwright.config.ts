@@ -3,7 +3,8 @@
  * servidor com um banco SQLite temporário em `e2e/.tmp/` recriado a cada execução.
  *
  * - projeto `chromium`: app sem autenticação (`ALLOW_NO_AUTH=true`);
- * - projeto `autenticacao`: app com `APP_PASSWORD`, para o login e o endpoint MCP (token pessoal).
+ * - projeto `autenticacao`: app com `APP_PASSWORD`, para o login e as rotas com token pessoal
+ *   (endpoint MCP e feed .ics).
  *
  * Rode `pnpm e2e` (faz o build antes) ou `pnpm exec playwright test` com um build existente.
  */
@@ -12,7 +13,7 @@ import { SENHA_E2E } from "./e2e/constantes";
 
 const PORTA = 3200;
 const PORTA_AUTH = 3201;
-const SPECS_AUTH = /(login|mcp|pwa)\.spec\.ts/;
+const SPECS_AUTH = /(login|mcp|pwa|lembretes)\.spec\.ts/;
 
 const servidor = (porta: number, banco: string, env: Record<string, string>) => ({
   command: `pnpm exec tsx e2e/servidor.ts ${porta} ${banco}`,

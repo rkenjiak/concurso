@@ -14,10 +14,13 @@ import {
   concursoTag,
   evento,
   link,
+  notificacaoEstado,
+  regraNotificacao,
   resultadoFase,
   statusHistorico,
   tag,
 } from "../db/schema";
+import { lerAntecedenciasBanco } from "../repositories/notificacoes";
 import type { Executor } from "../repositories/tipos";
 
 /** Converte os `Date` de uma linha em strings ISO 8601 (formato do arquivo). */
@@ -42,38 +45,58 @@ export async function exportarDados(
     .select({ id: concurso.id })
     .from(concurso)
     .where(eq(concurso.usuarioId, usuarioId));
-  const [concursos, tags, concursoTags, links, eventos, historico, resultados, anexos] =
-    await Promise.all([
-      db
-        .select(colunasConcurso)
-        .from(concurso)
-        .where(eq(concurso.usuarioId, usuarioId))
-        .orderBy(asc(concurso.id)),
-      db
-        .selectDistinct({ id: tag.id, nome: tag.nome })
-        .from(tag)
-        .innerJoin(concursoTag, eq(concursoTag.tagId, tag.id))
-        .where(inArray(concursoTag.concursoId, doUsuario))
-        .orderBy(asc(tag.id)),
-      db
-        .select()
-        .from(concursoTag)
-        .where(inArray(concursoTag.concursoId, doUsuario))
-        .orderBy(asc(concursoTag.concursoId), asc(concursoTag.tagId)),
-      db.select().from(link).where(inArray(link.concursoId, doUsuario)).orderBy(asc(link.id)),
-      db.select().from(evento).where(inArray(evento.concursoId, doUsuario)).orderBy(asc(evento.id)),
-      db
-        .select()
-        .from(statusHistorico)
-        .where(inArray(statusHistorico.concursoId, doUsuario))
-        .orderBy(asc(statusHistorico.id)),
-      db
-        .select()
-        .from(resultadoFase)
-        .where(inArray(resultadoFase.concursoId, doUsuario))
-        .orderBy(asc(resultadoFase.id)),
-      db.select().from(anexo).where(inArray(anexo.concursoId, doUsuario)).orderBy(asc(anexo.id)),
-    ]);
+  const [
+    concursos,
+    tags,
+    concursoTags,
+    links,
+    eventos,
+    historico,
+    resultados,
+    anexos,
+    regras,
+    notificacoes,
+  ] = await Promise.all([
+    db
+      .select(colunasConcurso)
+      .from(concurso)
+      .where(eq(concurso.usuarioId, usuarioId))
+      .orderBy(asc(concurso.id)),
+    db
+      .selectDistinct({ id: tag.id, nome: tag.nome })
+      .from(tag)
+      .innerJoin(concursoTag, eq(concursoTag.tagId, tag.id))
+      .where(inArray(concursoTag.concursoId, doUsuario))
+      .orderBy(asc(tag.id)),
+    db
+      .select()
+      .from(concursoTag)
+      .where(inArray(concursoTag.concursoId, doUsuario))
+      .orderBy(asc(concursoTag.concursoId), asc(concursoTag.tagId)),
+    db.select().from(link).where(inArray(link.concursoId, doUsuario)).orderBy(asc(link.id)),
+    db.select().from(evento).where(inArray(evento.concursoId, doUsuario)).orderBy(asc(evento.id)),
+    db
+      .select()
+      .from(statusHistorico)
+      .where(inArray(statusHistorico.concursoId, doUsuario))
+      .orderBy(asc(statusHistorico.id)),
+    db
+      .select()
+      .from(resultadoFase)
+      .where(inArray(resultadoFase.concursoId, doUsuario))
+      .orderBy(asc(resultadoFase.id)),
+    db.select().from(anexo).where(inArray(anexo.concursoId, doUsuario)).orderBy(asc(anexo.id)),
+    db
+      .select()
+      .from(regraNotificacao)
+      .where(eq(regraNotificacao.usuarioId, usuarioId))
+      .orderBy(asc(regraNotificacao.tipo)),
+    db
+      .select()
+      .from(notificacaoEstado)
+      .where(inArray(notificacaoEstado.concursoId, doUsuario))
+      .orderBy(asc(notificacaoEstado.chave)),
+  ]);
 
   return {
     app: APP_BACKUP,
@@ -88,6 +111,12 @@ export async function exportarDados(
       statusHistorico: historico.map(serializar),
       resultadosFase: resultados,
       anexos: anexos.map(serializar),
+      regrasNotificacao: regras.map((r) => ({
+        tipo: r.tipo,
+        ativo: r.ativo,
+        antecedencias: lerAntecedenciasBanco(r.antecedencias),
+      })),
+      notificacoes: notificacoes.map(({ chave: _, ...n }) => serializar(n)),
     },
   };
 }

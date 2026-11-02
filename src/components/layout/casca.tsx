@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { Marca } from "@/components/layout/marca";
 import { type ContaMenu, MenuConta } from "@/components/layout/menu-conta";
 import { NavegacaoInferior, NavegacaoLateral } from "@/components/layout/navegacao";
+import { SinoNotificacoes } from "@/components/notificacoes/sino-notificacoes";
 import { SeletorTema } from "@/components/tema/seletor-tema";
 import type { Visao } from "@/server/auth/visao";
 
@@ -15,11 +16,22 @@ interface CascaProps {
   faixa?: ReactNode;
   /** Selo ao lado da marca. */
   selo?: ReactNode;
+  /** Notificações não lidas (#65); ausente = sem sino (visão admin). */
+  naoLidas?: number;
   children: ReactNode;
 }
 
 /** Estrutura das páginas: navegação lateral (desktop) e inferior (celular) e menu da conta. */
-export function Casca({ visao, conta, ehAdmin, podeSair, faixa, selo, children }: CascaProps) {
+export function Casca({
+  visao,
+  conta,
+  ehAdmin,
+  podeSair,
+  faixa,
+  selo,
+  naoLidas,
+  children,
+}: CascaProps) {
   const secao = visao === "admin" ? "admin" : "app";
   const menu = { conta, ehAdmin, visao, podeSair };
   return (
@@ -29,6 +41,9 @@ export function Casca({ visao, conta, ehAdmin, podeSair, faixa, selo, children }
           <div className="flex items-center gap-2">
             <Marca />
             {selo}
+            {naoLidas !== undefined ? (
+              <SinoNotificacoes naoLidas={naoLidas} className="ml-auto" />
+            ) : null}
           </div>
           <NavegacaoLateral secao={secao} />
           <div className="mt-auto flex flex-col gap-3">
@@ -44,6 +59,7 @@ export function Casca({ visao, conta, ehAdmin, podeSair, faixa, selo, children }
             <Marca nomeClassName={selo ? "max-[399px]:sr-only" : undefined} />
             {selo}
             <SeletorTema className="ml-auto" />
+            {naoLidas !== undefined ? <SinoNotificacoes naoLidas={naoLidas} /> : null}
             <MenuConta {...menu} compacto />
           </header>
           {faixa}

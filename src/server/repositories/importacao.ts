@@ -4,9 +4,11 @@
  *
  * Como as tabelas são compartilhadas entre usuários, os IDs do arquivo não são preservados: os
  * concursos recebem IDs novos (mantendo a ordem do arquivo) e as filhas são religadas a eles;
- * as tags são reaproveitadas pelo nome.
+ * as tags são reaproveitadas pelo nome. Os eventos também recebem IDs novos, explícitos, para
+ * religar o estado das notificações (#65), cuja chave usa o ID do evento.
  */
 import { asc, eq, inArray, max } from "drizzle-orm";
+import { chaveNotificacao } from "@/domain/notificacoes";
 import { montarBuscaNormalizada } from "@/lib/normalize";
 import type { Backup } from "@/lib/schemas/backup";
 import type { Db } from "../db/client";
@@ -16,10 +18,13 @@ import {
   concursoTag,
   evento,
   link,
+  notificacaoEstado,
+  regraNotificacao,
   resultadoFase,
   statusHistorico,
   tag,
 } from "../db/schema";
+import { serializarAntecedencias } from "./notificacoes";
 import { removerTagsOrfas } from "./tags";
 import type { Transacao } from "./tipos";
 
@@ -43,7 +48,9 @@ type TabelaImportada =
   | typeof evento
   | typeof statusHistorico
   | typeof resultadoFase
-  | typeof anexo;
+  | typeof anexo
+  | typeof notificacaoEstado
+  | typeof regraNotificacao;
 
 async function inserirEmLotes<T extends TabelaImportada>(
   tx: Transacao,
@@ -82,10 +89,19 @@ export async function substituirTudo(
       .from(concurso)
       .where(eq(concurso.usuarioId, usuarioId));
     // Filhas primeiro (independe de ON DELETE CASCADE estar ativo).
-    for (const tabela of [concursoTag, anexo, resultadoFase, statusHistorico, evento, link]) {
+    for (const tabela of [
+      notificacaoEstado,
+      concursoTag,
+      anexo,
+      resultadoFase,
+      statusHistorico,
+      evento,
+      link,
+    ]) {
       await tx.delete(tabela).where(inArray(tabela.concursoId, doUsuario));
     }
     await tx.delete(concurso).where(eq(concurso.usuarioId, usuarioId));
+    await tx.delete(regraNotificacao).where(eq(regraNotificacao.usuarioId, usuarioId));
 
     // IDs novos a partir do maior existente: a transação de escrita impede inserções paralelas.
     const [ultimo] = await tx.select({ id: max(concurso.id) }).from(concurso);
@@ -136,10 +152,49 @@ export async function substituirTudo(
       })),
     );
     await inserirEmLotes(tx, link, religar(dados.links));
-    await inserirEmLotes(tx, evento, religar(dados.eventos));
+    const [ultimoEvento] = await tx.select({ id: max(evento.id) }).from(evento);
+    let proximoEvento = (ultimoEvento?.id ?? 0) + 1;
+    const novoIdEvento = new Map<number, number>();
+    for (const e of porId(dados.eventos)) novoIdEvento.set(e.id, proximoEvento++);
+    await inserirEmLotes(
+      tx,
+      evento,
+      porId(dados.eventos).map(({ id, concursoId, ...resto }) => ({
+        ...resto,
+        id: novoIdEvento.get(id) as number,
+        concursoId: novoId.get(concursoId) as number,
+      })),
+    );
     await inserirEmLotes(tx, statusHistorico, religar(dados.statusHistorico));
     await inserirEmLotes(tx, resultadoFase, religar(dados.resultadosFase));
     await inserirEmLotes(tx, anexo, religar(dados.anexos));
+    await inserirEmLotes(
+      tx,
+      regraNotificacao,
+      dados.regrasNotificacao.map((r) => ({
+        usuarioId,
+        tipo: r.tipo,
+        ativo: r.ativo,
+        antecedencias: serializarAntecedencias(r.antecedencias),
+      })),
+    );
+    await inserirEmLotes(
+      tx,
+      notificacaoEstado,
+      dados.notificacoes.map((n) => {
+        const concursoId = novoId.get(n.concursoId) as number;
+        const eventoId = n.eventoId === null ? null : (novoIdEvento.get(n.eventoId) as number);
+        return {
+          ...n,
+          concursoId,
+          eventoId,
+          chave: chaveNotificacao(
+            eventoId === null ? `validade-${concursoId}` : `evento-${eventoId}`,
+            n.antecedencia,
+          ),
+        };
+      }),
+    );
     await removerTagsOrfas(tx);
   });
 

@@ -1,8 +1,9 @@
 /**
  * Proteção das rotas (ARQUITETURA.md §7.1). Com a autenticação ligada, exige sessão válida em
  * todas as rotas, exceto `/login`, `/api/health`, o fluxo do login Google (`/api/auth/google…`),
- * `/api/mcp` (autenticada pelo próprio handler com o token do usuário), o manifest e os ícones do
- * PWA (#66, buscados pelo navegador sem sessão) e os arquivos estáticos (ver `matcher`). Aqui só
+ * `/api/mcp` e `/api/calendario.ics` (#65; autenticadas pelo próprio handler com o token do
+ * usuário), o manifest e os ícones do PWA (#66, buscados pelo navegador sem sessão) e os arquivos
+ * estáticos (ver `matcher`). Aqui só
  * se confere a assinatura do cookie (sem banco); páginas, Server Actions e Route Handlers obtêm o
  * usuário de novo (`auth/acesso.ts`), o que também barra sessões de e-mails retirados da allowlist.
  */
@@ -15,6 +16,7 @@ const ROTAS_PUBLICAS = new Set([
   "/login",
   "/api/health",
   "/api/mcp",
+  "/api/calendario.ics",
   "/api/auth/google",
   "/api/auth/google/callback",
 ]);

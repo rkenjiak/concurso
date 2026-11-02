@@ -16,6 +16,7 @@ import { definirPrazoOculto } from "./dashboard";
 import { criarEvento } from "./eventos";
 import { substituirTudo } from "./importacao";
 import { criarLink } from "./links";
+import { definirConcursoSilenciado, marcarNotificacoes, salvarRegras } from "./notificacoes";
 import { criarResultadoFase } from "./resultados";
 import { alterarStatus } from "./status";
 
@@ -100,6 +101,23 @@ async function popular(db: Db) {
   // Preferências de exibição do dashboard (#44) também fazem parte do backup.
   await definirPrazoOculto(db, U, { tipo: "evento", eventoId: evento }, true);
   await definirPrazoOculto(db, U, { tipo: "validade", concursoId: a }, true);
+  // Lembretes (#65): regras personalizadas, estado das notificações e concurso silenciado.
+  await salvarRegras(db, U, [{ tipo: "FIM_INSCRICOES", ativo: true, antecedencias: [10, 0] }]);
+  await marcarNotificacoes(
+    db,
+    U,
+    [{ tipo: "evento", eventoId: evento, antecedencia: 7 }],
+    "LER",
+    T1,
+  );
+  await marcarNotificacoes(
+    db,
+    U,
+    [{ tipo: "validade", concursoId: a, antecedencia: 90 }],
+    "DISPENSAR",
+    T1,
+  );
+  await definirConcursoSilenciado(db, U, b, true);
   await criarResultadoFase(
     db,
     U,
@@ -140,6 +158,12 @@ function semIds(b: BackupJson) {
       statusHistorico: filhas(b.dados.statusHistorico),
       resultadosFase: filhas(b.dados.resultadosFase),
       anexos: filhas(b.dados.anexos ?? []),
+      regrasNotificacao: b.dados.regrasNotificacao,
+      notificacoes: (b.dados.notificacoes ?? []).map(({ concursoId, eventoId, ...resto }) => ({
+        ...resto,
+        concurso: posicao.get(concursoId),
+        evento: eventoId === null ? null : b.dados.eventos.findIndex((e) => e.id === eventoId),
+      })),
     },
   };
 }
@@ -162,6 +186,11 @@ describe("exportar → importar", () => {
     expect(exportado.dados.resultadosFase).toHaveLength(1);
     expect(exportado.dados.eventos[0]?.ocultoDashboard).toBe(true);
     expect(exportado.dados.concursos.map((c) => c.validadeOcultaDashboard)).toEqual([true, false]);
+    expect(exportado.dados.regrasNotificacao).toEqual([
+      { tipo: "FIM_INSCRICOES", ativo: true, antecedencias: [10, 0] },
+    ]);
+    expect(exportado.dados.notificacoes).toHaveLength(2);
+    expect(exportado.dados.concursos.map((c) => c.notificacoesSilenciadas)).toEqual([false, true]);
     expect(exportado.dados.concursos.map((c) => [c.cor, c.icone])).toEqual([
       [null, null],
       ["MAGENTA", "🏛️"],
@@ -359,6 +388,42 @@ describe("validarBackup", () => {
     await substituirTudo(destino.db, U, backup);
     const reexportado = await exportarDados(destino.db, U, T1);
     expect(reexportado.dados.concursos.map((c) => c.cor)).toEqual([null, null]);
+  });
+
+  it("aceita backup antigo, sem os dados de lembretes (#65)", async () => {
+    const b = await base();
+    const { regrasNotificacao: _, notificacoes: __, ...dados } = b.dados;
+    const antigo = {
+      ...b,
+      dados: {
+        ...dados,
+        concursos: dados.concursos.map(({ notificacoesSilenciadas: _s, ...c }) => c),
+      },
+    };
+    const backup = validarBackup(antigo);
+    expect(backup.dados.regrasNotificacao).toEqual([]);
+    expect(backup.dados.notificacoes).toEqual([]);
+    expect(backup.dados.concursos.map((c) => c.notificacoesSilenciadas)).toEqual([false, false]);
+    await substituirTudo(destino.db, U, backup);
+    const reexportado = await exportarDados(destino.db, U, T1);
+    expect(reexportado.dados.regrasNotificacao).toEqual([]);
+    expect(reexportado.dados.notificacoes).toEqual([]);
+  });
+
+  it("rejeita notificação de evento de outro concurso e regra repetida", async () => {
+    const b = await base();
+    const [n] = b.dados.notificacoes ?? [];
+    const outroConcurso = b.dados.concursos.find((c) => c.id !== n?.concursoId)?.id as number;
+    expect(() =>
+      validarBackup({
+        ...b,
+        dados: { ...b.dados, notificacoes: [{ ...n, concursoId: outroConcurso }] },
+      }),
+    ).toThrow(/evento inexistente/);
+    const [r] = b.dados.regrasNotificacao ?? [];
+    expect(() => validarBackup({ ...b, dados: { ...b.dados, regrasNotificacao: [r, r] } })).toThrow(
+      /Tipo de regra de notificação repetido/,
+    );
   });
 
   it("rejeita cor fora da paleta e ícone inválido", async () => {

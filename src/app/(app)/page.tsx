@@ -4,8 +4,10 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { BadgeStatus } from "@/components/concurso/badge-status";
+import { SugestaoStatus } from "@/components/concurso/sugestao-status";
 import { ListaPrazos } from "@/components/dashboard/lista-prazos";
 import { CabecalhoPagina } from "@/components/layout/cabecalho-pagina";
+import { SinoNotificacoes } from "@/components/notificacoes/sino-notificacoes";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -23,6 +25,8 @@ import { exigirUsuarioPagina } from "@/server/auth/acesso";
 import { visaoAtual } from "@/server/auth/admin";
 import { getDb } from "@/server/db/client";
 import { obterDashboard } from "@/server/queries/dashboard";
+import { contarNotificacoesNaoLidas } from "@/server/queries/notificacoes";
+import { listarSugestoesStatus } from "@/server/queries/sugestoes";
 
 export const metadata: Metadata = { title: "Dashboard" };
 
@@ -63,7 +67,12 @@ export default async function DashboardPage({ searchParams }: PageProps<"/">) {
   // Admin na visão admin (#50): o início é o painel.
   if ((await visaoAtual(usuario)) === "admin") redirect("/admin");
   const usuarioId = usuario.id;
-  const dashboard = await obterDashboard(getDb(), usuarioId, hoje);
+  const db = getDb();
+  const [dashboard, naoLidas, sugestoes] = await Promise.all([
+    obterDashboard(db, usuarioId, hoje),
+    contarNotificacoesNaoLidas(db, usuarioId, hoje),
+    listarSugestoesStatus(db, usuarioId, hoje),
+  ]);
   const { porStatus, totalConcursos, ocultos } = dashboard;
   const prazos = mostrarOcultos ? dashboard.prazos : semOcultos(dashboard.prazos);
   const totalExibidos = totalPrazos(prazos);
@@ -115,22 +124,25 @@ export default async function DashboardPage({ searchParams }: PageProps<"/">) {
               Eventos pendentes de concursos em andamento: vencidos, hoje e próximos{" "}
               {JANELA_PADRAO_DIAS} dias.
             </CardDescription>
-            {ocultos > 0 ? (
-              <CardAction className="flex flex-col items-end gap-1">
-                <span className="text-muted-foreground text-xs" data-testid="contador-ocultos">
-                  {ocultos} {ocultos === 1 ? "oculto" : "ocultos"}
-                </span>
-                <Button asChild variant="outline" size="sm">
-                  <Link
-                    href={mostrarOcultos ? "/" : `/?${PARAM_OCULTOS}=1`}
-                    aria-pressed={mostrarOcultos}
-                  >
-                    {mostrarOcultos ? <EyeOff aria-hidden /> : <Eye aria-hidden />}
-                    {mostrarOcultos ? "Esconder ocultos" : "Mostrar ocultos"}
-                  </Link>
-                </Button>
-              </CardAction>
-            ) : null}
+            <CardAction className="flex items-start gap-2">
+              {ocultos > 0 ? (
+                <div className="flex flex-col items-end gap-1">
+                  <span className="text-muted-foreground text-xs" data-testid="contador-ocultos">
+                    {ocultos} {ocultos === 1 ? "oculto" : "ocultos"}
+                  </span>
+                  <Button asChild variant="outline" size="sm">
+                    <Link
+                      href={mostrarOcultos ? "/" : `/?${PARAM_OCULTOS}=1`}
+                      aria-pressed={mostrarOcultos}
+                    >
+                      {mostrarOcultos ? <EyeOff aria-hidden /> : <Eye aria-hidden />}
+                      {mostrarOcultos ? "Esconder ocultos" : "Mostrar ocultos"}
+                    </Link>
+                  </Button>
+                </div>
+              ) : null}
+              <SinoNotificacoes naoLidas={naoLidas} />
+            </CardAction>
           </CardHeader>
           <CardContent className="space-y-6">
             {totalExibidos === 0 ? (
@@ -181,30 +193,54 @@ export default async function DashboardPage({ searchParams }: PageProps<"/">) {
           </CardContent>
         </Card>
 
-        <Card className="h-fit">
-          <CardHeader>
-            <CardTitle>Concursos por status</CardTitle>
-            <CardDescription>
-              {totalConcursos} {totalConcursos === 1 ? "concurso" : "concursos"} · {ativos} em
-              andamento
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ul className="grid grid-cols-2 gap-2">
-              {porStatus.map(({ status, quantidade }) => (
-                <li key={status}>
-                  <Link
-                    href={`/concursos?status=${status}`}
-                    className="flex h-full flex-col gap-2 rounded-lg border p-3 transition-colors hover:bg-accent/50 focus-visible:outline-2 focus-visible:outline-ring"
-                  >
-                    <span className="font-semibold text-2xl tabular-nums">{quantidade}</span>
-                    <BadgeStatus status={status} className="max-w-full truncate" />
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
+        <div className="flex flex-col gap-6">
+          {sugestoes.length > 0 ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>Atualizar status?</CardTitle>
+                <CardDescription>
+                  Eventos que já passaram sugerem um novo status. Nada muda sem você aplicar.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {sugestoes.map((c) => (
+                  <SugestaoStatus
+                    key={c.id}
+                    concursoId={c.id}
+                    para={c.sugestao.para}
+                    motivo={c.sugestao.motivo}
+                    nomeConcurso={`${c.icone ? `${c.icone} ` : ""}${c.orgao} — ${c.cargo}`}
+                    compacta
+                  />
+                ))}
+              </CardContent>
+            </Card>
+          ) : null}
+          <Card className="h-fit">
+            <CardHeader>
+              <CardTitle>Concursos por status</CardTitle>
+              <CardDescription>
+                {totalConcursos} {totalConcursos === 1 ? "concurso" : "concursos"} · {ativos} em
+                andamento
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ul className="grid grid-cols-2 gap-2">
+                {porStatus.map(({ status, quantidade }) => (
+                  <li key={status}>
+                    <Link
+                      href={`/concursos?status=${status}`}
+                      className="flex h-full flex-col gap-2 rounded-lg border p-3 transition-colors hover:bg-accent/50 focus-visible:outline-2 focus-visible:outline-ring"
+                    >
+                      <span className="font-semibold text-2xl tabular-nums">{quantidade}</span>
+                      <BadgeStatus status={status} className="max-w-full truncate" />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   );

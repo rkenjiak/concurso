@@ -194,7 +194,8 @@ export default async function DashboardPage({ searchParams }: PageProps<"/">) {
           </CardContent>
         </Card>
 
-        <div className="flex flex-col gap-6">
+        {/* min-w-0: item de grid não encolhe abaixo do conteúdo (nome do concurso truncado). */}
+        <div className="flex min-w-0 flex-col gap-6">
           {sugestoes.length > 0 ? (
             <Card>
               <CardHeader>

@@ -8,11 +8,25 @@ test.use({ viewport: { width: 360, height: 740 }, hasTouch: true, isMobile: true
 async function semRolagemHorizontal(page: Page, rota: string) {
   await page.goto(rota);
   await page.waitForLoadState("networkidle");
-  const { rolavel, tela } = await page.evaluate(() => ({
-    rolavel: document.documentElement.scrollWidth,
-    tela: document.documentElement.clientWidth,
-  }));
-  expect(rolavel, `${rota} rola na horizontal`).toBeLessThanOrEqual(tela);
+  const { rolavel, tela, largos } = await page.evaluate(() => {
+    const tela = document.documentElement.clientWidth;
+    // Diagnóstico: os elementos mais internos que passam da borda direita da tela.
+    const largos = [...document.querySelectorAll("body *")]
+      .filter((el) => {
+        const r = el.getBoundingClientRect();
+        return (
+          r.width > 0 && r.right > tela + 0.5 && el.closest("[class*='overflow-x-auto']") === null
+        );
+      })
+      .filter((el, _, todos) => !todos.some((outro) => outro !== el && el.contains(outro)))
+      .slice(0, 5)
+      .map(
+        (el) =>
+          `<${el.tagName.toLowerCase()} class="${el.getAttribute("class") ?? ""}"> ${Math.round(el.getBoundingClientRect().right)}px: ${(el.textContent ?? "").trim().slice(0, 60)}`,
+      );
+    return { rolavel: document.documentElement.scrollWidth, tela, largos };
+  });
+  expect(rolavel, `${rota} rola na horizontal:\n${largos.join("\n")}`).toBeLessThanOrEqual(tela);
 }
 
 test("mobile: telas principais sem rolagem horizontal em 360 px", async ({ page }) => {

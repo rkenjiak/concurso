@@ -84,7 +84,7 @@ export function MenuConta({
         aria-label="Menu da conta"
         disabled={pendente}
         className={cn(
-          "flex min-w-0 items-center gap-2 rounded-md p-1 text-left text-sm outline-none hover:bg-sidebar-accent/60 focus-visible:ring-3 focus-visible:ring-ring/50",
+          "flex min-w-0 items-center gap-2 rounded-md p-1 pointer-coarse:p-1.5 text-left text-sm outline-none hover:bg-sidebar-accent/60 focus-visible:ring-3 focus-visible:ring-ring/50",
           className,
         )}
       >

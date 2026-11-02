@@ -8,7 +8,7 @@ export function TabelaAuditoria({ registros }: { registros: AuditoriaAdmin[] }) 
     return <p className="text-muted-foreground text-sm">Nenhuma ação administrativa registrada.</p>;
   }
   return (
-    <div className="overflow-x-auto">
+    <div className="relative overflow-x-auto">
       <table className="w-full text-sm">
         <thead className="text-left text-muted-foreground text-xs">
           <tr className="border-b">

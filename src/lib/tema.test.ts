@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { COR_TEMA } from "./pwa";
 import {
   aplicarTema,
   CHAVE_TEMA,
@@ -68,9 +69,15 @@ describe("SCRIPT_TEMA", () => {
       getItem: (k: string) => (k === CHAVE_TEMA ? salvo : null),
     });
     vi.stubGlobal("matchMedia", () => ({ matches: sistemaEscuro }));
-    vi.stubGlobal("document", { documentElement: raiz });
+    const head: { name: string; content: string }[] = [];
+    vi.stubGlobal("document", {
+      documentElement: raiz,
+      head: { appendChild: (no: { name: string; content: string }) => head.push(no) },
+      querySelector: () => head.find((m) => m.name === "theme-color") ?? null,
+      createElement: () => ({ name: "", content: "" }),
+    });
     new Function(SCRIPT_TEMA)();
-    return raiz;
+    return Object.assign(raiz, { metas: head });
   }
 
   it.each([
@@ -84,6 +91,10 @@ describe("SCRIPT_TEMA", () => {
     const raiz = rodar(salvo, sistemaEscuro);
     expect(raiz.classList.contains("dark")).toBe(dark);
     expect(raiz.style.colorScheme).toBe(dark ? "dark" : "light");
+    // Cria a meta da barra de status do PWA (#66) na cor do tema efetivo.
+    expect(raiz.metas).toEqual([
+      { name: "theme-color", content: dark ? COR_TEMA.escuro : COR_TEMA.claro },
+    ]);
   });
 
   it("não quebra se o localStorage estiver indisponível", () => {

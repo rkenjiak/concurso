@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!--
+    Logo do app (fonte única dos ícones): escudo + visto (aprovação), seta de crescimento e livro.
+    Os ícones (src/app/icon.svg, apple-icon.png, public/icons/*.png e assets/icon.svg) são gerados
+    a partir do trecho entre "marca:inicio" e "marca:fim" por `pnpm icones`; edite aqui e rode-o.
+    O desenho usa o sistema de coordenadas original (centro ≈ 250,258); cada variante aplica a
+    própria escala. Traços grossos para continuar legível em 48 px.
+  -->
+  <defs>
+    <!-- Gradiente diagonal: azul → ciano → verde → amarelo -->
+    <linearGradient id="gradiente-logo" gradientUnits="userSpaceOnUse" x1="140" y1="370" x2="360" y2="140">
+      <stop offset="0" stop-color="#3b82f6"/>
+      <stop offset="0.35" stop-color="#06b6d4"/>
+      <stop offset="0.65" stop-color="#10b981"/>
+      <stop offset="1" stop-color="#fbbf24"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Fundo escuro -->
+  <rect width="512" height="512" fill="#0f172a"/>
+
+  <g transform="translate(256 256) scale(1.45) translate(-250 -258)">
+    <!-- marca:inicio -->
+    <g fill="none" stroke="url(#gradiente-logo)" stroke-linecap="round" stroke-linejoin="round">
+      <!-- Escudo (aberto à direita para a seta passar) -->
+      <g stroke-width="9">
+        <path d="M 185 175 L 250 145 L 272 155"/>
+        <path d="M 185 175 C 185 230, 200 270, 250 295"/>
+        <path d="M 307 213 C 297 253, 277 278, 250 295"/>
+      </g>
+      <!-- Livro aberto (duas páginas) -->
+      <g stroke-width="8">
+        <path d="M 140 290 Q 200 305 240 335 L 250 345 L 260 335 Q 300 305 360 290"/>
+        <path d="M 128 312 Q 190 327 240 357 L 250 367 L 260 357 Q 310 327 372 312"/>
+      </g>
+      <!-- Gráfico em ziguezague com seta (45°) -->
+      <path d="M 172 278 L 225 225 L 250 250 L 326 174" stroke-width="12"/>
+      <path d="M 354 146 L 316 158 L 342 184 Z" fill="url(#gradiente-logo)" stroke-width="6"/>
+      <!-- Visto, paralelo à seta, e o ponto final -->
+      <path d="M 233 213 L 250 230 L 283 197" stroke-width="9"/>
+      <circle cx="297" cy="183" r="7" fill="url(#gradiente-logo)" stroke="none"/>
+    </g>
+    <!-- marca:fim -->
+  </g>
+</svg>

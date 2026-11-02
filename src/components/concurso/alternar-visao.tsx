@@ -20,7 +20,7 @@ export function AlternarVisao({ filtros, visao }: { filtros: FiltrosConcursos; v
             href={hrefConcursos(filtros, v)}
             aria-current={ativa ? "page" : undefined}
             className={cn(
-              "inline-flex h-7 items-center gap-1.5 rounded-md px-2.5 font-medium text-sm transition-colors focus-visible:outline-2 focus-visible:outline-ring",
+              "inline-flex h-7 pointer-coarse:h-9 items-center gap-1.5 rounded-md px-2.5 font-medium text-sm transition-colors focus-visible:outline-2 focus-visible:outline-ring",
               ativa
                 ? "bg-background text-foreground shadow-sm"
                 : "text-muted-foreground hover:text-foreground",

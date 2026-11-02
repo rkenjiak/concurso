@@ -38,14 +38,16 @@ export function Casca({ visao, conta, ehAdmin, podeSair, faixa, selo, children }
         </aside>
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b bg-background/95 px-4 backdrop-blur md:hidden">
-            <Marca />
+          {/* Áreas seguras (#66): no app instalado, o cabeçalho não fica sob o notch/barra. */}
+          <header className="sticky top-0 z-30 flex h-[calc(3.5rem+env(safe-area-inset-top))] items-center gap-2 border-b bg-background/95 pt-[env(safe-area-inset-top)] pr-[max(1rem,env(safe-area-inset-right))] pl-[max(1rem,env(safe-area-inset-left))] backdrop-blur md:hidden">
+            {/* Com selo (visão admin), o nome não cabe ao lado dos controles em ~360 px. */}
+            <Marca nomeClassName={selo ? "max-[399px]:sr-only" : undefined} />
             {selo}
             <SeletorTema className="ml-auto" />
             <MenuConta {...menu} compacto />
           </header>
           {faixa}
-          <main className="mx-auto w-full max-w-5xl flex-1 px-4 pt-6 pb-24 md:px-8 md:pb-10">
+          <main className="mx-auto w-full max-w-5xl flex-1 px-4 pt-6 pb-[calc(6rem+env(safe-area-inset-bottom))] md:px-8 md:pb-10">
             {children}
           </main>
         </div>

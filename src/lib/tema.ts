@@ -6,6 +6,8 @@
  * evitando o flash de tema errado no carregamento.
  */
 
+import { COR_TEMA, SELETOR_META_COR } from "./pwa";
+
 export const TEMAS = ["claro", "escuro", "sistema"] as const;
 export type Tema = (typeof TEMAS)[number];
 export type TemaEfetivo = Exclude<Tema, "sistema">;
@@ -38,7 +40,8 @@ export function aplicarTema(raiz: HTMLElement, efetivo: TemaEfetivo): void {
 }
 
 /**
- * Script inline (executado antes da pintura) que lê a preferência e aplica o tema.
+ * Script inline (executado antes da pintura) que lê a preferência e aplica o tema, e cria a
+ * `<meta name="theme-color">` da barra de status do PWA (#66, ver `sincronizarCorTema`).
  * Autocontido: não pode depender de nada do bundle.
  */
-export const SCRIPT_TEMA = `(function(){try{var t=localStorage.getItem(${JSON.stringify(CHAVE_TEMA)});if(t!=="claro"&&t!=="escuro")t="sistema";var e=t==="escuro"||(t==="sistema"&&matchMedia(${JSON.stringify(CONSULTA_ESCURO)}).matches);var r=document.documentElement;r.classList.toggle("dark",e);r.style.colorScheme=e?"dark":"light"}catch(_){}})()`;
+export const SCRIPT_TEMA = `(function(){try{var t=localStorage.getItem(${JSON.stringify(CHAVE_TEMA)});if(t!=="claro"&&t!=="escuro")t="sistema";var e=t==="escuro"||(t==="sistema"&&matchMedia(${JSON.stringify(CONSULTA_ESCURO)}).matches);var r=document.documentElement;r.classList.toggle("dark",e);r.style.colorScheme=e?"dark":"light";var m=document.querySelector(${JSON.stringify(SELETOR_META_COR)});if(!m){m=document.createElement("meta");m.name="theme-color";document.head.appendChild(m)}m.content=e?${JSON.stringify(COR_TEMA.escuro)}:${JSON.stringify(COR_TEMA.claro)}}catch(_){}})()`;

@@ -257,9 +257,19 @@ senão → indefinida
 | `/concursos?visao=quadro` | Quadro por status (kanban; arrastar ou “Mover para” = transição validada) | v1.1 |
 | `/calendario?mes=AAAA-MM` | Visão mensal de eventos (agenda em lista no celular); clique abre os detalhes do evento; cor/ícone por concurso com legenda (#46) | v1.1 |
 
-Layout responsivo: navegação lateral no desktop, barra inferior no celular; menu da conta (avatar)
-com Configurações, Sair e, só para admins, o seletor de visão (§7.1). Links externos com
+Layout responsivo (alvo: 360 px sem rolagem horizontal, #48): navegação lateral no desktop, barra
+inferior no celular; menu da conta (avatar) com Configurações, Sair e, só para admins, o seletor de
+visão (§7.1). Em telas de toque (`pointer: coarse`), botões, campos, abas e seletores crescem para
+36–40 px, sem mudar o desktop. Tabelas largas rolam dentro do próprio contêiner (`relative
+overflow-x-auto`, para o `sr-only` não escapar). Links externos com
 `target="_blank" rel="noopener noreferrer"`.
+
+PWA (#66): `app/manifest.ts` (`standalone`), ícones em `public/icons/` e `app/apple-icon.png`, e
+`appleWebApp` no layout raiz (`lib/pwa.ts`). A `<meta name="theme-color">` não vem do
+`viewport.themeColor` (o Next a recriaria a cada navegação): o `SCRIPT_TEMA` a cria antes da
+pintura e o seletor de tema a atualiza, então a barra de status segue o tema efetivo (§7.3). O
+proxy libera o manifest e os ícones sem sessão. Sem service worker por enquanto: o Chrome já instala sem ele, e o Web Push (#65) o trará.
+Os ícones são gerados de `assets/logo.svg` por `pnpm icones` (`scripts/gerar-icones.ts`).
 
 ### 5.2 Server Actions (`src/server/actions`)
 

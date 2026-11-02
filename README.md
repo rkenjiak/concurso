@@ -9,11 +9,13 @@ próximos prazos, busca e filtros, resultados por fase, validade do concurso e b
 celular (feed .ics). Com o [servidor MCP](#cadastro-pelo-edital-com-uma-llm-mcp), uma LLM lê o
 edital e faz o cadastro.
 
-Feito para **um usuário**: roda localmente com um comando (SQLite em arquivo) e, se quiser, pode ser
-hospedado de graça (Vercel + Turso) ou em um container Docker, com login por senha.
+Feito para **uso pessoal**: roda localmente com um comando (SQLite em arquivo) e, se quiser, pode
+ser hospedado de graça (Vercel + Turso) ou em um container Docker. Hospedado, aceita
+[login com Google](#autenticação) para você e quem mais liberar — cada pessoa vê só os próprios
+concursos — e pode ser [instalado no celular](#instalar-no-celular-pwa) como app.
 
 Documentação: [requisitos](docs/REQUISITOS.md) · [arquitetura](docs/ARQUITETURA.md) ·
-[changelog](CHANGELOG.md).
+[guia visual da arquitetura](docs/GUIA-ARQUITETURA.md) · [changelog](CHANGELOG.md).
 
 ## Início rápido
 
@@ -67,19 +69,18 @@ dados (inclusive export/import e MCP).
   antes do multiusuário pertencem ao **usuário inicial**, que é assumido pelo primeiro login de um
   e-mail de `ADMIN_EMAILS`. Retirar um e-mail da allowlist encerra as sessões dele na hora.
 - **Painel admin** (`/admin`, só admins): lista os usuários, promove/rebaixa admins, bloqueia
-  contas (sem acesso por sessão nem pelos tokens do MCP e do calendário), libera e-mails além dos de
-  `ALLOWED_EMAILS`
-  e registra tudo num log de auditoria. O admin alterna entre "Visão admin" e "Visão usuário" no
+  contas (sem acesso por sessão nem pelos tokens do MCP e do calendário), libera e-mails além dos
+  de `ALLOWED_EMAILS` e registra tudo num log de auditoria. O admin alterna entre "Visão admin" e "Visão usuário" no
   menu da conta, sem novo login. Os e-mails de `ADMIN_EMAILS` são admins garantidos, e o último
   admin ativo não pode ser rebaixado nem bloqueado.
 - **Senha única** (`APP_PASSWORD` + `AUTH_SECRET`): para uso local; entra sempre como o usuário
   inicial. Em produção não pode ser combinada com o login Google. Após 5 senhas erradas, novas
   tentativas do mesmo cliente esperam cada vez mais.
-- Com login, todas as páginas e APIs exigem sessão (exceto `/login`, `/api/health`, o fluxo do
-  Google em `/api/auth/google…`, `/api/mcp` e `/api/calendario.ics`, que usam token). A sessão fica
-  em um cookie JWT
-  assinado (`httpOnly`, `SameSite=Lax`, `Secure` em produção) válido por 30 dias; "Sair" fica em
-  **Configurações**.
+- Com login, todas as páginas e APIs exigem sessão, exceto `/login`, `/api/health`, o fluxo do
+  Google em `/api/auth/google…`, o manifest e os ícones do PWA e `/api/mcp` e
+  `/api/calendario.ics` (que usam token próprio). A sessão fica em um cookie JWT assinado
+  (`httpOnly`, `SameSite=Lax`, `Secure` em produção) válido por 30 dias; "Sair" fica no menu da
+  conta e em **Configurações**.
 - Gere o segredo com `openssl rand -base64 32` (ou
   `node -e "console.log(crypto.randomBytes(32).toString('base64'))"`). Trocar o `AUTH_SECRET`
   encerra todas as sessões.
@@ -109,7 +110,8 @@ cada deploy) não conseguem fazer login com Google. Use um domínio fixo de prod
 
 **Export/import JSON (qualquer banco).** Em **Configurações**: "Baixar backup (JSON)" gera um
 arquivo versionado com todos os seus dados (concursos, tags, links, eventos, histórico,
-resultados, regras de notificação e o que já foi lido); "Baixar concursos (CSV)" gera uma planilha (separador `;`). "Importar…" restaura um
+resultados, regras de notificação e o que já foi lido); "Baixar concursos (CSV)" gera uma
+planilha (separador `;`, abre direto no Excel/LibreOffice). "Importar…" restaura um
 backup JSON **substituindo todos os seus dados** (com confirmação; tudo ou nada) — os de outros
 usuários não são tocados, e os IDs são renumerados. Também serve para migrar entre local ↔
 hospedado.
@@ -209,7 +211,8 @@ só uma vez) e conecte o cliente a `https://<seu-app>/api/mcp` com o header
 `Authorization: Bearer <token>`:
 
 ```bash
-claude mcp add --transport http concurso https://<seu-app>/api/mcp   --header "Authorization: Bearer $TOKEN"
+claude mcp add --transport http concurso https://<seu-app>/api/mcp \
+  --header "Authorization: Bearer $TOKEN"
 ```
 
 O token dá acesso apenas aos dados de quem o gerou; o banco guarda só o resumo SHA-256. Tokens
@@ -235,6 +238,9 @@ errados seguidos sofrem atraso progressivo. Gerar um novo token ou revogar inval
 4. Faça o deploy. O `pnpm build` aplica as migrações no Turso antes do `next build` (as variáveis
    do banco precisam estar disponíveis no build).
 
+Nunca use `DATABASE_URL=file:` na Vercel (nem deixe o banco sem configurar, o que cai no SQLite
+local): o sistema de arquivos é efêmero.
+
 ### Instalar no celular (PWA)
 
 Com o app publicado em HTTPS, abra-o no navegador do celular:
@@ -244,9 +250,6 @@ Com o app publicado em HTTPS, abra-o no navegador do celular:
 
 Se você adicionou o app à tela inicial antes do suporte a PWA (quando não havia manifest), remova o
 atalho antigo e instale de novo: o atalho antigo continua abrindo numa aba do navegador.
-
-Nunca use `DATABASE_URL=file:` na Vercel (nem deixe o banco sem configurar, o que cai no SQLite
-local): o sistema de arquivos é efêmero.
 
 ### Docker (VPS, Fly.io…)
 
@@ -263,7 +266,10 @@ docker run -d --name concurso -p 3000:3000 \
 ```
 
 Coloque um proxy com HTTPS na frente (Caddy, Traefik, Fly.io…). A imagem tem `HEALTHCHECK` em
-`/api/health`. Para usar o Turso no container, passe `DATABASE_URL`/`DATABASE_AUTH_TOKEN`.
+`/api/health`. Sem `APP_PASSWORD` nem login Google o container recusa iniciar (salvo
+`ALLOW_NO_AUTH=true`). Para o login com Google no container, troque `APP_PASSWORD` pelas variáveis
+do Google (e `APP_URL`, se o proxy não repassar o host original). Para usar o Turso, passe
+`DATABASE_URL`/`DATABASE_AUTH_TOKEN`.
 
 ## Scripts
 
@@ -273,8 +279,8 @@ Coloque um proxy com HTTPS na frente (Caddy, Traefik, Fly.io…). A imagem tem `
 | `pnpm build` / `pnpm start` | build de produção (também aplica migrações) e execução |
 | `pnpm lint` | lint + verificação de formatação (Biome, modo CI) |
 | `pnpm format` | aplica formatação e correções seguras (Biome) |
-| `pnpm typecheck` | checagem de tipos (`tsc --noEmit`) |
-| `pnpm test` | testes unitários/integração (Vitest, em `TZ=UTC`) |
+| `pnpm typecheck` | checagem de tipos (`next typegen` + `tsc --noEmit`) |
+| `pnpm test` / `pnpm test:watch` | testes unitários/integração (Vitest, em `TZ=UTC`) |
 | `pnpm e2e` | build + testes e2e (Playwright/Chromium, bancos temporários) |
 | `pnpm db:migrate` | aplica migrações pendentes no banco de `DATABASE_URL` (ou `TURSO_DATABASE_URL`) |
 | `pnpm db:generate` | gera nova migração a partir de `src/server/db/schema.ts` |
@@ -292,7 +298,9 @@ Antes do primeiro `pnpm e2e`, instale o navegador: `pnpm exec playwright install
 - `feature/<nome>` a partir de `develop`, com PR de volta para `develop`.
 - `release/X.Y.Z` a partir de `develop` (versão no `package.json` + `CHANGELOG.md`), PR para
   `master`, tag e merge de volta em `develop`; `hotfix/<nome>` a partir de `master`.
-- PRs exigem CI verde (Biome, tipos, testes, build, e2e e imagem Docker). Commits no estilo
-  Conventional Commits; mudanças registradas em `CHANGELOG.md` (seção `Unreleased`).
+- PRs exigem CI verde (Biome, tipos, testes, build, e2e e imagem Docker); PRs para `master` só
+  de `release/*` ou `hotfix/*`. Commits no estilo Conventional Commits; mudanças registradas em
+  `CHANGELOG.md` (seção `Unreleased`). A tag `vX.Y.Z` publica a GitHub Release com as notas do
+  changelog.
 
 Created in [T3 Code](https://t3.codes).

@@ -7,6 +7,27 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 
 ## [Unreleased]
 
+### Adicionado
+
+- Guia visual da arquitetura (`docs/GUIA-ARQUITETURA.md`): diagramas Mermaid das camadas, do
+  fluxo de leitura e de gravação, da máquina de status, dos lembretes, do modelo de dados, da
+  autenticação multiusuário, do MCP, da inicialização, do deploy e da CI, além de um mapa
+  "onde mexo para…" e glossário. Linkado no README e em `ARQUITETURA.md`.
+
+### Alterado
+
+- Documentação revisada contra o código da v2.2.0:
+  - `REQUISITOS.md`: multiusuário, lembretes e PWA saem de "fora do escopo"; usuário-alvo,
+    RNF03/RNF06 e as questões em aberto passam a refletir as decisões tomadas.
+  - `ARQUITETURA.md`: estrutura de pastas atualizada (componentes, domínio, `lib`, scripts,
+    `instrumentation.ts`); ordem real das Server Actions (sessão → Zod → `executar`); export CSV
+    só de concursos e import que sempre substitui tudo; jobs de CI (e2e sempre, imagem Docker com
+    smoke test) e `release.yml` sem imagem no GHCR; `jose` na stack.
+  - README: menção ao multiusuário e ao PWA, link para o guia visual, rotas públicas completas,
+    aviso da Vercel de volta à seção da Vercel, comando `claude mcp add` em duas linhas, notas do
+    Docker com login Google e `pnpm test:watch`.
+  - `.env.example`: lista completa das rotas que não exigem sessão.
+
 ## [2.2.0] - 2026-11-01
 
 ### Adicionado

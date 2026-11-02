@@ -39,6 +39,7 @@ test("mobile: telas principais sem rolagem horizontal em 360 px", async ({ page 
     "/concursos?visao=quadro",
     "/calendario",
     "/configuracoes",
+    "/notificacoes",
     "/concursos/novo",
     id,
     `${id}/editar`,

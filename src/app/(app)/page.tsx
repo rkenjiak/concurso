@@ -119,30 +119,31 @@ export default async function DashboardPage({ searchParams }: PageProps<"/">) {
       <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <Card>
           <CardHeader>
-            <CardTitle>Próximos prazos</CardTitle>
+            {/* Sino ao lado do título (#65): não disputa largura com "Mostrar ocultos" em 360 px. */}
+            <CardTitle className="flex items-center gap-1">
+              Próximos prazos
+              <SinoNotificacoes naoLidas={naoLidas} className="-my-2" />
+            </CardTitle>
             <CardDescription>
               Eventos pendentes de concursos em andamento: vencidos, hoje e próximos{" "}
               {JANELA_PADRAO_DIAS} dias.
             </CardDescription>
-            <CardAction className="flex items-start gap-2">
-              {ocultos > 0 ? (
-                <div className="flex flex-col items-end gap-1">
-                  <span className="text-muted-foreground text-xs" data-testid="contador-ocultos">
-                    {ocultos} {ocultos === 1 ? "oculto" : "ocultos"}
-                  </span>
-                  <Button asChild variant="outline" size="sm">
-                    <Link
-                      href={mostrarOcultos ? "/" : `/?${PARAM_OCULTOS}=1`}
-                      aria-pressed={mostrarOcultos}
-                    >
-                      {mostrarOcultos ? <EyeOff aria-hidden /> : <Eye aria-hidden />}
-                      {mostrarOcultos ? "Esconder ocultos" : "Mostrar ocultos"}
-                    </Link>
-                  </Button>
-                </div>
-              ) : null}
-              <SinoNotificacoes naoLidas={naoLidas} />
-            </CardAction>
+            {ocultos > 0 ? (
+              <CardAction className="flex flex-col items-end gap-1">
+                <span className="text-muted-foreground text-xs" data-testid="contador-ocultos">
+                  {ocultos} {ocultos === 1 ? "oculto" : "ocultos"}
+                </span>
+                <Button asChild variant="outline" size="sm">
+                  <Link
+                    href={mostrarOcultos ? "/" : `/?${PARAM_OCULTOS}=1`}
+                    aria-pressed={mostrarOcultos}
+                  >
+                    {mostrarOcultos ? <EyeOff aria-hidden /> : <Eye aria-hidden />}
+                    {mostrarOcultos ? "Esconder ocultos" : "Mostrar ocultos"}
+                  </Link>
+                </Button>
+              </CardAction>
+            ) : null}
           </CardHeader>
           <CardContent className="space-y-6">
             {totalExibidos === 0 ? (

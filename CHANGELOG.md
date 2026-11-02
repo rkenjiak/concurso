@@ -7,6 +7,8 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 
 ## [Unreleased]
 
+## [2.3.0] - 2026-11-02
+
 ### Adicionado
 
 - Guia visual da arquitetura (`docs/GUIA-ARQUITETURA.md`): diagramas Mermaid das camadas, do

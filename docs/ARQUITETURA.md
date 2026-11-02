@@ -651,7 +651,8 @@ Cada item = uma branch `feature/*` a partir de `develop`; cada milestone fecha c
 | **Integração Vercel + Turso** → `v2.1.0` | `feature/turso-env-vercel` (#62) | Lê `TURSO_DATABASE_URL`/`TURSO_AUTH_TOKEN` da integração do Marketplace |
 | **PWA e celular** → `v2.2.0` | `feature/pwa-mobile` (#66, #48) | App instalável (manifest, ícones) e responsividade em 360 px |
 | **M6 — Lembretes** → `v2.2.0` | `feature/lembretes` (#65): feed/download .ics, notificações no app com regras configuráveis, sugestão de status. E-mail descartado (2026-11-01) | RF08 |
-| **M7 — Anexos** → `v2.3.0` | `feature/anexos` | RF02 desejável |
+| **Desempenho** → `v2.3.0` | `feature/performance-mutacoes` (#73) | Mutações com uma viagem só ao servidor e esqueletos de carregamento |
+| **M7 — Anexos** → `v2.4.0` | `feature/anexos` | RF02 desejável |
 
 ---
 

@@ -1,7 +1,6 @@
 "use client";
 
 import { Bell, BellOff, Loader2 } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { silenciarConcursoAcao } from "@/server/actions/notificacoes";
@@ -17,7 +16,6 @@ export function BotaoSilenciarConcurso({
   concursoId: number;
   silenciado: boolean;
 }) {
-  const router = useRouter();
   const [pendente, iniciar] = useTransition();
   const [erro, setErro] = useState<string | null>(null);
 
@@ -25,8 +23,7 @@ export function BotaoSilenciarConcurso({
     setErro(null);
     iniciar(async () => {
       const r = await silenciarConcursoAcao(concursoId, !silenciado);
-      if (r.ok) router.refresh();
-      else setErro(r.erros._form?.[0] ?? "Não foi possível atualizar.");
+      if (!r.ok) setErro(r.erros._form?.[0] ?? "Não foi possível atualizar.");
     });
   }
 

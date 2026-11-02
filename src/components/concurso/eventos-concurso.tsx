@@ -2,7 +2,6 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CalendarDays, Clock, MapPin, Pencil, Plus, Trash2 } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { Badge } from "@/components/ui/badge";
@@ -55,7 +54,6 @@ const nomeEvento = (e: Pick<EventoItem, "titulo" | "tipo">) =>
 
 /** Lista e gerencia as datas e eventos do concurso (RF04). */
 export function EventosConcurso({ concursoId, eventos }: EventosConcursoProps) {
-  const router = useRouter();
   const [editando, setEditando] = useState<EventoItem | "novo" | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [alternando, iniciarAlternar] = useTransition();
@@ -64,8 +62,7 @@ export function EventosConcurso({ concursoId, eventos }: EventosConcursoProps) {
     setErro(null);
     iniciarAlternar(async () => {
       const r = await alternarConcluido(concursoId, e.id, concluido);
-      if (r.ok) router.refresh();
-      else setErro(r.erros._form?.[0] ?? "Não foi possível atualizar o evento.");
+      if (!r.ok) setErro(r.erros._form?.[0] ?? "Não foi possível atualizar o evento.");
     });
   }
 
@@ -145,7 +142,6 @@ export function EventosConcurso({ concursoId, eventos }: EventosConcursoProps) {
                     tamanho="icon"
                     rotuloAcessivel={`Excluir evento ${nome}`}
                     acao={() => excluirEvento(concursoId, e.id)}
-                    aoConcluir={() => router.refresh()}
                   >
                     <Trash2 aria-hidden />
                   </BotaoConfirmar>
@@ -172,10 +168,7 @@ export function EventosConcurso({ concursoId, eventos }: EventosConcursoProps) {
               key={editando === "novo" ? "novo" : editando.id}
               concursoId={concursoId}
               evento={editando === "novo" ? null : editando}
-              aoConcluir={() => {
-                setEditando(null);
-                router.refresh();
-              }}
+              aoConcluir={() => setEditando(null)}
             />
           ) : null}
         </DialogContent>

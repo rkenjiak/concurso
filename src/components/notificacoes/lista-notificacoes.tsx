@@ -2,7 +2,6 @@
 
 import { Check, CheckCheck, Clock, Loader2, X } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { MarcadorConcurso } from "@/components/concurso/marcador-concurso";
 import { Button } from "@/components/ui/button";
@@ -32,7 +31,6 @@ type ResultadoSimples = { ok: true } | { ok: false; erros: { _form?: string[] } 
  * concurso marca a notificação como lida.
  */
 export function ListaNotificacoes({ itens }: { itens: readonly ItemNotificacao[] }) {
-  const router = useRouter();
   const [pendente, iniciar] = useTransition();
   const [emAndamento, setEmAndamento] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
@@ -44,8 +42,7 @@ export function ListaNotificacoes({ itens }: { itens: readonly ItemNotificacao[]
     iniciar(async () => {
       const r = await acao();
       setEmAndamento(null);
-      if (r.ok) router.refresh();
-      else setErro(r.erros._form?.[0] ?? "Não foi possível atualizar a notificação.");
+      if (!r.ok) setErro(r.erros._form?.[0] ?? "Não foi possível atualizar a notificação.");
     });
   }
 

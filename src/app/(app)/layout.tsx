@@ -10,7 +10,8 @@ import { contarNotificacoesNaoLidas } from "@/server/queries/notificacoes";
 /**
  * Layout do app (visão usuário): o mesmo para todos, admins inclusive — nada de admin aparece
  * aqui além do seletor de visão no menu da conta, visível só para admins (#50). O contador do sino
- * (#65) é recalculado quando a página é atualizada (as ações chamam `router.refresh()`).
+ * (#65) é recalculado na resposta de toda Server Action que revalida: com `revalidatePath`, o Next
+ * re-renderiza a rota atual a partir da raiz (layout incluso) na mesma viagem, sem `router.refresh()`.
  */
 export default async function AppLayout({ children }: { children: ReactNode }) {
   await connection();

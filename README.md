@@ -201,6 +201,16 @@ errados seguidos sofrem atraso progressivo. Gerar um novo token ou revogar inval
 4. Faça o deploy. O `pnpm build` aplica as migrações no Turso antes do `next build` (as variáveis
    do banco precisam estar disponíveis no build).
 
+### Instalar no celular (PWA)
+
+Com o app publicado em HTTPS, abra-o no navegador do celular:
+
+- **Android (Chrome):** menu ⋮ → **Instalar app**. Ele abre em tela cheia, sem a barra de URL.
+- **iPhone (Safari):** Compartilhar → **Adicionar à Tela de Início**.
+
+Se você adicionou o app à tela inicial antes do suporte a PWA (quando não havia manifest), remova o
+atalho antigo e instale de novo: o atalho antigo continua abrindo numa aba do navegador.
+
 Nunca use `DATABASE_URL=file:` na Vercel (nem deixe o banco sem configurar, o que cai no SQLite
 local): o sistema de arquivos é efêmero.
 
@@ -238,6 +248,7 @@ Coloque um proxy com HTTPS na frente (Caddy, Traefik, Fly.io…). A imagem tem `
 | `pnpm db:backup` | cópia do banco local em `backups/` (mantém as últimas N) |
 | `pnpm db:studio` | abre o Drizzle Studio |
 | `pnpm --silent mcp` | servidor MCP por stdio (para clientes como Claude Desktop/Code) |
+| `pnpm icones` | gera favicon, ícones do PWA e `apple-icon.png` a partir de `assets/logo.svg` |
 
 Antes do primeiro `pnpm e2e`, instale o navegador: `pnpm exec playwright install chromium`.
 

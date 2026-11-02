@@ -86,7 +86,7 @@ export function CampoTags({ id, value, onChange, sugestoes, ...aria }: CampoTags
                 <button
                   type="button"
                   onClick={() => remover(t)}
-                  className="rounded-full p-0.5 hover:bg-foreground/10"
+                  className="rounded-full p-0.5 hover:bg-foreground/10 pointer-coarse:-my-1 pointer-coarse:p-1.5"
                   aria-label={`Remover tag ${t}`}
                 >
                   <X className="size-3" aria-hidden />

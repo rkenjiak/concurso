@@ -27,7 +27,7 @@ export default async function UsuariosAdminPage() {
         descricao="Promova ou rebaixe admins e bloqueie o acesso. Sempre resta pelo menos um admin ativo."
       />
       <Card>
-        <CardContent className="overflow-x-auto">
+        <CardContent className="relative overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="text-left text-muted-foreground text-xs">
               <tr className="border-b">

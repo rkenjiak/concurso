@@ -12,7 +12,7 @@ import { SENHA_E2E } from "./e2e/constantes";
 
 const PORTA = 3200;
 const PORTA_AUTH = 3201;
-const SPECS_AUTH = /(login|mcp)\.spec\.ts/;
+const SPECS_AUTH = /(login|mcp|pwa)\.spec\.ts/;
 
 const servidor = (porta: number, banco: string, env: Record<string, string>) => ({
   command: `pnpm exec tsx e2e/servidor.ts ${porta} ${banco}`,

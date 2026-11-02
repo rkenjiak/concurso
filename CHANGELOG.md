@@ -7,6 +7,25 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 
 ## [Unreleased]
 
+### Adicionado
+
+- App instalável (PWA, #66): Web App Manifest (`/manifest.webmanifest`, `display: standalone`),
+  ícones PNG 192/512 e maskable, `apple-icon.png` e `appleWebApp` para o iOS, e `theme-color` que
+  segue o tema efetivo (do sistema ou escolhido no app), para a barra de status combinar. No Android, o
+  Chrome passa a oferecer "Instalar app", que abre em tela cheia, sem a barra de URL. Manifest e
+  ícones ficam acessíveis sem login. **Quem já tinha o atalho antigo na tela inicial precisa
+  removê-lo e instalar de novo.**
+- Novo logo (escudo com visto, seta de crescimento e livro), fonte única em `assets/logo.svg`; os
+  ícones são gerados por `pnpm icones` (`sharp`, só em desenvolvimento).
+
+### Corrigido
+
+- Responsividade em celulares de ~360 px (#48): a lista de concursos com nome ou cargo longo e as
+  tabelas do painel admin (`/admin/usuarios`, auditoria) não fazem mais a página rolar na
+  horizontal; em telas de toque, botões, campos, abas e o seletor de tema têm alvos de 36–40 px.
+  O cabeçalho do celular respeita as áreas seguras (notch) no app instalado, e na visão admin
+  esconde o nome do app abaixo de 400 px para caber o selo "Admin".
+
 ## [2.1.0] - 2026-11-01
 
 ### Adicionado

@@ -16,8 +16,9 @@ async function contarViagens(page: Page, acao: () => Promise<void>) {
   };
   page.on("request", ouvir);
   await acao();
-  // Dá tempo de um eventual refresh do cliente sair antes de contar.
-  await page.waitForLoadState("networkidle");
+  // Espera explícita: um refresh do cliente sairia logo após a resposta da action. O
+  // `networkidle` não serve aqui, porque resolve na hora se a página já estava ociosa.
+  await page.waitForTimeout(500);
   page.off("request", ouvir);
   return {
     posts: vistas.filter((r) => r.method() === "POST").length,
@@ -61,6 +62,31 @@ test("mutações fazem uma viagem só e o sino atualiza sem recarregar (#73)", a
   });
   expect(ler).toEqual({ posts: 1, refreshes: 0 });
   await expect.poll(() => naoLidas(page)).toBe(antes);
+});
+
+test("editar e excluir concurso redirecionam na própria resposta da action (#73)", async ({
+  page,
+}) => {
+  const orgao = `Redireciona E2E ${unico()}`;
+  const url = await cadastrarConcurso(page, { orgao, cargo: "Analista" });
+  const detalhe = new URL(url).pathname;
+
+  await page.goto(`${detalhe}/editar`);
+  await page.getByLabel("Cargo(s) / área").fill("Técnico");
+  const editar = await contarViagens(page, async () => {
+    await page.getByRole("button", { name: "Salvar alterações" }).click();
+    await expect(page).toHaveURL(new RegExp(`${detalhe}$`));
+    await expect(page.getByText("Técnico", { exact: true })).toBeVisible();
+  });
+  expect(editar).toEqual({ posts: 1, refreshes: 0 });
+
+  const excluir = await contarViagens(page, async () => {
+    await page.getByRole("button", { name: "Excluir", exact: true }).click();
+    await page.getByRole("alertdialog").getByRole("button", { name: "Excluir" }).click();
+    await expect(page).toHaveURL(/\/concursos$/);
+  });
+  expect(excluir).toEqual({ posts: 1, refreshes: 0 });
+  await expect(page.getByText(orgao)).toHaveCount(0);
 });
 
 test("navegar mostra o esqueleto antes da resposta do servidor (#73)", async ({ page }) => {

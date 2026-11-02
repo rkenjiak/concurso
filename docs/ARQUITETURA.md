@@ -357,7 +357,16 @@ mensagem genérica) → `revalidatePath`. Retorno padronizado `{ ok: true, data 
 O `revalidatePath` faz a resposta da action trazer a tela atual já re-renderizada (uma viagem só ao
 servidor). Por isso os componentes **não** chamam `router.refresh()` depois de `r.ok` (#73): isso
 seria uma segunda requisição refazendo todas as queries do layout e da página. Exceções: a importação
-(`POST /api/import`, Route Handler) e a falha ao mover um cartão no quadro, que não revalidam nada.
+(`POST /api/import`, Route Handler) e as falhas ao mover ou desfazer no quadro, que não revalidam
+nada. Criar, editar e excluir concurso terminam com `redirect()` na própria action (fora de
+`executar`, que engoliria o erro de controle): a resposta já traz a página de destino.
+
+As páginas têm `loading.tsx` (#73): o esqueleto é pré-carregado e aparece na hora ao navegar. Como
+o stream começa no fallback, o status HTTP fica fixado em 200 antes de a página rodar: um
+`notFound()` no detalhe de um concurso inexistente (ou de outro usuário) mostra a página de não
+encontrado com `<meta name="robots" content="noindex">`, mas com status 200, e o `redirect` da
+visão admin no dashboard vira redirecionamento no cliente. Aceito: as páginas exigem login. O
+`forbidden()` do painel admin continua 403, porque fica no layout, acima do `loading.tsx`.
 
 ### 5.3 Route Handlers (`src/app/api`)
 

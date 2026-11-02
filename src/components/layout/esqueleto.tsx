@@ -27,7 +27,7 @@ function CardEsqueleto({ className, children }: { className?: string; children: 
 
 function Regiao({ children }: { children: ReactNode }) {
   return (
-    <div role="status" aria-busy="true" data-testid="esqueleto" className="space-y-6">
+    <div role="status" data-testid="esqueleto" className="space-y-6">
       <span className="sr-only">Carregando…</span>
       {children}
     </div>

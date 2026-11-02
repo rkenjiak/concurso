@@ -102,7 +102,7 @@ export default async function ConcursosPage({ searchParams }: PageProps<"/concur
           }))}
         />
       ) : (
-        <ul className="grid gap-3">
+        <ul className="grid grid-cols-1 gap-3">
           {concursos.map((c) => {
             const local = [c.cidade, c.uf].filter(Boolean).join(" / ");
             const detalhes = [

@@ -9,7 +9,9 @@
  * Campos adicionados depois da versão 1 sem quebrar o formato (opcionais, com default na
  * importação, para aceitar backups antigos): `concursos[].validadeOcultaDashboard` e
  * `eventos[].ocultoDashboard` (prazos ocultos do dashboard, #44); `concursos[].cor` e
- * `concursos[].icone` (identificação visual, #46; ausentes = `null`, cor automática). Versões
+ * `concursos[].icone` (identificação visual, #46; ausentes = `null`, cor automática);
+ * `concursos[].notificacoesSilenciadas`, `regrasNotificacao` e `notificacoes` (lembretes, #65:
+ * regras personalizadas e estado de leitura/dispensa; ausentes = padrão, nada lido). Versões
  * antigas do app ignoram esses campos ao importar um backup novo.
  */
 import { z } from "zod";
@@ -25,6 +27,7 @@ import {
   UF,
 } from "@/domain/enums";
 import { ErroDominio } from "@/domain/erros";
+import { ANTECEDENCIA_MAXIMA, MAX_ANTECEDENCIAS } from "@/domain/notificacoes";
 import { VALIDADE_MESES_MAX, VALIDADE_MESES_MIN } from "@/domain/validade";
 import { normalizarTag } from "../normalize";
 import { ehDataISO } from "../tz";
@@ -75,6 +78,7 @@ const concursoBackup = z.object({
   validadeOcultaDashboard: z.boolean().default(false),
   cor: z.enum(COR_CONCURSO).nullable().default(null),
   icone: z.string().refine(ehIconeValido, "Ícone inválido.").nullable().default(null),
+  notificacoesSilenciadas: z.boolean().default(false),
   createdAt: instante,
   updatedAt: instante,
 });
@@ -150,6 +154,23 @@ const anexoBackup = z.object({
   createdAt: instante,
 });
 
+const antecedencia = z.int().min(0).max(ANTECEDENCIA_MAXIMA);
+
+const regraNotificacaoBackup = z.object({
+  tipo: z.enum(TIPO_EVENTO),
+  ativo: z.boolean(),
+  antecedencias: z.array(antecedencia).min(1).max(MAX_ANTECEDENCIAS),
+});
+
+/** Estado de uma notificação: do evento (`eventoId`) ou do fim da validade (`eventoId` nulo). */
+const notificacaoBackup = z.object({
+  concursoId: id,
+  eventoId: id.nullable(),
+  antecedencia,
+  lidaEm: instante.nullable(),
+  dispensadaEm: instante.nullable(),
+});
+
 const dadosBackup = z.object({
   concursos: z.array(concursoBackup),
   tags: z.array(tagBackup),
@@ -159,6 +180,8 @@ const dadosBackup = z.object({
   statusHistorico: z.array(statusHistoricoBackup),
   resultadosFase: z.array(resultadoFaseBackup),
   anexos: z.array(anexoBackup).default([]),
+  regrasNotificacao: z.array(regraNotificacaoBackup).default([]),
+  notificacoes: z.array(notificacaoBackup).default([]),
 });
 
 type Dados = z.output<typeof dadosBackup>;
@@ -209,6 +232,29 @@ function checarIntegridade(dados: Dados, ctx: z.RefinementCtx): void {
       }
     });
   }
+  unicos(
+    "regrasNotificacao",
+    dados.regrasNotificacao,
+    (r) => r.tipo,
+    "Tipo de regra de notificação",
+  );
+  const eventos = new Map(dados.eventos.map((e) => [e.id, e.concursoId]));
+  unicos(
+    "notificacoes",
+    dados.notificacoes,
+    (n) => `${n.concursoId}/${n.eventoId ?? "validade"}/${n.antecedencia}`,
+    "Estado de notificação",
+  );
+  dados.notificacoes.forEach((n, i) => {
+    if (!concursos.has(n.concursoId)) {
+      erro(`A notificação referencia um concurso inexistente (${n.concursoId}).`, [
+        "notificacoes",
+        i,
+      ]);
+    } else if (n.eventoId !== null && eventos.get(n.eventoId) !== n.concursoId) {
+      erro(`A notificação referencia um evento inexistente (${n.eventoId}).`, ["notificacoes", i]);
+    }
+  });
   dados.concursoTags.forEach((ct, i) => {
     if (!tags.has(ct.tagId)) {
       erro(`A tag de concurso referencia uma tag inexistente (${ct.tagId}).`, ["concursoTags", i]);

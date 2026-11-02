@@ -28,6 +28,8 @@ export interface ConcursoDoPrazo {
   cor: CorConcurso;
   /** Ícone (emoji) opcional (#46). */
   icone: string | null;
+  /** Notificações e alarmes silenciados para este concurso (#65). */
+  notificacoesSilenciadas: boolean;
 }
 
 export interface EventoDoPrazo {
@@ -92,6 +94,7 @@ export async function listarConcursosDoPrazo(
       validadeOcultaDashboard: concurso.validadeOcultaDashboard,
       cor: concurso.cor,
       icone: concurso.icone,
+      notificacoesSilenciadas: concurso.notificacoesSilenciadas,
     })
     .from(concurso)
     .where(eq(concurso.usuarioId, usuarioId));

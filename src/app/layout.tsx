@@ -8,12 +8,23 @@ export const metadata: Metadata = {
     template: "%s · Concursos",
   },
   description: "Controle pessoal de concursos públicos",
+  applicationName: "Concursos",
+  // iOS: "Adicionar à Tela de Início" abre sem a interface do Safari (#66). Barra de status
+  // "default" (opaca, texto escuro): a translúcida deixaria o texto branco sobre o tema claro.
+  appleWebApp: {
+    capable: true,
+    title: "Concursos",
+    statusBarStyle: "default",
+  },
+  formatDetection: { telephone: false },
 };
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
+  // Sem `themeColor`: a `<meta name="theme-color">` é criada pelo SCRIPT_TEMA e segue o tema
+  // efetivo, inclusive o escolhido no app (o Next recriaria a dele a cada navegação, #66).
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
@@ -21,7 +32,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     // `suppressHydrationWarning`: o script de tema altera classe/estilo do <html> antes da hidratação.
     <html lang="pt-BR" className="h-full antialiased" suppressHydrationWarning>
       <head>
-        {/* Aplica o tema salvo antes da primeira pintura (sem flash). */}
+        {/* Aplica o tema salvo (e a cor da barra de status) antes da primeira pintura. */}
         {/* biome-ignore lint/security/noDangerouslySetInnerHtml: script estático, sem dados do usuário */}
         <script dangerouslySetInnerHTML={{ __html: SCRIPT_TEMA }} />
       </head>

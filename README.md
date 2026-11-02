@@ -5,7 +5,9 @@
 App pessoal para cadastrar e acompanhar concursos públicos — do "radar" até a posse: dados do
 edital, status com histórico, datas importantes (inscrição, boleto, provas, recursos), dashboard de
 próximos prazos, busca e filtros, resultados por fase, validade do concurso e backup/restauração.
-Com o [servidor MCP](#cadastro-pelo-edital-com-uma-llm-mcp), uma LLM lê o edital e faz o cadastro.
+[Lembretes](#lembretes-notificações-e-calendário) avisam dos prazos no app e no calendário do
+celular (feed .ics). Com o [servidor MCP](#cadastro-pelo-edital-com-uma-llm-mcp), uma LLM lê o
+edital e faz o cadastro.
 
 Feito para **um usuário**: roda localmente com um comando (SQLite em arquivo) e, se quiser, pode ser
 hospedado de graça (Vercel + Turso) ou em um container Docker, com login por senha.
@@ -65,7 +67,8 @@ dados (inclusive export/import e MCP).
   antes do multiusuário pertencem ao **usuário inicial**, que é assumido pelo primeiro login de um
   e-mail de `ADMIN_EMAILS`. Retirar um e-mail da allowlist encerra as sessões dele na hora.
 - **Painel admin** (`/admin`, só admins): lista os usuários, promove/rebaixa admins, bloqueia
-  contas (sem acesso por sessão nem pelo token do MCP), libera e-mails além dos de `ALLOWED_EMAILS`
+  contas (sem acesso por sessão nem pelos tokens do MCP e do calendário), libera e-mails além dos de
+  `ALLOWED_EMAILS`
   e registra tudo num log de auditoria. O admin alterna entre "Visão admin" e "Visão usuário" no
   menu da conta, sem novo login. Os e-mails de `ADMIN_EMAILS` são admins garantidos, e o último
   admin ativo não pode ser rebaixado nem bloqueado.
@@ -73,7 +76,8 @@ dados (inclusive export/import e MCP).
   inicial. Em produção não pode ser combinada com o login Google. Após 5 senhas erradas, novas
   tentativas do mesmo cliente esperam cada vez mais.
 - Com login, todas as páginas e APIs exigem sessão (exceto `/login`, `/api/health`, o fluxo do
-  Google em `/api/auth/google…` e `/api/mcp`, que usa token). A sessão fica em um cookie JWT
+  Google em `/api/auth/google…`, `/api/mcp` e `/api/calendario.ics`, que usam token). A sessão fica
+  em um cookie JWT
   assinado (`httpOnly`, `SameSite=Lax`, `Secure` em produção) válido por 30 dias; "Sair" fica em
   **Configurações**.
 - Gere o segredo com `openssl rand -base64 32` (ou
@@ -105,7 +109,7 @@ cada deploy) não conseguem fazer login com Google. Use um domínio fixo de prod
 
 **Export/import JSON (qualquer banco).** Em **Configurações**: "Baixar backup (JSON)" gera um
 arquivo versionado com todos os seus dados (concursos, tags, links, eventos, histórico,
-resultados); "Baixar concursos (CSV)" gera uma planilha (separador `;`). "Importar…" restaura um
+resultados, regras de notificação e o que já foi lido); "Baixar concursos (CSV)" gera uma planilha (separador `;`). "Importar…" restaura um
 backup JSON **substituindo todos os seus dados** (com confirmação; tudo ou nada) — os de outros
 usuários não são tocados, e os IDs são renumerados. Também serve para migrar entre local ↔
 hospedado.
@@ -124,6 +128,36 @@ para `data/concurso.db` (ou o caminho de `DATABASE_URL`).
 No Docker o banco fica no volume: com o container parado, `docker cp concurso:/app/data/concurso.db .`
 copia o arquivo (e o caminho inverso restaura); ou use o export JSON. No Turso, use o point-in-time
 restore do serviço e o export JSON periódico.
+
+## Lembretes: notificações e calendário
+
+**Notificações no app.** O sino (na navegação e no dashboard) conta os avisos não lidos e leva à
+central (`/notificacoes`), onde cada aviso pode ser marcado como lido ou dispensado. Os avisos são
+calculados na hora a partir dos eventos pendentes — não há cron, então funciona até localmente — e
+seguem as **regras de notificação** de **Configurações → Notificações**: para cada tipo de evento,
+ligar/desligar e as antecedências em dias (0 = no dia). O padrão: fim das inscrições em 7, 1 e 0
+dias; isenção e boleto em 2 e 0; provas e demais fases em 7 e 1; recursos em 1 e 0; convocação,
+nomeação e posse em 3 e 0; fim da validade em 90 e 30. "Restaurar padrão" desfaz as mudanças. No
+detalhe do concurso, **Silenciar** cala os avisos e alarmes só daquele concurso. Eventos concluídos
+e concursos encerrados não notificam. Se a data de um evento muda (retificação), o aviso acompanha
+a nova data, sem duplicar.
+
+**Calendário (.ics).** Em **Configurações → Calendário**, "Gerar link de assinatura" cria um link
+pessoal (`/api/calendario.ics?token=…`, exibido uma única vez; o banco guarda só o resumo
+SHA-256). Assine-o no Google Calendar (*Outras agendas → + → Do URL*), no Apple Calendar (botão
+"Assinar", que abre o `webcal://`) ou no Outlook: o calendário do celular passa a mostrar os prazos
+e notifica de graça. Eventos sem hora entram como dia inteiro; com hora, no horário de Brasília;
+prazos críticos pendentes (inscrição, isenção, boleto, provas, recursos, posse) levam alarmes com as
+antecedências das regras de notificação. Cada evento tem um identificador estável, então mudanças
+no app aparecem na próxima sincronização (o Google leva até algumas horas) sem duplicar. Opções:
+incluir eventos concluídos e eventos de concursos encerrados. Gerar um novo link ou revogar invalida
+o anterior; quem tiver o link vê seus prazos, então não o compartilhe. Sem assinatura, baixe o
+`.ics` de todos os concursos (Configurações) ou de um só (botão **.ics** no detalhe do concurso).
+
+**Sugestão de status.** Quando um evento-chave passa, o detalhe do concurso e o dashboard sugerem o
+próximo status (ex.: prova realizada → "Prova realizada"; fim do prazo de recurso → "Aguardando
+resultado"; inscrito com prova marcada → "Prova agendada"). Nada muda sozinho: "Aplicar" faz a
+transição normal e registra o motivo no histórico.
 
 ## Cadastro pelo edital com uma LLM (MCP)
 
@@ -201,6 +235,16 @@ errados seguidos sofrem atraso progressivo. Gerar um novo token ou revogar inval
 4. Faça o deploy. O `pnpm build` aplica as migrações no Turso antes do `next build` (as variáveis
    do banco precisam estar disponíveis no build).
 
+### Instalar no celular (PWA)
+
+Com o app publicado em HTTPS, abra-o no navegador do celular:
+
+- **Android (Chrome):** menu ⋮ → **Instalar app**. Ele abre em tela cheia, sem a barra de URL.
+- **iPhone (Safari):** Compartilhar → **Adicionar à Tela de Início**.
+
+Se você adicionou o app à tela inicial antes do suporte a PWA (quando não havia manifest), remova o
+atalho antigo e instale de novo: o atalho antigo continua abrindo numa aba do navegador.
+
 Nunca use `DATABASE_URL=file:` na Vercel (nem deixe o banco sem configurar, o que cai no SQLite
 local): o sistema de arquivos é efêmero.
 
@@ -238,6 +282,7 @@ Coloque um proxy com HTTPS na frente (Caddy, Traefik, Fly.io…). A imagem tem `
 | `pnpm db:backup` | cópia do banco local em `backups/` (mantém as últimas N) |
 | `pnpm db:studio` | abre o Drizzle Studio |
 | `pnpm --silent mcp` | servidor MCP por stdio (para clientes como Claude Desktop/Code) |
+| `pnpm icones` | gera favicon, ícones do PWA e `apple-icon.png` a partir de `assets/logo.svg` |
 
 Antes do primeiro `pnpm e2e`, instale o navegador: `pnpm exec playwright install chromium`.
 

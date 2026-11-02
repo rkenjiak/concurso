@@ -45,6 +45,8 @@ RUN groupadd --system --gid 1001 concurso \
 
 COPY --from=builder --chown=concurso:concurso /app/.next/standalone ./
 COPY --from=builder --chown=concurso:concurso /app/.next/static ./.next/static
+# O `standalone` não inclui `public/` (ícones do manifest do PWA, #66).
+COPY --from=builder --chown=concurso:concurso /app/public ./public
 COPY --from=builder --chown=concurso:concurso /app/drizzle ./drizzle
 
 USER concurso

@@ -105,7 +105,7 @@ export async function registrarAcesso(db: Db, id: number, agora: Date = new Date
   await db.update(usuario).set({ ultimoAcessoEm: agora }).where(eq(usuario.id, id));
 }
 
-/** Resumo SHA-256 (hex) do token do MCP: só ele é guardado no banco. */
+/** Resumo SHA-256 (hex) de um token (MCP ou feed .ics): só ele é guardado no banco. */
 export function resumoTokenMcp(token: string): string {
   return createHash("sha256").update(token, "utf8").digest("hex");
 }
@@ -138,4 +138,55 @@ export async function usuarioDoTokenMcp(db: Db, token: string): Promise<Usuario 
     .from(usuario)
     .where(and(eq(usuario.mcpTokenHash, resumoTokenMcp(token)), isNull(usuario.bloqueadoEm)));
   return linha ?? null;
+}
+
+/** Prefixo dos tokens do feed de calendário (#65). */
+export const PREFIXO_TOKEN_ICS = "cics_";
+
+/**
+ * Gera um novo token do feed de calendário (.ics, #65) — o anterior deixa de valer — e o devolve;
+ * o banco guarda só o resumo (como no token do MCP).
+ */
+export async function gerarTokenIcs(db: Db, usuarioId: number): Promise<string> {
+  const token = `${PREFIXO_TOKEN_ICS}${randomBytes(32).toString("base64url")}`;
+  await db
+    .update(usuario)
+    .set({ icsTokenHash: resumoTokenMcp(token) })
+    .where(eq(usuario.id, usuarioId));
+  return token;
+}
+
+/** Revoga o token do feed de calendário. */
+export async function revogarTokenIcs(db: Db, usuarioId: number): Promise<void> {
+  await db.update(usuario).set({ icsTokenHash: null }).where(eq(usuario.id, usuarioId));
+}
+
+/** Usuário dono do token do feed de calendário, ou `null` (também se estiver bloqueado, #50). */
+export async function usuarioDoTokenIcs(db: Db, token: string): Promise<Usuario | null> {
+  if (!token.startsWith(PREFIXO_TOKEN_ICS)) return null;
+  const [linha] = await db
+    .select()
+    .from(usuario)
+    .where(and(eq(usuario.icsTokenHash, resumoTokenMcp(token)), isNull(usuario.bloqueadoEm)));
+  return linha ?? null;
+}
+
+export interface OpcoesFeedIcs {
+  incluirConcluidos: boolean;
+  incluirEncerrados: boolean;
+}
+
+/** Opções do feed de calendário (valem também para o download de todos os concursos). */
+export async function definirOpcoesIcs(
+  db: Db,
+  usuarioId: number,
+  opcoes: OpcoesFeedIcs,
+): Promise<void> {
+  await db
+    .update(usuario)
+    .set({
+      icsIncluirConcluidos: opcoes.incluirConcluidos,
+      icsIncluirEncerrados: opcoes.incluirEncerrados,
+    })
+    .where(eq(usuario.id, usuarioId));
 }

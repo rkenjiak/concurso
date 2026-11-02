@@ -1,6 +1,6 @@
 {
   "name": "concurso",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "private": true,
   "type": "module",
   "description": "App pessoal para cadastrar e acompanhar concursos públicos",
@@ -25,7 +25,8 @@
     "db:seed": "tsx scripts/seed.ts",
     "db:backup": "tsx scripts/backup.ts",
     "db:studio": "drizzle-kit studio",
-    "mcp": "tsx scripts/mcp.ts"
+    "mcp": "tsx scripts/mcp.ts",
+    "icones": "tsx scripts/gerar-icones.ts"
   },
   "dependencies": {
     "@date-fns/tz": "^1.5.0",
@@ -59,6 +60,7 @@
     "@vitest/coverage-v8": "^4.1.12",
     "drizzle-kit": "^0.31.11",
     "shadcn": "^4.23.0",
+    "sharp": "^0.35.5",
     "tailwindcss": "^4.3.3",
     "tsx": "^4.23.15",
     "typescript": "^6.0.3",

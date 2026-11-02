@@ -2,6 +2,7 @@
 
 import { Monitor, Moon, Sun } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useSyncExternalStore } from "react";
+import { sincronizarCorTema } from "@/lib/pwa";
 import {
   aplicarTema,
   CHAVE_TEMA,
@@ -38,7 +39,9 @@ function assinar(aoMudar: () => void): () => void {
 }
 
 function aplicar(tema: Tema): void {
-  aplicarTema(document.documentElement, resolverTema(tema, matchMedia(CONSULTA_ESCURO).matches));
+  const efetivo = resolverTema(tema, matchMedia(CONSULTA_ESCURO).matches);
+  aplicarTema(document.documentElement, efetivo);
+  sincronizarCorTema(document, efetivo === "escuro");
 }
 
 /** Alternância Claro / Escuro / Sistema, persistida no `localStorage`. */
@@ -87,7 +90,7 @@ export function SeletorTema({ className }: { className?: string }) {
             title={ROTULO_TEMA[opcao]}
             onClick={() => escolher(opcao)}
             className={cn(
-              "inline-flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring",
+              "inline-flex size-7 pointer-coarse:size-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring",
               ativo && "bg-background text-foreground shadow-sm",
             )}
           >

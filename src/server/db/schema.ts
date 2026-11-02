@@ -58,6 +58,16 @@ export const usuario = sqliteTable("usuario", {
   ultimoAcessoEm: integer("ultimo_acesso_em", { mode: "timestamp_ms" }),
   /** Bloqueado pelo painel admin (#50): sem acesso por sessão nem por token do MCP. */
   bloqueadoEm: integer("bloqueado_em", { mode: "timestamp_ms" }),
+  /** SHA-256 (hex) do token do feed de calendário (.ics, #65); o token em si não é guardado. */
+  icsTokenHash: text("ics_token_hash").unique(),
+  /** Feed de calendário: inclui eventos concluídos (#65). */
+  icsIncluirConcluidos: integer("ics_incluir_concluidos", { mode: "boolean" })
+    .notNull()
+    .default(true),
+  /** Feed de calendário: inclui eventos de concursos encerrados (#65). */
+  icsIncluirEncerrados: integer("ics_incluir_encerrados", { mode: "boolean" })
+    .notNull()
+    .default(false),
   createdAt: criadoEm(),
 });
 
@@ -131,6 +141,10 @@ export const concurso = sqliteTable(
     cor: text("cor", { enum: COR_CONCURSO }),
     /** Ícone opcional (um emoji) exibido junto da cor (#46). */
     icone: text("icone"),
+    /** Silencia as notificações do app e os alarmes do calendário deste concurso (#65). */
+    notificacoesSilenciadas: integer("notificacoes_silenciadas", { mode: "boolean" })
+      .notNull()
+      .default(false),
     buscaNormalizada: text("busca_normalizada").notNull().default(""),
     createdAt: criadoEm(),
     updatedAt: atualizadoEm(),
@@ -264,6 +278,43 @@ export const anexo = sqliteTable(
   (t) => [index("anexo_concurso_idx").on(t.concursoId)],
 );
 
+// regra_notificacao (#65): personalização das regras de notificação por usuário. Só os tipos
+// alterados são guardados; os demais seguem o padrão (`domain/notificacoes`).
+export const regraNotificacao = sqliteTable(
+  "regra_notificacao",
+  {
+    usuarioId: integer("usuario_id")
+      .notNull()
+      .references(() => usuario.id, { onDelete: "cascade" }),
+    tipo: text("tipo", { enum: TIPO_EVENTO }).notNull(),
+    ativo: integer("ativo", { mode: "boolean" }).notNull(),
+    /** Antecedências em dias, separadas por vírgula, da maior para a menor (`7,1,0`). */
+    antecedencias: text("antecedencias").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.usuarioId, t.tipo] })],
+);
+
+// notificacao_estado (#65): leitura/dispensa das notificações do app. A notificação em si é
+// calculada sob demanda; `chave` = `<prazo>:<antecedência>` (`evento-12:7`, `validade-3:30`).
+// O dono vem pelo concurso; o evento (se houver) leva o estado junto ao ser excluído.
+export const notificacaoEstado = sqliteTable(
+  "notificacao_estado",
+  {
+    chave: text("chave").primaryKey(),
+    concursoId: integer("concurso_id")
+      .notNull()
+      .references(() => concurso.id, { onDelete: "cascade" }),
+    eventoId: integer("evento_id").references(() => evento.id, { onDelete: "cascade" }),
+    antecedencia: integer("antecedencia").notNull(),
+    lidaEm: integer("lida_em", { mode: "timestamp_ms" }),
+    dispensadaEm: integer("dispensada_em", { mode: "timestamp_ms" }),
+  },
+  (t) => [
+    index("notificacao_estado_concurso_idx").on(t.concursoId),
+    index("notificacao_estado_evento_idx").on(t.eventoId),
+  ],
+);
+
 export type Usuario = typeof usuario.$inferSelect;
 export type NovoUsuario = typeof usuario.$inferInsert;
 export type EmailPermitido = typeof emailPermitido.$inferSelect;
@@ -280,5 +331,7 @@ export type ResultadoFase = typeof resultadoFase.$inferSelect;
 export type NovoResultadoFase = typeof resultadoFase.$inferInsert;
 export type Tag = typeof tag.$inferSelect;
 export type ConcursoTag = typeof concursoTag.$inferSelect;
+export type RegraNotificacaoLinha = typeof regraNotificacao.$inferSelect;
+export type NotificacaoEstado = typeof notificacaoEstado.$inferSelect;
 export type Anexo = typeof anexo.$inferSelect;
 export type NovoAnexo = typeof anexo.$inferInsert;

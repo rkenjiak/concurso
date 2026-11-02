@@ -39,6 +39,16 @@ test("tema: padrão do sistema, alternância e persistência sem flash", async (
   await expect(html(page)).not.toHaveClass(/\bdark\b/);
   await expect(html(page)).toHaveCSS("color-scheme", "light");
 
+  // A cor da barra de status (PWA, #66) segue o tema escolhido, inclusive após navegar no app.
+  const corBarra = page.locator('meta[name="theme-color"]');
+  await page.goto("/configuracoes");
+  await seletor(page).getByRole("button", { name: "Escuro" }).click();
+  await expect(corBarra).toHaveAttribute("content", "#0a0a0a");
+  await page.getByRole("complementary").getByRole("link", { name: "Calendário" }).click();
+  await expect(page).toHaveURL(/\/calendario$/);
+  await expect(corBarra).toHaveCount(1);
+  await expect(corBarra).toHaveAttribute("content", "#0a0a0a");
+
   // Volta ao padrão.
   await page.goto("/configuracoes");
   await seletor(page).getByRole("button", { name: "Sistema" }).click();

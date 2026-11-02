@@ -1,7 +1,6 @@
 "use client";
 
 import { Loader2, RotateCcw, Save } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -36,7 +35,6 @@ const paraLinhas = (regras: readonly RegraNotificacao[]): Linha[] =>
  * (0 = no dia). "Restaurar padrão" volta tudo ao conjunto que vem pronto.
  */
 export function RegrasNotificacao({ regras }: { regras: readonly RegraNotificacao[] }) {
-  const router = useRouter();
   const [linhas, setLinhas] = useState<Linha[]>(() => paraLinhas(regras));
   const [erros, setErros] = useState<Record<string, string[] | undefined>>({});
   const [mensagem, setMensagem] = useState<{ tipo: "ok" | "erro"; texto: string } | null>(null);
@@ -55,7 +53,6 @@ export function RegrasNotificacao({ regras }: { regras: readonly RegraNotificaca
       if (r.ok) {
         setErros({});
         setMensagem({ tipo: "ok", texto: "Regras salvas." });
-        router.refresh();
       } else {
         setErros(r.erros);
         setMensagem({ tipo: "erro", texto: r.erros._form?.[0] ?? "Não foi possível salvar." });
@@ -71,7 +68,6 @@ export function RegrasNotificacao({ regras }: { regras: readonly RegraNotificaca
         setErros({});
         setLinhas(paraLinhas(Object.values(REGRAS_PADRAO)));
         setMensagem({ tipo: "ok", texto: "Regras restauradas para o padrão." });
-        router.refresh();
       } else {
         setMensagem({ tipo: "erro", texto: r.erros._form?.[0] ?? "Não foi possível restaurar." });
       }

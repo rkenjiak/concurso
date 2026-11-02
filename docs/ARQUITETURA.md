@@ -270,8 +270,9 @@ senão → indefinida
   restantes (quem abre o app na véspera vê só "amanhã"). Identidade = (prazo, antecedência), sem a
   data: retificar a data mantém a notificação (e o estado). Do banco vêm só lida/dispensada.
 - Ordenação: dia de disparo (`data − antecedência`) desc, depois data/hora do prazo.
-- O contador do sino é calculado no layout do app e atualizado quando a página é recarregada
-  (as ações chamam `router.refresh()` ou revalidam o layout).
+- O contador do sino é calculado no layout do app. Toda Server Action que chama `revalidatePath`
+  recebe na própria resposta a rota atual re-renderizada a partir da raiz (layout incluso), então o
+  sino atualiza sem `router.refresh()` (#73).
 
 ### 4.5 Calendário iCalendar (RF08, #65)
 
@@ -352,6 +353,11 @@ Todas: checagem de sessão (`exigirUsuarioAcao`, ou `exigirAdminAcao` no painel)
 `executar` (transação no repositório; `ErroDominio` vira mensagem, exceção inesperada vira
 mensagem genérica) → `revalidatePath`. Retorno padronizado `{ ok: true, data } | { ok: false, erros }`
 (`actions/resultado.ts`).
+
+O `revalidatePath` faz a resposta da action trazer a tela atual já re-renderizada (uma viagem só ao
+servidor). Por isso os componentes **não** chamam `router.refresh()` depois de `r.ok` (#73): isso
+seria uma segunda requisição refazendo todas as queries do layout e da página. Exceções: a importação
+(`POST /api/import`, Route Handler) e a falha ao mover um cartão no quadro, que não revalidam nada.
 
 ### 5.3 Route Handlers (`src/app/api`)
 

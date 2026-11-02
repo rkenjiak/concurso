@@ -1,7 +1,6 @@
 "use client";
 
 import { Undo2 } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,7 +20,6 @@ interface AlterarStatusProps {
 
 /** Troca de status restrita às transições permitidas + desfazer a última mudança. */
 export function AlterarStatus({ concursoId, atual, transicoes, desfazerPara }: AlterarStatusProps) {
-  const router = useRouter();
   const [para, setPara] = useState<Status | "">("");
   const [observacao, setObservacao] = useState("");
   const [erro, setErro] = useState<string | null>(null);
@@ -36,7 +34,6 @@ export function AlterarStatus({ concursoId, atual, transicoes, desfazerPara }: A
       if (r.ok) {
         setPara("");
         setObservacao("");
-        router.refresh();
       } else {
         setErro(r.erros._form?.[0] ?? r.erros.para?.[0] ?? r.erros.observacao?.[0] ?? "Erro.");
       }
@@ -103,7 +100,6 @@ export function AlterarStatus({ concursoId, atual, transicoes, desfazerPara }: A
           variante="ghost"
           tamanho="sm"
           acao={() => desfazerUltimoStatus(concursoId)}
-          aoConcluir={() => router.refresh()}
         >
           <Undo2 aria-hidden />
           Desfazer última mudança

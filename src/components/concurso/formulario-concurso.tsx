@@ -76,7 +76,6 @@ export function FormularioConcurso({
         : await criarConcurso(valores);
       if (r.ok) {
         router.push(`/concursos/${r.data.id}`);
-        router.refresh();
         return;
       }
       for (const [campo, mensagens] of Object.entries(r.erros)) {

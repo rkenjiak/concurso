@@ -2,7 +2,6 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Pencil, Plus, Trash2 } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { Badge } from "@/components/ui/badge";
@@ -73,7 +72,6 @@ function Dado({ rotulo, valor }: { rotulo: string; valor: string | null }) {
 
 /** Lista e gerencia as notas, classificações e situação por fase (RF05). */
 export function ResultadosConcurso({ concursoId, resultados }: ResultadosConcursoProps) {
-  const router = useRouter();
   const [editando, setEditando] = useState<ResultadoFaseItem | "novo" | null>(null);
 
   return (
@@ -137,7 +135,6 @@ export function ResultadosConcurso({ concursoId, resultados }: ResultadosConcurs
                     tamanho="icon"
                     rotuloAcessivel={`Excluir resultado ${nome}`}
                     acao={() => excluirResultadoFase(concursoId, r.id)}
-                    aoConcluir={() => router.refresh()}
                   >
                     <Trash2 aria-hidden />
                   </BotaoConfirmar>
@@ -159,10 +156,7 @@ export function ResultadosConcurso({ concursoId, resultados }: ResultadosConcurs
               key={editando === "novo" ? "novo" : editando.id}
               concursoId={concursoId}
               resultado={editando === "novo" ? null : editando}
-              aoConcluir={() => {
-                setEditando(null);
-                router.refresh();
-              }}
+              aoConcluir={() => setEditando(null)}
             />
           ) : null}
         </DialogContent>

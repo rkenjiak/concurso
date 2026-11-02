@@ -13,9 +13,16 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
   fluxo de leitura e de gravação, da máquina de status, dos lembretes, do modelo de dados, da
   autenticação multiusuário, do MCP, da inicialização, do deploy e da CI, além de um mapa
   "onde mexo para…" e glossário. Linkado no README e em `ARQUITETURA.md`.
+- Esqueletos de carregamento (`loading.tsx`, #73) no app e no painel admin, com formas próprias
+  para o detalhe do concurso e o calendário: ao clicar na navegação a tela troca na hora, em vez
+  de ficar parada até a resposta do servidor.
 
 ### Alterado
 
+- Mutações com uma viagem só ao servidor (#73): os componentes deixaram de chamar
+  `router.refresh()` depois das Server Actions, que já revalidam e devolvem a tela (layout e sino
+  inclusos) na mesma resposta. Ficam a importação de backup (`POST /api/import`) e a falha ao
+  mover um cartão no quadro.
 - Documentação revisada contra o código da v2.2.0:
   - `REQUISITOS.md`: multiusuário, lembretes e PWA saem de "fora do escopo"; usuário-alvo,
     RNF03/RNF06 e as questões em aberto passam a refletir as decisões tomadas.

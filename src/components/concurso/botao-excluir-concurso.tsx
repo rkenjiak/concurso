@@ -21,7 +21,6 @@ export function BotaoExcluirConcurso({ id, nome }: { id: number; nome: string })
       acao={() => excluirConcurso(id)}
       aoConcluir={() => {
         router.push("/concursos");
-        router.refresh();
       }}
     >
       <Trash2 aria-hidden />

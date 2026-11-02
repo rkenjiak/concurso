@@ -259,7 +259,8 @@ sequenceDiagram
   end
   A->>A: revalidatePath("/", "/concursos", "/concursos/id")
   A-->>C: { ok: true, data } ou { ok: false, erros }
-  C->>C: router.refresh() ou mostra erros
+  A-->>C: a mesma resposta traz a tela re-renderizada
+  C->>C: mostra erros (se houver)
 ```
 
 A "receita" de uma Server Action, em 5 passos:

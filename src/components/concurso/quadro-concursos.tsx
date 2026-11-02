@@ -71,8 +71,9 @@ export function QuadroConcursos({ cartoes }: { cartoes: CartaoQuadro[] }) {
         });
       } else {
         setAviso({ tipo: "erro", texto: r.erros._form?.[0] ?? "Não foi possível mover." });
+        // Falhou: nada foi revalidado; busca o estado atual (outra aba pode ter mudado o status).
+        router.refresh();
       }
-      router.refresh();
     });
   }
 
@@ -88,7 +89,7 @@ export function QuadroConcursos({ cartoes }: { cartoes: CartaoQuadro[] }) {
             }
           : { tipo: "erro", texto: r.erros._form?.[0] ?? "Não foi possível desfazer." },
       );
-      router.refresh();
+      if (!r.ok) router.refresh();
     });
   }
 

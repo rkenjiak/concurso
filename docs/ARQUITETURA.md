@@ -1,8 +1,10 @@
 # Arquitetura — App de Controle de Concursos
 
 > Documento de arquitetura derivado de [`REQUISITOS.md`](./REQUISITOS.md).
-> Princípio-guia: **simplicidade** (um usuário, centenas de registros, roda local com um comando,
-> hospedagem gratuita/barata opcional).
+> Princípio-guia: **simplicidade** (uso pessoal ou de poucas pessoas, centenas de registros, roda
+> local com um comando, hospedagem gratuita/barata opcional).
+> Para uma introdução visual (diagramas e "onde mexo para…"), veja
+> [`GUIA-ARQUITETURA.md`](./GUIA-ARQUITETURA.md).
 
 ---
 
@@ -20,6 +22,7 @@
 | Formulários | **react-hook-form** + `@hookform/resolvers/zod` | Formulários grandes (RF01) com pouca re-renderização. |
 | Datas | **date-fns** + **@date-fns/tz** | Cálculo de "hoje" e prazos em `America/Sao_Paulo`. |
 | Markdown | **react-markdown** + **remark-gfm** (sem HTML bruto) | Observações (RF01) renderizadas com segurança. |
+| Autenticação | **`jose`** (JWT HS256 e validação do `id_token` do Google) | Sessão em cookie assinado e OIDC próprio em poucas funções testáveis, sem biblioteca de auth completa (§7.1). |
 | MCP | **`@modelcontextprotocol/server`** (SDK v2) | Servidor MCP (RF10) com stdio e HTTP web-standard (`fetch`) a partir da mesma definição; só depende de Zod. |
 | Testes | **Vitest** (unit/integração) + **Playwright** (e2e smoke) | Rápidos; Vitest roda o domínio puro e o banco em memória. |
 | Lint/format | **Biome** | Uma ferramenta só para lint + format, rápida, configuração mínima. |
@@ -237,8 +240,8 @@ PROVA_REALIZADA(5) → AGUARDANDO_RESULTADO(6)`.
    `semOcultos(grupos)` filtra e `contarOcultos(grupos)` alimenta o contador "N ocultos". O
    dashboard esconde os ocultos por padrão e os mostra esmaecidos com `/?ocultos=1`. A preferência
    é só de exibição: calendário e MCP continuam listando todos os prazos (o MCP informa
-   `ocultoNoDashboard`), e ocultar/reexibir não altera `updated_at`. App de usuário único: a
-   preferência fica no próprio registro (por usuário quando houver multiusuário, #49).
+   `ocultoNoDashboard`), e ocultar/reexibir não altera `updated_at`. A preferência fica no próprio
+   registro, que já pertence a um único usuário (via concurso, #49).
 
 `proximaData(concurso)` = menor `data >= hoje` entre eventos não concluídos → usado na ordenação RF07.
 
@@ -345,15 +348,17 @@ Os ícones são gerados de `assets/logo.svg` por `pnpm icones` (`scripts/gerar-i
 | `definirPapelAcao(id, papel)`, `definirBloqueioAcao(id, bloqueado)` | #50 — admin; protege o último admin ativo e os de `ADMIN_EMAILS` |
 | `adicionarEmailPermitidoAcao(email)`, `removerEmailPermitidoAcao(email)` | #50 — admin; allowlist do painel |
 
-Todas: validação Zod → checagem de sessão (quando auth ativa) → transação → `revalidatePath`.
-Retorno padronizado `{ ok: true, data } | { ok: false, erros }`.
+Todas: checagem de sessão (`exigirUsuarioAcao`, ou `exigirAdminAcao` no painel) → validação Zod →
+`executar` (transação no repositório; `ErroDominio` vira mensagem, exceção inesperada vira
+mensagem genérica) → `revalidatePath`. Retorno padronizado `{ ok: true, data } | { ok: false, erros }`
+(`actions/resultado.ts`).
 
 ### 5.3 Route Handlers (`src/app/api`)
 
 | Rota | Uso |
 |---|---|
-| `GET /api/export?formato=json\|csv\|ics` | RF09 (CSV = um arquivo por entidade em `.zip`, ou só concursos); `ics` = RF08, todos os concursos ou `&concurso=<id>` |
-| `POST /api/import` | RF09 — importa JSON (substituir tudo ou mesclar; valida com Zod e versão do schema) |
+| `GET /api/export?formato=json\|csv\|ics` | RF09 — `json` (padrão) = backup completo do usuário; `csv` = só os concursos (separador `;`, BOM UTF-8, proteção contra fórmulas); `ics` = RF08, todos os concursos ou `&concurso=<id>` |
+| `POST /api/import` | RF09 — `multipart/form-data` com `arquivo` e `confirmacao=SUBSTITUIR_TUDO`; substitui todos os dados do usuário numa transação (até 20 MB; valida com Zod e `schemaVersion`; IDs renumerados) |
 | `GET /api/health` | health check do deploy |
 | `POST/GET/DELETE /api/mcp` | RF10 — servidor MCP (Streamable HTTP); exige `Authorization: Bearer <token pessoal>` |
 | `GET /api/auth/google` e `/api/auth/google/callback` | #49 — login com Google (OIDC, código + PKCE) |
@@ -403,35 +408,45 @@ Decisões (issue #39):
 ```
 .
 ├── .github/
-│   ├── workflows/ci.yml            # lint, typecheck, testes, build
+│   ├── workflows/ci.yml            # lint, typecheck, testes, build, e2e, imagem Docker
 │   ├── workflows/release.yml       # tag vX.Y.Z → GitHub Release
+│   ├── dependabot.yml              # npm + actions, semanal, PRs para develop
 │   └── pull_request_template.md
-├── docs/                           # REQUISITOS.md, ARQUITETURA.md, ADRs futuros
+├── assets/                         # logo.svg (fonte dos ícones) e icon.svg
+├── docs/                           # REQUISITOS.md, ARQUITETURA.md, GUIA-ARQUITETURA.md
 ├── drizzle/                        # migrações SQL geradas (versionadas)
 ├── data/                           # concurso.db local (gitignored)
 ├── e2e/                            # testes Playwright
-├── scripts/                        # backup.ts, seed.ts, mcp.ts (stdio)
+├── public/icons/                   # ícones PNG do PWA (gerados por `pnpm icones`)
+├── scripts/                        # migrate, seed, backup, mcp (stdio), gerar-icones, env
 ├── src/
-│   ├── app/                        # rotas (páginas, layouts, api/)
+│   ├── app/                        # rotas: (app)/ com navegação, admin/, login/, api/, manifest.ts
 │   ├── components/
 │   │   ├── ui/                     # shadcn/ui
-│   │   ├── concurso/               # formulários, cards, tabelas, badges de status
+│   │   ├── concurso/               # formulários, cards, quadro, badges, sugestão de status
+│   │   ├── calendario/             # visão mensal e detalhes do evento
+│   │   ├── dashboard/              # lista de prazos, ocultar/reexibir
+│   │   ├── configuracoes/          # regras de notificação, calendário .ics, export/import, token MCP
 │   │   ├── admin/                  # painel admin (#50)
+│   │   ├── auth/                   # login (Google/senha) e sair
 │   │   ├── layout/                 # casca, navegação, menu da conta
 │   │   ├── notificacoes/           # sino e central de notificações (#65)
 │   │   └── tema/                   # seletor de tema (claro/escuro/sistema)
 │   ├── domain/                     # regras puras + testes *.test.ts ao lado
-│   │   ├── enums.ts  labels.ts
+│   │   ├── enums.ts  labels.ts  erros.ts
 │   │   ├── status.ts  prazos.ts  validade.ts
-│   │   ├── notificacoes.ts  icalendar.ts  sugestao-status.ts   # lembretes (#65)
+│   │   ├── calendario.ts  quadro.ts  cores.ts  duplicados.ts
+│   │   └── notificacoes.ts  icalendar.ts  sugestao-status.ts   # lembretes (#65)
 │   ├── server/
-│   │   ├── db/                     # schema.ts, client.ts, migrate.ts
-│   │   ├── queries/                # leituras (lista, dashboard, detalhe)
+│   │   ├── db/                     # schema.ts, client.ts, migrate.ts, url.ts, backup.ts
+│   │   ├── queries/                # leituras (lista, dashboard, detalhe, notificações, .ics)
 │   │   ├── repositories/           # escritas transacionais
 │   │   ├── actions/                # Server Actions
 │   │   ├── mcp/                    # servidor MCP (ferramentas, entradas, textos)
-│   │   └── auth/                   # sessão, senha, Google, autorização, visão admin
-│   ├── lib/                        # format.ts (BRL, datas), tz.ts, normalize.ts, schemas zod
+│   │   ├── auth/                   # sessão, senha, Google, autorização, visão admin
+│   │   └── inicializacao.ts        # checagem do ambiente e migrações ao iniciar
+│   ├── lib/                        # format, tz, normalize, csv, tema, pwa, tags, schemas Zod
+│   ├── instrumentation.ts          # chama server/inicializacao.ts ao subir o servidor
 │   └── proxy.ts
 ├── biome.json  drizzle.config.ts  next.config.ts  vitest.config.ts  playwright.config.ts
 ├── .env.example  .nvmrc  CHANGELOG.md  package.json
@@ -459,9 +474,10 @@ Decisões (issue #39):
 - **Senha única (`APP_PASSWORD`):** uso local; comparada em tempo constante, com atraso progressivo
   após falhas. Em produção não pode coexistir com o Google.
 - **Sessão:** cookie **JWT assinado** (`jose`, HS256 com `AUTH_SECRET` ≥ 32 bytes) com o ID do
-  usuário e o método de login; `httpOnly`, `secure`, `SameSite=Lax`, 30 dias. `proxy.ts` confere só
+  usuário e o método de login; `httpOnly`, `Secure` em produção, `SameSite=Lax`, 30 dias. `proxy.ts` confere só
   a assinatura (sem banco) e protege tudo exceto `/login`, `/api/health`, `/api/auth/google…`,
-  `/api/mcp` e `/api/calendario.ics`; páginas, Server Actions e Route Handlers obtêm o usuário em `auth/acesso.ts`
+  `/api/mcp`, `/api/calendario.ics` e o manifest e os ícones do PWA (`lib/pwa.ts`); páginas, Server
+  Actions e Route Handlers obtêm o usuário em `auth/acesso.ts`
   (`exigirUsuarioPagina/Acao/Rota`), que relê o usuário no banco.
 - Em produção (`NODE_ENV=production`) sem login, o app **recusa iniciar** salvo
   `ALLOW_NO_AUTH=true` explícito — evita expor dados por esquecimento.
@@ -542,9 +558,9 @@ Decisões (issue #39):
 ### 8.1 Estratégia de testes
 | Nível | Ferramenta | Escopo | Meta |
 |---|---|---|---|
-| Unitário | Vitest | `domain/*` (transições, prazos, validade, criticidade), `lib/format`, parsers BRL, schemas Zod | cobertura ≥ 90% em `domain/` |
+| Unitário | Vitest | `domain/*` (transições, prazos, validade, criticidade), `lib/format`, parsers BRL, schemas Zod | meta: cobertura ≥ 90% em `domain/` (medida no CI, sem limite configurado) |
 | Integração | Vitest + libSQL `:memory:` + migrações | repositories/queries (transação de status, tags, filtros, export→import ida e volta); servidor MCP com cliente em memória (`InMemoryTransport`) | casos principais |
-| E2E | Playwright (Chromium) | smoke: criar concurso → evento → aparece no dashboard → mudar status → exportar; login quando auth ativa; `/api/mcp` com token → concurso visível no app | poucos fluxos |
+| E2E | Playwright (Chromium) | smoke: criar concurso → evento → aparece no dashboard → mudar status → exportar/importar; login, MCP, PWA e lembretes com auth ativa; painel admin com o usuário inicial (sem auth); busca, quadro, calendário, cor/ícone, ocultar prazos, tema, lembretes (sino, regras, feed .ics), PWA e layout em 360 px; `/api/mcp` com token → concurso visível no app. Dois servidores (com e sem auth) com bancos temporários em `e2e/.tmp` | poucos fluxos |
 
 Datas sempre fixadas (`vi.setSystemTime` / `hoje` injetado).
 
@@ -553,19 +569,22 @@ Datas sempre fixadas (`vi.setSystemTime` / `hoje` injetado).
 
 ```
 jobs:
-  check:  pnpm install --frozen-lockfile → biome ci → tsc --noEmit → vitest run --coverage → next build
-  e2e:    (needs: check) playwright — em PRs para master e push em develop
+  check:  pnpm install --frozen-lockfile → biome ci → pnpm typecheck → vitest run --coverage → pnpm build
+  e2e:    (needs: check) pnpm e2e (Playwright/Chromium, navegadores em cache)
+  docker: (needs: check) docker build + smoke test: sem login o container sai com código 1;
+          com APP_PASSWORD responde /api/health e recusa /api/export e /api/mcp sem credencial (401)
   branch-policy: em PRs para master, falha se head ≠ release/* ou hotfix/*
 ```
 - **Proteção de branches**: `master` e `develop` exigem PR + CI verde; sem push direto.
-- `release.yml`: em push de tag `v*.*.*` → cria GitHub Release com notas do `CHANGELOG.md`
-  (e imagem Docker no GHCR, se usado o deploy em container).
+- `release.yml`: em push de tag `v*.*.*` → cria GitHub Release com as notas da seção da versão no
+  `CHANGELOG.md` (`v0.*` como pre-release). Não publica imagem Docker: ela é gerada a partir do
+  `Dockerfile` por quem fizer o deploy.
 - Dependabot semanal (npm + actions) com PRs para `develop`.
 
 ### 8.3 Versionamento semântico
 - `0.x` durante a construção do MVP; **`v1.0.0` = MVP completo**.
 - Versão bumpada em `package.json` na branch `release/X.Y.Z`; `CHANGELOG.md` no formato
-  *Keep a Changelog*; merge em `master` → tag `vX.Y.Z` → merge de volta em `develop`.
+  *Keep a Changelog*; PR para `master` → tag `vX.Y.Z` → PR da mesma `release/*` de volta para `develop`.
 - `hotfix/*` incrementa PATCH. Mensagens de commit no estilo *Conventional Commits* (recomendado,
   não obrigatório por ferramenta).
 - Mudança de schema = nova migração Drizzle; o JSON de export carrega `schemaVersion`.
@@ -625,7 +644,7 @@ Cada item = uma branch `feature/*` a partir de `develop`; cada milestone fecha c
 
 | # | Questão | Padrão proposto | Impacto na arquitetura |
 |---|---|---|---|
-| 1 | Local ou hospedado? | **Local-first**, com hospedagem opcional pronta (Vercel+Turso). Auth ligada por variável de ambiente; produção sem senha bloqueada por padrão. | Nenhum retrabalho: driver libSQL e proxy de auth já previstos. |
+| 1 | Local ou hospedado? | **Local-first**, com hospedagem opcional pronta (Vercel+Turso). Auth ligada por variável de ambiente (Google multiusuário ou senha única); produção sem login bloqueada por padrão. | Nenhum retrabalho: driver libSQL e proxy de auth já previstos. |
 | 2 | Anexos no MVP? | **Não** — só links no MVP (edital costuma estar em URL pública). Anexos no M7 com interface `Storage` (`disco local` / Vercel Blob ou Cloudflare R2), limite 10 MB, só PDF/imagem. | Tabela `anexo` já desenhada; backup passa a incluir arquivos. |
 | 3 | E-mail desde o início? | **Não — e não será feito** (decisão de 2026-11-01). O feed **.ics assinável** (M6) faz o Google/Apple Calendar notificar no celular de graça, e as notificações no app cobrem o uso na web. | Sem cron, sem segredo extra e sem serviço de e-mail; .ics funciona até local (download manual). |
 

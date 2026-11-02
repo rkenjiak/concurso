@@ -15,17 +15,24 @@ deixar claro "o que vem a seguir" em cada concurso.
 - Visão de próximos prazos/eventos.
 - Filtros e busca.
 
+**Incorporado depois do MVP**
+- Multiusuário com login Google e painel de administração (#49, #50; RF11): cada usuário vê só
+  os próprios concursos — não há compartilhamento de concursos entre usuários.
+- Lembretes no app e calendário .ics (RF08, #65) e app instalável no celular (PWA, #66).
+
 **Fora do escopo (por enquanto)**
-- Multiusuário / compartilhamento.
+- Compartilhamento de concursos entre usuários.
+- Lembretes por e-mail (decisão de 2026-11-01; ver RF08).
 - Raspagem automática de sites de bancas ou importação automática de editais (o cadastro
   assistido por LLM do RF10 parte do edital que o usuário fornece).
 - Plano de estudos detalhado (cronograma por matéria, questões, etc.).
-- App mobile nativo (a web deve ser responsiva).
+- App mobile nativo (a web é responsiva e instalável como PWA).
 
 ## 3. Usuário
 
-Um único usuário (o dono do app). Autenticação simples é desejável se o app for
-hospedado publicamente; dispensável se rodar apenas localmente.
+Pensado para uso pessoal: localmente, um único usuário (o dono do app), sem login ou com senha
+única. Hospedado, admite poucos usuários com login Google e allowlist de e-mails (#49), cada um
+com os próprios dados; admins administram a instância (RF11).
 
 ## 4. Requisitos funcionais
 
@@ -93,13 +100,15 @@ Status sugeridos, em ordem:
 - Filtrar por status, esfera, UF, escolaridade, faixa de remuneração.
 - Ordenar por próxima data, remuneração, data de cadastro.
 
-### RF08 — Lembretes (desejável, pós-MVP)
+### RF08 — Lembretes (pós-MVP, entregue na v2.2.0)
 - Notificação de prazos próximos ~~(e-mail ou notificação do navegador)~~ — no próprio app, com regras
   configuráveis por tipo de evento (#65). E-mail fora do escopo (decisão de 2026-11-01).
 - Exportar eventos para calendário (.ics), inclusive como feed assinável.
+- Sugerir o próximo status quando um evento-chave passa (sem alterar sozinho).
 
 ### RF09 — Exportação / backup
-- Exportar todos os dados em JSON e/ou CSV; importar a partir do JSON.
+- Backup completo em JSON, restaurável por importação (substitui todos os dados do usuário);
+  planilha CSV só dos concursos.
 
 ### RF10 — Cadastro assistido por LLM (MCP)
 - Servidor MCP para que uma LLM com acesso ao edital (anexado pelo usuário) cadastre e atualize
@@ -123,13 +132,15 @@ Status sugeridos, em ordem:
 - **RNF01 — Simplicidade:** stack enxuta, fácil de rodar localmente com um comando.
 - **RNF02 — Persistência:** dados persistidos de forma confiável (ex.: SQLite) e
   fáceis de fazer backup.
-- **RNF03 — Responsividade:** usável no celular.
+- **RNF03 — Responsividade:** usável no celular (alvo: 360 px sem rolagem horizontal) e
+  instalável como PWA (#48, #66).
 - **RNF04 — Idioma/locale:** interface em português (pt-BR), datas `dd/mm/aaaa`,
   moeda em BRL, fuso `America/Sao_Paulo`.
 - **RNF05 — Desempenho:** volume pequeno (dezenas a centenas de concursos); sem
   necessidade de escalabilidade.
-- **RNF06 — Segurança:** se hospedado, exigir login; links externos abertos com
-  `rel="noopener noreferrer"`.
+- **RNF06 — Segurança:** se hospedado, exigir login (o servidor recusa iniciar em produção sem
+  login, salvo opt-out explícito); cada usuário acessa só os próprios dados; links externos
+  abertos com `rel="noopener noreferrer"`.
 - **RNF07 — Qualidade:** testes automatizados das regras de domínio (status, datas)
   e lint/format padronizados.
 - **RNF08 — Deploy:** possibilidade de hospedar gratuitamente/barato (desejável).
@@ -147,6 +158,11 @@ Status sugeridos, em ordem:
 
 ## 7. Questões em aberto
 
-1. O app será apenas local ou hospedado (exige autenticação)?
-2. Anexos de arquivos entram no MVP ou só links?
-3. Lembretes por e-mail são desejáveis desde o início?
+Decisões registradas em [`ARQUITETURA.md` §11](./ARQUITETURA.md#11-riscos-e-decisões-pendentes-seção-7-dos-requisitos):
+
+1. ~~O app será apenas local ou hospedado (exige autenticação)?~~ **Ambos:** local-first, com
+   hospedagem opcional (Vercel + Turso ou Docker) e login obrigatório em produção.
+2. Anexos de arquivos entram no MVP ou só links? **Só links no MVP**; anexos seguem planejados
+   (M7).
+3. ~~Lembretes por e-mail são desejáveis desde o início?~~ **Não serão feitos** (2026-11-01): o
+   feed .ics e as notificações no app cobrem o caso.

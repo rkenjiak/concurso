@@ -162,9 +162,11 @@ flowchart LR
   UI["app/ · components/"] --> ACT["server/actions · app/api · server/mcp"]
   ACT --> DATA["server/queries · server/repositories"]
   DATA --> DOM["domain/"]
-  ACT --> LIB["lib/ (schemas Zod, tz, format)"]
+  ACT --> SCH["lib/schemas (Zod)"]
+  UI --> SCH
+  SCH --> DOM
+  DOM --> LIB["lib/ puros<br/>tz · format · normalize"]
   UI --> LIB
-  DOM --> LIB
   DATA --> DB["server/db"]
 
   DOM -. "❌ nunca importa" .-> NEXT["next/*"]
@@ -177,6 +179,9 @@ flowchart LR
 **Por que isso importa?**
 
 - `domain/` é testado com Vitest em milissegundos, sem subir servidor nem banco.
+- `lib/` tem duas metades: os utilitários puros (`tz`, `format`, `normalize`), que o domínio usa,
+  e os schemas Zod (`lib/schemas`), que usam os enums e as regras do domínio e são compartilhados
+  pela UI, pelas actions e pelo MCP.
 - Se uma API do Next mudar (como `middleware.ts` → `proxy.ts` no Next 16), as regras não mudam.
 - O `hoje` é sempre **parâmetro** das funções do domínio (nunca `new Date()` solto). Assim os testes
   são determinísticos e o fuso de Brasília é tratado num lugar só (`lib/tz.ts`).
@@ -215,7 +220,7 @@ Pontos-chave:
 - **Não há API REST para a tela.** O componente de página é `async` e chama a query diretamente.
 - A query busca o mínimo no SQL e delega a **regra** (o que é vencido, o que é crítico) ao domínio.
 - Em paralelo, a página pede o contador do sino (`queries/notificacoes.ts`) e as sugestões de
-  status (`queries/sugestoes.ts`) — ambos calculados na hora, sem cron (§7.4).
+  status (`queries/sugestoes.ts`) — ambos calculados na hora, sem cron (seção 7.4 abaixo).
 - Componentes interativos (`"use client"`) são só as "ilhas" que precisam de estado: formulários,
   diálogos, seletor de tema, quadro arrastável.
 
@@ -264,11 +269,12 @@ flowchart LR
   S1["1. exigirUsuarioAcao()<br/>sessão → usuarioId"] --> S2["2. Zod<br/>validar entrada"] --> S3["3. repository<br/>transação + domínio"] --> S4["4. revalidatePath<br/>atualiza telas"] --> S5["5. ResultadoAcao<br/>{ ok, data | erros }"]
 ```
 
-E os erros viram mensagens amigáveis num lugar só (`actions/resultado.ts → executar()`):
+E os erros viram mensagens amigáveis em `actions/resultado.ts`: a falha do Zod é tratada antes,
+por `falhaValidacao()`; o resto passa por `executar()`:
 
 ```mermaid
 flowchart TD
-  E{"Algo deu errado?"} -->|"Zod falhou"| F1["erros por campo<br/>{ cargo: ['Obrigatório'] }"]
+  E{"Algo deu errado?"} -->|"Zod falhou<br/>falhaValidacao()"| F1["erros por campo<br/>{ cargo: ['Obrigatório'] }"]
   E -->|"ErroDominio"| F2["mensagem da regra<br/>'Não é possível mudar de X para Y'"]
   E -->|"exceção inesperada"| F3["console.error no servidor<br/>+ mensagem genérica ao usuário"]
   E -->|não| OK["{ ok: true, data }"]
@@ -310,6 +316,8 @@ stateDiagram-v2
     CLASSIFICADO --> APROVADO
     APROVADO --> REPROVADO
     REPROVADO --> APROVADO
+    CLASSIFICADO --> REPROVADO
+    REPROVADO --> CLASSIFICADO
   }
 
   Resultado --> NOMEADO : aprovado / classificado
@@ -401,7 +409,8 @@ erDiagram
   CONCURSO ||--o{ RESULTADO_FASE : "tem notas"
   CONCURSO ||--o{ CONCURSO_TAG : ""
   TAG ||--o{ CONCURSO_TAG : ""
-  EVENTO ||--o{ NOTIFICACAO_ESTADO : "lida/dispensada"
+  CONCURSO ||--o{ NOTIFICACAO_ESTADO : "lida/dispensada"
+  EVENTO |o--o{ NOTIFICACAO_ESTADO : "nulo no fim da validade"
 
   USUARIO {
     int id PK
@@ -469,10 +478,11 @@ erDiagram
   }
 ```
 
-Tabelas de apoio (fora do diagrama para não poluir): `regra_notificacao` e `notificacao_estado`
-(lembretes, #65), `email_permitido` e `auditoria_admin` (painel admin, #50). A `tag` é um vocabulário
-compartilhado só de nomes; cada usuário vê apenas as tags dos próprios concursos. Detalhes campo a
-campo em [`ARQUITETURA.md` §3](./ARQUITETURA.md#3-modelo-de-dados).
+As tabelas de apoio — `regra_notificacao` e `notificacao_estado` (lembretes, #65),
+`email_permitido` e `auditoria_admin` (painel admin, #50) — aparecem só nos relacionamentos, sem
+atributos, para não poluir. A tabela `anexo` já existe no schema, mas só será usada com os anexos
+(M7). A `tag` é um vocabulário compartilhado só de nomes; cada usuário vê apenas as tags dos
+próprios concursos. Detalhes campo a campo em [`ARQUITETURA.md` §3](./ARQUITETURA.md#3-modelo-de-dados).
 
 Convenções que evitam bugs clássicos:
 
@@ -502,7 +512,7 @@ A autenticação é **opcional** e ligada por variável de ambiente. Há três m
 |---|---|---|
 | **Sem login** (uso local) | nenhuma | todos os dados são do **usuário inicial** (ID 1) |
 | **Senha única** (uso local) | `APP_PASSWORD` + `AUTH_SECRET` | sempre o usuário inicial |
-| **Google** (multiusuário) | `GOOGLE_CLIENT_ID/SECRET` + `ADMIN_EMAILS` + `AUTH_SECRET` | e-mails da allowlist; o primeiro admin a entrar assume o usuário inicial |
+| **Google** (multiusuário) | `GOOGLE_CLIENT_ID/SECRET` + `ADMIN_EMAILS` + `AUTH_SECRET` | e-mails da allowlist; o primeiro login de um e-mail de `ADMIN_EMAILS` assume o usuário inicial |
 
 Há duas checagens (defesa em profundidade): o `proxy.ts` na entrada, que só confere a assinatura do
 cookie (sem banco), e `auth/acesso.ts` em cada página, action e handler, que relê o usuário no banco
@@ -641,8 +651,10 @@ sequenceDiagram
   I->>Ini: verificarAmbienteAoIniciar()
   alt produção sem login e sem ALLOW_NO_AUTH=true
     Ini-->>N: process.exit(1) 🛑
-  else AUTH_SECRET curto, Google sem ADMIN_EMAILS<br/>ou Google + APP_PASSWORD em produção
+  else AUTH_SECRET curto, Google incompleto ou sem ADMIN_EMAILS,<br/>ou Google + APP_PASSWORD em produção
     Ini-->>N: process.exit(1) 🛑
+  else configuração válida
+    Ini-->>I: ok
   end
   I->>Ini: migrarAoIniciar()
   opt MIGRATE_ON_START=true (Docker)
@@ -658,6 +670,7 @@ E onde as migrações rodam em cada cenário:
 | `pnpm dev` | script `predev` → `pnpm db:migrate` |
 | `pnpm build` (local, Vercel) | script `prebuild` → `pnpm db:migrate` |
 | Docker | `MIGRATE_ON_START=true` → `instrumentation.ts` |
+| `pnpm --silent mcp` (stdio) | `scripts/mcp.ts` aplica as migrações antes de abrir o servidor |
 | Testes | banco `:memory:` migrado em cada suíte |
 
 O cliente do banco (`server/db/client.ts`) é um **singleton** guardado em `globalThis`, para não abrir
@@ -688,7 +701,7 @@ flowchart TB
 | | Local | Vercel + Turso | Docker |
 |---|---|---|---|
 | Custo | R$ 0 | R$ 0 | ~US$ 2–5/mês |
-| Login | opcional | **obrigatório** (Google) | **obrigatório** (senha ou Google) |
+| Login | opcional | **obrigatório** (Google recomendado) | **obrigatório** (senha ou Google) |
 | Backup | `pnpm db:backup` (`VACUUM INTO`) + JSON | restore do Turso + JSON | cópia do volume + JSON |
 
 Backup e restauração universais, que funcionam em qualquer cenário:
@@ -710,7 +723,7 @@ flowchart LR
 flowchart TB
   E2E["🎭 E2E — Playwright<br/>login, admin, fluxo principal, calendário, quadro,<br/>lembretes, MCP, PWA, celular 360 px…<br/><i>poucos, lentos, realistas</i>"]
   INT["🔗 Integração — Vitest + libSQL :memory:<br/>repositories, queries, export→import,<br/>isolamento entre usuários, servidor MCP<br/><i>banco real em memória</i>"]
-  UNI["🧪 Unitários — Vitest<br/>domain/*, lib/*, schemas Zod<br/><i>muitos, rápidos, cobertura ≥ 90% no domínio</i>"]
+  UNI["🧪 Unitários — Vitest<br/>domain/*, lib/*, schemas Zod<br/><i>muitos, rápidos, meta de cobertura ≥ 90% no domínio</i>"]
   E2E --- INT --- UNI
 
   style UNI fill:#e8f5e9,stroke:#2e7d32
@@ -741,12 +754,12 @@ gitGraph
   checkout master
   merge release/1.3.0 id: "PR #56" tag: "v1.3.0"
   checkout develop
-  merge master id: "volta p/ develop"
+  merge release/1.3.0 id: "PR #57"
 ```
 
 ```mermaid
 flowchart LR
-  PR["PR / push<br/>develop ou master"] --> CHK["check<br/>biome ci → tsc → vitest --coverage → next build"]
+  PR["PR / push<br/>develop ou master"] --> CHK["check<br/>biome ci → pnpm typecheck → vitest --coverage → pnpm build"]
   CHK --> E2E["e2e<br/>Playwright"]
   CHK --> DKR["docker<br/>build da imagem + smoke test"]
   PR --> POL["branch-policy<br/>PR p/ master só de release/* ou hotfix/*"]
@@ -796,7 +809,7 @@ mindmap
 
 | Quero… | Comece por |
 |---|---|
-| Adicionar um campo ao concurso | `server/db/schema.ts` → `pnpm db:generate` → `lib/schemas/concurso.ts` → `formulario-concurso.tsx` → `lib/schemas/backup.ts` → `mcp/entradas.ts` |
+| Adicionar um campo ao concurso | `server/db/schema.ts` → `pnpm db:generate` → `lib/schemas/concurso.ts` → `formulario-concurso.tsx` → backup (`lib/schemas/backup.ts`, `queries/exportacao.ts`, `repositories/importacao.ts`) e CSV → `mcp/entradas.ts` |
 | Mudar uma regra de status | `domain/status.ts` + `domain/status.test.ts` |
 | Mudar o que aparece nos prazos | `domain/prazos.ts` (regra) ou `server/queries/dashboard.ts` (dados) |
 | Criar uma nova tela | `src/app/(app)/<rota>/page.tsx` + uma função em `server/queries/` |
@@ -825,6 +838,6 @@ mindmap
 | **MCP** | Model Context Protocol: padrão para uma LLM chamar ferramentas de um app. |
 | **`ErroDominio`** | Exceção de regra de negócio; vira mensagem amigável ao usuário (ou à LLM). |
 | **Pseudo-evento de validade** | Prazo calculado (não gravado) a partir da homologação + meses de validade. |
-| **Usuário inicial** | Usuário de ID 1, dono dos dados no uso local (sem login ou com senha única); assumido pelo primeiro admin que entra com Google. |
+| **Usuário inicial** | Usuário de ID 1, dono dos dados no uso local (sem login ou com senha única); assumido pelo primeiro login Google de um e-mail de `ADMIN_EMAILS`. |
 | **Feed .ics** | Calendário no formato iCalendar que apps como o Google Calendar assinam por URL e sincronizam sozinhos. |
 | **PWA** | *Progressive Web App*: o site pode ser instalado no celular e abre em tela cheia, como um app. |

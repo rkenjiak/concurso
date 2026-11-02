@@ -474,9 +474,10 @@ Decisões (issue #39):
 - **Senha única (`APP_PASSWORD`):** uso local; comparada em tempo constante, com atraso progressivo
   após falhas. Em produção não pode coexistir com o Google.
 - **Sessão:** cookie **JWT assinado** (`jose`, HS256 com `AUTH_SECRET` ≥ 32 bytes) com o ID do
-  usuário e o método de login; `httpOnly`, `secure`, `SameSite=Lax`, 30 dias. `proxy.ts` confere só
+  usuário e o método de login; `httpOnly`, `Secure` em produção, `SameSite=Lax`, 30 dias. `proxy.ts` confere só
   a assinatura (sem banco) e protege tudo exceto `/login`, `/api/health`, `/api/auth/google…`,
-  `/api/mcp` e `/api/calendario.ics`; páginas, Server Actions e Route Handlers obtêm o usuário em `auth/acesso.ts`
+  `/api/mcp`, `/api/calendario.ics` e o manifest e os ícones do PWA (`lib/pwa.ts`); páginas, Server
+  Actions e Route Handlers obtêm o usuário em `auth/acesso.ts`
   (`exigirUsuarioPagina/Acao/Rota`), que relê o usuário no banco.
 - Em produção (`NODE_ENV=production`) sem login, o app **recusa iniciar** salvo
   `ALLOW_NO_AUTH=true` explícito — evita expor dados por esquecimento.
@@ -557,9 +558,9 @@ Decisões (issue #39):
 ### 8.1 Estratégia de testes
 | Nível | Ferramenta | Escopo | Meta |
 |---|---|---|---|
-| Unitário | Vitest | `domain/*` (transições, prazos, validade, criticidade), `lib/format`, parsers BRL, schemas Zod | cobertura ≥ 90% em `domain/` |
+| Unitário | Vitest | `domain/*` (transições, prazos, validade, criticidade), `lib/format`, parsers BRL, schemas Zod | meta: cobertura ≥ 90% em `domain/` (medida no CI, sem limite configurado) |
 | Integração | Vitest + libSQL `:memory:` + migrações | repositories/queries (transação de status, tags, filtros, export→import ida e volta); servidor MCP com cliente em memória (`InMemoryTransport`) | casos principais |
-| E2E | Playwright (Chromium) | smoke: criar concurso → evento → aparece no dashboard → mudar status → exportar/importar; login e painel admin com auth ativa; busca, quadro, calendário, cor/ícone, ocultar prazos, tema, lembretes (sino, regras, feed .ics), PWA e layout em 360 px; `/api/mcp` com token → concurso visível no app. Dois servidores (com e sem auth) com bancos temporários em `e2e/.tmp` | poucos fluxos |
+| E2E | Playwright (Chromium) | smoke: criar concurso → evento → aparece no dashboard → mudar status → exportar/importar; login, MCP, PWA e lembretes com auth ativa; painel admin com o usuário inicial (sem auth); busca, quadro, calendário, cor/ícone, ocultar prazos, tema, lembretes (sino, regras, feed .ics), PWA e layout em 360 px; `/api/mcp` com token → concurso visível no app. Dois servidores (com e sem auth) com bancos temporários em `e2e/.tmp` | poucos fluxos |
 
 Datas sempre fixadas (`vi.setSystemTime` / `hoje` injetado).
 
@@ -583,7 +584,7 @@ jobs:
 ### 8.3 Versionamento semântico
 - `0.x` durante a construção do MVP; **`v1.0.0` = MVP completo**.
 - Versão bumpada em `package.json` na branch `release/X.Y.Z`; `CHANGELOG.md` no formato
-  *Keep a Changelog*; merge em `master` → tag `vX.Y.Z` → merge de volta em `develop`.
+  *Keep a Changelog*; PR para `master` → tag `vX.Y.Z` → PR da mesma `release/*` de volta para `develop`.
 - `hotfix/*` incrementa PATCH. Mensagens de commit no estilo *Conventional Commits* (recomendado,
   não obrigatório por ferramenta).
 - Mudança de schema = nova migração Drizzle; o JSON de export carrega `schemaVersion`.

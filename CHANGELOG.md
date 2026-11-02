@@ -24,8 +24,9 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
     só de concursos e import que sempre substitui tudo; jobs de CI (e2e sempre, imagem Docker com
     smoke test) e `release.yml` sem imagem no GHCR; `jose` na stack.
   - README: menção ao multiusuário e ao PWA, link para o guia visual, rotas públicas completas,
-    aviso da Vercel de volta à seção da Vercel, comando `claude mcp add` em duas linhas, notas do
-    Docker com login Google e `pnpm test:watch`.
+    aviso da Vercel de volta à seção da Vercel, notas do Docker com login Google, uso do `APP_URL`
+    no `.ics` e retorno da `release/*` para `develop` por PR.
+  - `REQUISITOS.md` RF09: CSV só dos concursos.
   - `.env.example`: lista completa das rotas que não exigem sessão.
 
 ## [2.2.0] - 2026-11-01

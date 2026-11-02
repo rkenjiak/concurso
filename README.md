@@ -53,7 +53,7 @@ Copie `.env.example` para `.env.local` e ajuste. Nada é obrigatório para rodar
 | `ALLOWED_EMAILS` | — | Allowlist: demais e-mails que podem entrar com Google (separados por vírgula) |
 | `APP_PASSWORD` | — | Login por senha única, **para uso local** (entra como o usuário inicial) |
 | `AUTH_SECRET` | — | Segredo (≥ 32 bytes) que assina a sessão; obrigatório com qualquer login |
-| `APP_URL` | — | Origem pública (ex.: `https://concursos.exemplo.com`) para a URL de callback do Google, se o app estiver atrás de proxy |
+| `APP_URL` | — | Origem pública (ex.: `https://concursos.exemplo.com`), se o app estiver atrás de proxy: usada na URL de callback do Google e nos links e identificadores do calendário `.ics` |
 | `ALLOW_NO_AUTH` | `false` | `true` permite rodar em produção sem login (uso local, sem exposição) |
 | `MIGRATE_ON_START` | `false` | `true` aplica as migrações ao iniciar o servidor (já ligado na imagem Docker) |
 | `BACKUP_KEEP` | `10` | Quantos backups o `pnpm db:backup` mantém |
@@ -70,8 +70,8 @@ dados (inclusive export/import e MCP).
   e-mail de `ADMIN_EMAILS`. Retirar um e-mail da allowlist encerra as sessões dele na hora.
 - **Painel admin** (`/admin`, só admins): lista os usuários, promove/rebaixa admins, bloqueia
   contas (sem acesso por sessão nem pelos tokens do MCP e do calendário), libera e-mails além dos
-  de `ALLOWED_EMAILS` e registra tudo num log de auditoria. O admin alterna entre "Visão admin" e "Visão usuário" no
-  menu da conta, sem novo login. Os e-mails de `ADMIN_EMAILS` são admins garantidos, e o último
+  de `ALLOWED_EMAILS` e registra tudo num log de auditoria. O admin alterna entre "Visão admin" e
+  "Visão usuário" no menu da conta, sem novo login. Os e-mails de `ADMIN_EMAILS` são admins garantidos, e o último
   admin ativo não pode ser rebaixado nem bloqueado.
 - **Senha única** (`APP_PASSWORD` + `AUTH_SECRET`): para uso local; entra sempre como o usuário
   inicial. Em produção não pode ser combinada com o login Google. Após 5 senhas erradas, novas
@@ -297,7 +297,7 @@ Antes do primeiro `pnpm e2e`, instale o navegador: `pnpm exec playwright install
 - `master`: só versões liberadas (tags `vX.Y.Z`); `develop`: integração.
 - `feature/<nome>` a partir de `develop`, com PR de volta para `develop`.
 - `release/X.Y.Z` a partir de `develop` (versão no `package.json` + `CHANGELOG.md`), PR para
-  `master`, tag e merge de volta em `develop`; `hotfix/<nome>` a partir de `master`.
+  `master`, tag e PR da mesma `release/*` de volta para `develop`; `hotfix/<nome>` a partir de `master`.
 - PRs exigem CI verde (Biome, tipos, testes, build, e2e e imagem Docker); PRs para `master` só
   de `release/*` ou `hotfix/*`. Commits no estilo Conventional Commits; mudanças registradas em
   `CHANGELOG.md` (seção `Unreleased`). A tag `vX.Y.Z` publica a GitHub Release com as notas do

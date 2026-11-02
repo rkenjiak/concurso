@@ -107,7 +107,8 @@ Status sugeridos, em ordem:
 - Sugerir o próximo status quando um evento-chave passa (sem alterar sozinho).
 
 ### RF09 — Exportação / backup
-- Exportar todos os dados em JSON e/ou CSV; importar a partir do JSON.
+- Backup completo em JSON, restaurável por importação (substitui todos os dados do usuário);
+  planilha CSV só dos concursos.
 
 ### RF10 — Cadastro assistido por LLM (MCP)
 - Servidor MCP para que uma LLM com acesso ao edital (anexado pelo usuário) cadastre e atualize

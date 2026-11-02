@@ -30,6 +30,8 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
     realizada"; prazo de recurso (após a prova) encerrado → "Aguardando resultado"; inscrito com
     prova marcada → "Prova agendada". Só sugere; "Aplicar" usa a transição validada e grava o
     motivo no histórico.
+  - No cabeçalho do celular, abaixo de 400 px, o nome do app fica só para leitores de tela (o
+    ícone continua), para o sino caber ao lado do tema e do menu da conta.
   - Migração `0005_lembretes`: tabelas `regra_notificacao` e `notificacao_estado`, e as colunas
     `concurso.notificacoes_silenciadas` e `usuario.ics_token_hash`/`ics_incluir_concluidos`/
     `ics_incluir_encerrados`. O backup JSON (ainda `schemaVersion` 1) passa a levar

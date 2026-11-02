@@ -1,16 +1,18 @@
-import { ArrowLeft, Pencil } from "lucide-react";
+import { ArrowLeft, CalendarArrowDown, Pencil } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AlterarStatus } from "@/components/concurso/alterar-status";
 import { BadgeStatus } from "@/components/concurso/badge-status";
 import { BotaoExcluirConcurso } from "@/components/concurso/botao-excluir-concurso";
+import { BotaoSilenciarConcurso } from "@/components/concurso/botao-silenciar-concurso";
 import { EventosConcurso } from "@/components/concurso/eventos-concurso";
 import { LinksConcurso } from "@/components/concurso/links-concurso";
 import { ListaTags } from "@/components/concurso/lista-tags";
 import { MarcadorConcurso } from "@/components/concurso/marcador-concurso";
 import { Markdown } from "@/components/concurso/markdown";
 import { ResultadosConcurso } from "@/components/concurso/resultados-concurso";
+import { SugestaoStatus } from "@/components/concurso/sugestao-status";
 import { TimelineStatus } from "@/components/concurso/timeline-status";
 import { ValidadeConcurso } from "@/components/concurso/validade-concurso";
 import { Button } from "@/components/ui/button";
@@ -18,6 +20,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { corDoConcurso } from "@/domain/cores";
 import { ROTULO_ESCOLARIDADE, ROTULO_ESFERA } from "@/domain/labels";
+import { sugerirStatus } from "@/domain/sugestao-status";
 import { formatarBRL, formatarDataInstante } from "@/lib/format";
 import { idSchema } from "@/lib/schemas/comum";
 import { hojeSP } from "@/lib/tz";
@@ -66,6 +69,7 @@ export default async function ConcursoPage({ params }: PageProps<"/concursos/[id
     listarResultadosFase(getDb(), c.id),
   ]);
   const pendentes = eventos.filter((e) => !e.concluido).length;
+  const sugestao = sugerirStatus(c.status, eventos, hojeSP());
   const local = [c.cidade, c.uf].filter(Boolean).join(" / ");
 
   return (
@@ -95,7 +99,18 @@ export default async function ConcursoPage({ params }: PageProps<"/concursos/[id
             <ListaTags tags={c.tags} />
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          <Button asChild variant="outline">
+            <a
+              href={`/api/export?formato=ics&concurso=${c.id}`}
+              download
+              title="Baixar os eventos deste concurso para o calendário"
+            >
+              <CalendarArrowDown aria-hidden />
+              .ics
+            </a>
+          </Button>
+          <BotaoSilenciarConcurso concursoId={c.id} silenciado={c.notificacoesSilenciadas} />
           <Button asChild variant="outline">
             <Link href={`/concursos/${c.id}/editar`}>
               <Pencil aria-hidden />
@@ -105,6 +120,10 @@ export default async function ConcursoPage({ params }: PageProps<"/concursos/[id
           <BotaoExcluirConcurso id={c.id} nome={`${c.orgao} — ${c.cargo}`} />
         </div>
       </header>
+
+      {sugestao ? (
+        <SugestaoStatus concursoId={c.id} para={sugestao.para} motivo={sugestao.motivo} />
+      ) : null}
 
       <Tabs defaultValue="geral" className="gap-4">
         <TabsList className="w-full justify-start overflow-x-auto sm:w-fit">

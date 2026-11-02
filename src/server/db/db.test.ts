@@ -59,6 +59,8 @@ describe("migrações", () => {
       "email_permitido",
       "evento",
       "link",
+      "notificacao_estado",
+      "regra_notificacao",
       "resultado_fase",
       "status_historico",
       "tag",

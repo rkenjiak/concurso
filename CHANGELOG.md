@@ -9,6 +9,35 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 
 ### Adicionado
 
+- Lembretes (RF08, #65), sem e-mail (decisão: o resumo diário por e-mail não será desenvolvido):
+  - **Notificações no app**: sino com contador de não lidas na navegação (lateral no desktop,
+    cabeçalho no celular) e no dashboard, e central em `/notificacoes` com marcar como lida,
+    marcar todas e dispensar. Calculadas sob demanda a partir dos eventos pendentes, das regras e
+    de "hoje" (Brasília), sem cron; uma notificação é o par (prazo, antecedência), então mudar a
+    data do evento não a duplica. Eventos concluídos e concursos encerrados não notificam.
+  - **Regras de notificação** em Configurações → Notificações: por tipo de evento (inclusive o fim
+    da validade), ligar/desligar e as antecedências em dias (0 = no dia), com padrão pronto e
+    "Restaurar padrão". **Silenciar** um concurso no detalhe dele cala os avisos e os alarmes só
+    daquele concurso.
+  - **Calendário .ics** (RFC 5545): feed assinável (`webcal://`) em `/api/calendario.ics?token=…`,
+    com token pessoal (só o SHA-256 fica no banco), revogável e regenerável em Configurações →
+    Calendário; usuário bloqueado perde o acesso. Opções: incluir eventos concluídos e de
+    concursos encerrados. Download manual de todos os concursos (Configurações) e de um só (botão
+    **.ics** no detalhe), via `/api/export?formato=ics[&concurso=<id>]`. Eventos sem hora são de dia
+    inteiro; com hora, convertidos de Brasília para UTC; `UID` estável por evento; pseudo-evento do
+    fim da validade; `VALARM` nos prazos críticos pendentes com as antecedências das regras.
+  - **Sugestão de status** no detalhe do concurso e no dashboard: prova passada → "Prova
+    realizada"; prazo de recurso (após a prova) encerrado → "Aguardando resultado"; inscrito com
+    prova marcada → "Prova agendada". Só sugere; "Aplicar" usa a transição validada e grava o
+    motivo no histórico.
+  - No cabeçalho do celular, abaixo de 400 px, o nome do app fica só para leitores de tela (o
+    ícone continua), para o sino caber ao lado do tema e do menu da conta.
+  - Migração `0005_lembretes`: tabelas `regra_notificacao` e `notificacao_estado`, e as colunas
+    `concurso.notificacoes_silenciadas` e `usuario.ics_token_hash`/`ics_incluir_concluidos`/
+    `ics_incluir_encerrados`. O backup JSON (ainda `schemaVersion` 1) passa a levar
+    `regrasNotificacao`, `notificacoes` (lidas/dispensadas) e `concursos[].notificacoesSilenciadas`,
+    todos opcionais; na importação, os eventos recebem IDs novos e o estado é religado a eles.
+
 - App instalável (PWA, #66): Web App Manifest (`/manifest.webmanifest`, `display: standalone`),
   ícones PNG 192/512 e maskable, `apple-icon.png` e `appleWebApp` para o iOS, e `theme-color` que
   segue o tema efetivo (do sistema ou escolhido no app), para a barra de status combinar. No Android, o

@@ -39,6 +39,7 @@ flowchart LR
   MW --> RSC[Server Components<br/>páginas / leitura]
   MW --> SA[Server Actions<br/>mutações]
   MW --> RH[Route Handlers<br/>export/import, .ics, health]
+  CAL[App de calendário] -->|feed .ics + token| RH
   LLM[Cliente MCP<br/>LLM + edital] -->|stdio ou HTTP + token| MCP[server/mcp<br/>ferramentas]
   RSC --> Q[server/queries]
   MCP --> Q
@@ -80,6 +81,9 @@ erDiagram
   CONCURSO ||--o{ CONCURSO_TAG : ""
   TAG ||--o{ CONCURSO_TAG : ""
   CONCURSO ||--o{ ANEXO : "pós-MVP"
+  USUARIO ||--o{ REGRA_NOTIFICACAO : personaliza
+  CONCURSO ||--o{ NOTIFICACAO_ESTADO : "lida/dispensada"
+  EVENTO ||--o{ NOTIFICACAO_ESTADO : ""
 ```
 
 ### 3.0 `usuario` (#49)
@@ -96,6 +100,16 @@ obrigatório, garantido por triggers porque a coluna foi adicionada com `ALTER T
   `alvo` (cópias do e-mail/descrição no momento da ação, para o registro sobreviver a mudanças),
   `acao` (`PROMOVER_ADMIN`, `REBAIXAR_ADMIN`, `BLOQUEAR_USUARIO`, `DESBLOQUEAR_USUARIO`,
   `PERMITIR_EMAIL`, `REMOVER_EMAIL`), `created_at` (índice).
+
+**Lembretes (#65, migração `0005_lembretes`):**
+- `usuario.ics_token_hash` (SHA-256 do token do feed de calendário, único), `ics_incluir_concluidos`
+  (default true) e `ics_incluir_encerrados` (default false): opções do feed e do download geral.
+- `regra_notificacao`: `usuario_id` → `usuario.id` (`CASCADE`), `tipo` (`TipoEvento`), `ativo`,
+  `antecedencias` (`text` "7,1,0"); PK (`usuario_id`, `tipo`). Só os tipos que diferem do padrão
+  (`domain/notificacoes`) são guardados.
+- `notificacao_estado`: `chave` (PK, `evento-<id>:<dias>` ou `validade-<concursoId>:<dias>`),
+  `concurso_id` → `concurso.id` e `evento_id` → `evento.id` (nulo no fim da validade; ambos
+  `CASCADE`), `antecedencia`, `lida_em`, `dispensada_em`. A notificação em si não é guardada.
 
 ### 3.1 `concurso` (RF01, RF03, RF05)
 
@@ -125,6 +139,7 @@ obrigatório, garantido por triggers porque a coluna foi adicionada com `ALTER T
 | validade_oculta_dashboard | boolean | | default false; oculta do dashboard o pseudo-evento de validade (#44) |
 | cor | enum `CorConcurso` | | `null` = automática, derivada do ID (§7.4, #46) |
 | icone | text | | um único emoji/símbolo (grafema), opcional (#46) |
+| notificacoes_silenciadas | boolean | | default false; cala notificações e alarmes do concurso (#65) |
 | busca_normalizada | text | ✔ | orgao+cargo+banca+tags em minúsculas sem acento (busca RF07) |
 | created_at / updated_at | integer (UTC) | ✔ | |
 
@@ -198,8 +213,12 @@ PROVA_REALIZADA(5) → AGUARDANDO_RESULTADO(6)`.
   e restaura o `de`), cobrindo erros de digitação sem liberar transições arbitrárias.
 - Toda mudança grava `status_historico` e atualiza `concurso.status/status_desde` na mesma transação.
 - API do domínio: `podeTransicionar(de, para)`, `transicoesPermitidas(de)`, `ehTerminal(s)`, `ehAtivo(s)`.
-- (Pós-MVP) **Sugestão de status**: se existe evento `PROVA_OBJETIVA` concluído/passado e status é
-  `PROVA_AGENDADA`, a UI sugere "Marcar como Prova realizada" (nunca automático).
+- **Sugestão de status** (#65, `domain/sugestao-status.ts`), só a partir de `INSCRITO` na trilha
+  principal; "passou" = concluído ou `data < hoje`. Prova (objetiva/discursiva) passada →
+  `PROVA_REALIZADA`; prova passada e `PRAZO_RECURSO` posterior a ela também → `AGUARDANDO_RESULTADO`;
+  `INSCRITO` com prova marcada → `PROVA_AGENDADA`. Vale a mais adiantada que seja transição
+  permitida. Nunca automático: a UI (detalhe e dashboard) oferece "Aplicar", que recalcula a
+  sugestão no servidor, usa `alterarStatus` e grava o motivo na observação do histórico.
 
 ### 4.2 Próximos prazos (RF06)
 
@@ -235,6 +254,40 @@ senão → indefinida
 - Validação: `validade_meses` entre 1 e 24.
 - Exibe "vence em X dias" e alerta quando faltam ≤ 90 dias (para lembrar de acompanhar convocações).
 
+### 4.4 Notificações (RF08, #65)
+
+`domain/notificacoes.ts`, puro, com `hoje` injetado:
+- **Regras** por `TipoEvento` (inclui `VALIDADE`, o fim da validade): `ativo` e antecedências em dias
+  (0–365, até 6, sem repetição). `REGRAS_PADRAO`: fim de inscrição 7/1/0; isenção e boleto 2/0;
+  provas e `OUTRA_FASE` 7/1; recurso 1/0; convocação, nomeação e posse 3/0; validade 90/30; os
+  demais desligados. `mesclarRegras(personalizadas)` sobrescreve o padrão tipo a tipo.
+- **Disparo sem cron** (`notificacoesDisparadas`): eventos não concluídos, de hoje em diante, de
+  concursos acompanhados e não silenciados, mais o pseudo-evento de validade (§4.3). Para cada
+  prazo, no máximo uma notificação: a da **antecedência vigente** = menor antecedência ≥ dias
+  restantes (quem abre o app na véspera vê só "amanhã"). Identidade = (prazo, antecedência), sem a
+  data: retificar a data mantém a notificação (e o estado). Do banco vêm só lida/dispensada.
+- Ordenação: dia de disparo (`data − antecedência`) desc, depois data/hora do prazo.
+- O contador do sino é calculado no layout do app e atualizado quando a página é recarregada
+  (as ações chamam `router.refresh()` ou revalidam o layout).
+
+### 4.5 Calendário iCalendar (RF08, #65)
+
+`domain/icalendar.ts` (RFC 5545), puro, com o instante da geração injetado (`DTSTAMP`):
+- Sem hora → dia inteiro (`DTSTART;VALUE=DATE`, `DTEND` no dia seguinte, `TRANSP:TRANSPARENT`).
+  Com hora → convertido de Brasília para **UTC** via `instanteSP` (sem `VTIMEZONE`; respeita o
+  histórico do fuso), 1 h de duração.
+- `UID` estável: `evento-<id>@<host>` / `validade-<concursoId>@<host>`. Importar um backup renumera
+  os eventos, o que troca os `UID`s (o calendário assinado recria os eventos uma vez).
+- `SUMMARY` = [✓ se concluído] [ícone] nome do prazo — órgão; `DESCRIPTION` com tipo, concurso,
+  observação e link; `URL` e `LAST-MODIFIED`.
+- `VALARM` (`DISPLAY`) só em prazos críticos (§4.2) pendentes de concursos ativos e não
+  silenciados, um por antecedência da regra do tipo: dia inteiro → 9h do dia do aviso; com hora →
+  mesmo horário `d` dias antes, ou 2 h antes no dia.
+- Texto escapado (barra invertida, `;`, `,`, quebras), linhas dobradas em 75 octetos UTF-8, CRLF;
+  `REFRESH-INTERVAL`/`X-PUBLISHED-TTL` de 4 h.
+- Opções: incluir concluídos e concursos encerrados (feed e download geral); o download de um
+  concurso traz todos os eventos dele.
+
 ---
 
 ## 5. Rotas, telas e ações
@@ -248,7 +301,8 @@ senão → indefinida
 | `/concursos/novo` | **Formulário** de cadastro | MVP |
 | `/concursos/[id]` | **Detalhe** em abas: Visão geral · Eventos · Links · Resultados · Histórico | MVP |
 | `/concursos/[id]/editar` | Formulário de edição | MVP |
-| `/configuracoes` | Exportar/importar dados, sobre/versão | MVP |
+| `/configuracoes` | Aparência, regras de notificação, calendário (.ics), exportar/importar dados, token do MCP, acesso | MVP |
+| `/notificacoes` | **Central de notificações** (#65): marcar como lida, marcar todas, dispensar | v2.2 |
 | `/login` | Login Google e/ou senha única (só se auth habilitada) | MVP |
 | `/admin` | **Painel admin** (#50, só papel `ADMIN`; 403 para os demais): visão geral com totais de usuários, concursos e eventos e ações recentes | v1.4 |
 | `/admin/usuarios` | Usuários (nome, e-mail, papel, cadastro, último acesso, nº de concursos); promover/rebaixar, bloquear/desbloquear | v1.4 |
@@ -268,7 +322,7 @@ PWA (#66): `app/manifest.ts` (`standalone`), ícones em `public/icons/` e `app/a
 `appleWebApp` no layout raiz (`lib/pwa.ts`). A `<meta name="theme-color">` não vem do
 `viewport.themeColor` (o Next a recriaria a cada navegação): o `SCRIPT_TEMA` a cria antes da
 pintura e o seletor de tema a atualiza, então a barra de status segue o tema efetivo (§7.3). O
-proxy libera o manifest e os ícones sem sessão. Sem service worker por enquanto: o Chrome já instala sem ele, e o Web Push (#65) o trará.
+proxy libera o manifest e os ícones sem sessão. Sem service worker por enquanto: o Chrome já instala sem ele (o Web Push, opcional em #65, ficou para depois).
 Os ícones são gerados de `assets/logo.svg` por `pnpm icones` (`scripts/gerar-icones.ts`).
 
 ### 5.2 Server Actions (`src/server/actions`)
@@ -283,6 +337,10 @@ Os ícones são gerados de `assets/logo.svg` por `pnpm icones` (`scripts/gerar-i
 | `salvarResultadoFase`, `excluirResultadoFase` | RF05 |
 | `login`, `logout` | Auth |
 | `gerarTokenMcpAcao`, `revogarTokenMcpAcao` | Token pessoal do MCP (#49) |
+| `marcarNotificacaoLidaAcao(chave)`, `dispensarNotificacaoAcao(chave)`, `marcarTodasLidasAcao()` | #65 — estado das notificações (`evento-<id>:<dias>` / `validade-<id>:<dias>`) |
+| `salvarRegrasNotificacaoAcao(regras)`, `restaurarRegrasPadraoAcao()`, `silenciarConcursoAcao(id, silenciado)` | #65 — regras e silenciamento por concurso |
+| `gerarTokenIcsAcao`, `revogarTokenIcsAcao`, `salvarOpcoesIcsAcao(opcoes)` | #65 — feed de calendário |
+| `aplicarSugestaoStatus(id, esperado)` | #65 — aplica a sugestão recalculada no servidor |
 | `alternarVisaoAcao(visao)` | #50 — "usuario" ou "admin" (só admins); grava o cookie da visão e leva a `/` ou `/admin` |
 | `definirPapelAcao(id, papel)`, `definirBloqueioAcao(id, bloqueado)` | #50 — admin; protege o último admin ativo e os de `ADMIN_EMAILS` |
 | `adicionarEmailPermitidoAcao(email)`, `removerEmailPermitidoAcao(email)` | #50 — admin; allowlist do painel |
@@ -294,12 +352,12 @@ Retorno padronizado `{ ok: true, data } | { ok: false, erros }`.
 
 | Rota | Uso |
 |---|---|
-| `GET /api/export?formato=json\|csv` | RF09 (CSV = um arquivo por entidade em `.zip`, ou só concursos) |
+| `GET /api/export?formato=json\|csv\|ics` | RF09 (CSV = um arquivo por entidade em `.zip`, ou só concursos); `ics` = RF08, todos os concursos ou `&concurso=<id>` |
 | `POST /api/import` | RF09 — importa JSON (substituir tudo ou mesclar; valida com Zod e versão do schema) |
 | `GET /api/health` | health check do deploy |
 | `POST/GET/DELETE /api/mcp` | RF10 — servidor MCP (Streamable HTTP); exige `Authorization: Bearer <token pessoal>` |
 | `GET /api/auth/google` e `/api/auth/google/callback` | #49 — login com Google (OIDC, código + PKCE) |
-| `GET /api/calendario.ics?token=…` | RF08, pós-MVP (assinável no Google Calendar) |
+| `GET /api/calendario.ics?token=…` | RF08 (#65) — feed assinável; pública no `proxy.ts`, autenticada pelo token do feed (`cics_…`, SHA-256 em `usuario.ics_token_hash`); token inválido/revogado ou usuário bloqueado → 404; atraso progressivo como o MCP |
 
 ### 5.4 Servidor MCP (`src/server/mcp`, RF10)
 
@@ -360,10 +418,12 @@ Decisões (issue #39):
 │   │   ├── concurso/               # formulários, cards, tabelas, badges de status
 │   │   ├── admin/                  # painel admin (#50)
 │   │   ├── layout/                 # casca, navegação, menu da conta
+│   │   ├── notificacoes/           # sino e central de notificações (#65)
 │   │   └── tema/                   # seletor de tema (claro/escuro/sistema)
 │   ├── domain/                     # regras puras + testes *.test.ts ao lado
 │   │   ├── enums.ts  labels.ts
 │   │   ├── status.ts  prazos.ts  validade.ts
+│   │   ├── notificacoes.ts  icalendar.ts  sugestao-status.ts   # lembretes (#65)
 │   ├── server/
 │   │   ├── db/                     # schema.ts, client.ts, migrate.ts
 │   │   ├── queries/                # leituras (lista, dashboard, detalhe)
@@ -400,8 +460,8 @@ Decisões (issue #39):
   após falhas. Em produção não pode coexistir com o Google.
 - **Sessão:** cookie **JWT assinado** (`jose`, HS256 com `AUTH_SECRET` ≥ 32 bytes) com o ID do
   usuário e o método de login; `httpOnly`, `secure`, `SameSite=Lax`, 30 dias. `proxy.ts` confere só
-  a assinatura (sem banco) e protege tudo exceto `/login`, `/api/health`, `/api/auth/google…` e
-  `/api/mcp`; páginas, Server Actions e Route Handlers obtêm o usuário em `auth/acesso.ts`
+  a assinatura (sem banco) e protege tudo exceto `/login`, `/api/health`, `/api/auth/google…`,
+  `/api/mcp` e `/api/calendario.ics`; páginas, Server Actions e Route Handlers obtêm o usuário em `auth/acesso.ts`
   (`exigirUsuarioPagina/Acao/Rota`), que relê o usuário no banco.
 - Em produção (`NODE_ENV=production`) sem login, o app **recusa iniciar** salvo
   `ALLOW_NO_AUTH=true` explícito — evita expor dados por esquecimento.
@@ -424,7 +484,7 @@ Decisões (issue #39):
   (`WHERE … AND EXISTS (outro admin ativo)`), sem janela de corrida. Ninguém bloqueia a própria
   conta; quem se rebaixa volta para a visão usuário.
 - **Bloqueio:** `usuario.bloqueado_em`. Barra o login (Google e senha), a sessão existente
-  (relida a cada requisição) e o token do MCP; os dados e o token ficam guardados e voltam a valer
+  (relida a cada requisição) e os tokens do MCP e do feed de calendário; os dados e o token ficam guardados e voltam a valer
   ao desbloquear. Sem login configurado (uso local), o bloqueio não se aplica.
 - **Visão admin ↔ visão usuário:** seletor no menu da conta, só para admins, sem novo login. A
   escolha fica no cookie `concurso_visao` (`auth/visao.ts`) e decide o início (`/` redireciona a
@@ -555,7 +615,7 @@ Cada item = uma branch `feature/*` a partir de `develop`; cada milestone fecha c
 | **Ajustes de uso** → `v1.3.0` | `feature/markdown-tabelas` (#43) · `feature/dashboard-ocultar-eventos` (#44) · `feature/calendario-popup` (#45) · `feature/tema-escuro` (#47) · `feature/cor-concurso` (#46) | Melhorias pedidas no uso diário |
 | **Multiusuário** → `v2.0.0` | `feature/login-google-multiusuario` (#49) · `feature/painel-admin` (#50) | Login Google, dados por usuário, painel admin (RF11) |
 | **Integração Vercel + Turso** → `v2.1.0` | `feature/turso-env-vercel` (#62) | Lê `TURSO_DATABASE_URL`/`TURSO_AUTH_TOKEN` da integração do Marketplace |
-| **M6 — Lembretes** → `v2.2.0` | `feature/exportar-ics` (RF08) · `feature/sugestao-status` · `feature/notificacao-email` (opcional) | RF08 |
+| **M6 — Lembretes** → `v2.2.0` | `feature/lembretes` (#65): feed/download .ics, notificações no app com regras configuráveis, sugestão de status. E-mail descartado (2026-11-01) | RF08 |
 | **M7 — Anexos** → `v2.3.0` | `feature/anexos` | RF02 desejável |
 
 ---
@@ -566,7 +626,7 @@ Cada item = uma branch `feature/*` a partir de `develop`; cada milestone fecha c
 |---|---|---|---|
 | 1 | Local ou hospedado? | **Local-first**, com hospedagem opcional pronta (Vercel+Turso). Auth ligada por variável de ambiente; produção sem senha bloqueada por padrão. | Nenhum retrabalho: driver libSQL e proxy de auth já previstos. |
 | 2 | Anexos no MVP? | **Não** — só links no MVP (edital costuma estar em URL pública). Anexos no M7 com interface `Storage` (`disco local` / Vercel Blob ou Cloudflare R2), limite 10 MB, só PDF/imagem. | Tabela `anexo` já desenhada; backup passa a incluir arquivos. |
-| 3 | E-mail desde o início? | **Não.** Primeiro o feed **.ics assinável** (M6): o Google/Apple Calendar notifica no celular de graça. E-mail depois, se necessário: Resend + cron (Vercel Cron ou GitHub Actions `schedule`) com resumo diário. | E-mail exige app hospedado e segredo extra; .ics funciona até local (download manual). |
+| 3 | E-mail desde o início? | **Não — e não será feito** (decisão de 2026-11-01). O feed **.ics assinável** (M6) faz o Google/Apple Calendar notificar no celular de graça, e as notificações no app cobrem o uso na web. | Sem cron, sem segredo extra e sem serviço de e-mail; .ics funciona até local (download manual). |
 
 **Outros riscos**
 - **Fuso/datas** (prazos errados por 1 dia): datas como `YYYY-MM-DD` de Brasília, `hoje` injetado,

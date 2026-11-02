@@ -26,7 +26,16 @@ test("cadastrar concurso → mudar status → adicionar evento → ver no dashbo
   await dialogo.getByLabel("Hora").fill("13:00");
   await dialogo.getByRole("button", { name: "Salvar" }).click();
   await expect(dialogo).toBeHidden();
-  await expect(page.getByText(titulo)).toBeVisible();
+  await expect(page.getByText(titulo, { exact: true })).toBeVisible();
+
+  // Inscrito com prova marcada: o app sugere "Prova agendada" (#65); aplicar grava no histórico.
+  const sugestao = page.getByTestId("sugestao-status");
+  await expect(sugestao).toContainText(`${titulo} marcada para`);
+  await expect(sugestao).toContainText("Prova agendada");
+  await sugestao.getByRole("button", { name: "Aplicar" }).click();
+  await expect(sugestao).toBeHidden();
+  await page.getByRole("tab", { name: "Histórico" }).click();
+  await expect(page.getByText(/^Sugestão: .*marcada para/)).toBeVisible();
 
   // Dashboard: o prazo aparece com o concurso e leva ao detalhe.
   await page.goto("/");

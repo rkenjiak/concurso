@@ -94,8 +94,9 @@ Status sugeridos, em ordem:
 - Ordenar por próxima data, remuneração, data de cadastro.
 
 ### RF08 — Lembretes (desejável, pós-MVP)
-- Notificação de prazos próximos (e-mail ou notificação do navegador).
-- Exportar eventos para calendário (.ics).
+- Notificação de prazos próximos ~~(e-mail ou notificação do navegador)~~ — no próprio app, com regras
+  configuráveis por tipo de evento (#65). E-mail fora do escopo (decisão de 2026-11-01).
+- Exportar eventos para calendário (.ics), inclusive como feed assinável.
 
 ### RF09 — Exportação / backup
 - Exportar todos os dados em JSON e/ou CSV; importar a partir do JSON.

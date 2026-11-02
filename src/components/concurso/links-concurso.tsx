@@ -2,7 +2,6 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowDown, ArrowUp, ExternalLink, Pencil, Plus, Trash2 } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { Badge } from "@/components/ui/badge";
@@ -38,7 +37,6 @@ interface LinksConcursoProps {
 
 /** Lista e gerencia os links do concurso (RF02). Links externos abrem em nova aba com segurança. */
 export function LinksConcurso({ concursoId, links }: LinksConcursoProps) {
-  const router = useRouter();
   const [editando, setEditando] = useState<LinkItem | "novo" | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [movendo, iniciarMover] = useTransition();
@@ -54,8 +52,7 @@ export function LinksConcurso({ concursoId, links }: LinksConcursoProps) {
     setErro(null);
     iniciarMover(async () => {
       const r = await reordenarLinks(concursoId, ids);
-      if (r.ok) router.refresh();
-      else setErro(r.erros._form?.[0] ?? "Não foi possível reordenar.");
+      if (!r.ok) setErro(r.erros._form?.[0] ?? "Não foi possível reordenar.");
     });
   }
 
@@ -121,7 +118,6 @@ export function LinksConcurso({ concursoId, links }: LinksConcursoProps) {
                   tamanho="icon"
                   rotuloAcessivel={`Excluir link ${l.rotulo ?? ROTULO_TIPO_LINK[l.tipo]}`}
                   acao={() => excluirLink(concursoId, l.id)}
-                  aoConcluir={() => router.refresh()}
                 >
                   <Trash2 aria-hidden />
                 </BotaoConfirmar>
@@ -147,10 +143,7 @@ export function LinksConcurso({ concursoId, links }: LinksConcursoProps) {
               key={editando === "novo" ? "novo" : editando.id}
               concursoId={concursoId}
               link={editando === "novo" ? null : editando}
-              aoConcluir={() => {
-                setEditando(null);
-                router.refresh();
-              }}
+              aoConcluir={() => setEditando(null)}
             />
           ) : null}
         </DialogContent>

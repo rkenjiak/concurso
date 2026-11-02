@@ -74,11 +74,8 @@ export function FormularioConcurso({
       const r = editando
         ? await atualizarConcurso(concursoId, valores)
         : await criarConcurso(valores);
-      if (r.ok) {
-        router.push(`/concursos/${r.data.id}`);
-        router.refresh();
-        return;
-      }
+      // Em caso de sucesso a action redireciona para o detalhe na própria resposta (#73).
+      if (r.ok) return;
       for (const [campo, mensagens] of Object.entries(r.erros)) {
         if (CAMPOS.has(campo) && mensagens?.[0]) {
           setError(campo as keyof ConcursoFormValores, { message: mensagens[0] });

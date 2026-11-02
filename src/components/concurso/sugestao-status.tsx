@@ -1,7 +1,6 @@
 "use client";
 
 import { Lightbulb, Loader2 } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import type { Status } from "@/domain/enums";
@@ -27,7 +26,6 @@ export function SugestaoStatus({
   nomeConcurso?: string;
   compacta?: boolean;
 }) {
-  const router = useRouter();
   const [pendente, iniciar] = useTransition();
   const [erro, setErro] = useState<string | null>(null);
   const [escondida, setEscondida] = useState(false);
@@ -37,8 +35,7 @@ export function SugestaoStatus({
     setErro(null);
     iniciar(async () => {
       const r = await aplicarSugestaoStatus(concursoId, para);
-      if (r.ok) router.refresh();
-      else setErro(r.erros._form?.[0] ?? "Não foi possível mudar o status.");
+      if (!r.ok) setErro(r.erros._form?.[0] ?? "Não foi possível mudar o status.");
     });
   }
 

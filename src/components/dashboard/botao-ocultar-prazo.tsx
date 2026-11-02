@@ -1,7 +1,6 @@
 "use client";
 
 import { Eye, EyeOff, Loader2 } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { alternarPrazoOculto } from "@/server/actions/dashboard";
@@ -17,7 +16,6 @@ interface BotaoOcultarPrazoProps {
 
 /** Oculta ou reexibe um prazo no dashboard (#44). A preferência é gravada no banco. */
 export function BotaoOcultarPrazo({ chave, oculto, nome }: BotaoOcultarPrazoProps) {
-  const router = useRouter();
   const [pendente, iniciar] = useTransition();
   const [erro, setErro] = useState<string | null>(null);
   const rotulo = oculto ? `Mostrar "${nome}" no dashboard` : `Ocultar "${nome}" do dashboard`;
@@ -26,8 +24,7 @@ export function BotaoOcultarPrazo({ chave, oculto, nome }: BotaoOcultarPrazoProp
     setErro(null);
     iniciar(async () => {
       const r = await alternarPrazoOculto(chave, !oculto);
-      if (r.ok) router.refresh();
-      else setErro(r.erros._form?.[0] ?? "Não foi possível atualizar o prazo.");
+      if (!r.ok) setErro(r.erros._form?.[0] ?? "Não foi possível atualizar o prazo.");
     });
   }
 

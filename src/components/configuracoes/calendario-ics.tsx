@@ -1,7 +1,6 @@
 "use client";
 
 import { CalendarPlus, Copy, Download, Link2, Trash2 } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useId, useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -38,7 +37,6 @@ interface Props {
  */
 export function CalendarioIcs({ temToken: temTokenInicial, ...opcoesIniciais }: Props) {
   const idUrl = useId();
-  const router = useRouter();
   const [temToken, setTemToken] = useState(temTokenInicial);
   const [url, setUrl] = useState<string | null>(null);
   const [opcoes, setOpcoes] = useState(opcoesIniciais);
@@ -84,7 +82,6 @@ export function CalendarioIcs({ temToken: temTokenInicial, ...opcoesIniciais }: 
         return;
       }
       setErro(null);
-      router.refresh();
     });
   }
 

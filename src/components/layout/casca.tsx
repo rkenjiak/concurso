@@ -60,16 +60,16 @@ export function Casca({
         <div className="flex min-w-0 flex-1 flex-col">
           {/* Áreas seguras (#66): no app instalado, o cabeçalho não fica sob o notch/barra. */}
           <header className="sticky top-0 z-30 flex h-[calc(3.5rem+env(safe-area-inset-top))] items-center gap-2 border-b bg-background/95 pt-[env(safe-area-inset-top)] pr-[max(1rem,env(safe-area-inset-right))] pl-[max(1rem,env(safe-area-inset-left))] backdrop-blur md:hidden">
-            {/* Com selo (visão admin) ou sino (#65), o nome não cabe ao lado dos controles em
-                ~360 px: fica só o ícone (o nome segue para leitores de tela). */}
-            <Marca
-              nomeClassName={selo || naoLidas !== undefined ? "max-[399px]:sr-only" : undefined}
-            />
+            {/* Com selo (visão admin), o nome não cabe ao lado dos controles em ~360 px: fica só o
+                ícone (o nome segue para leitores de tela). O tema fica dentro do menu da conta
+                (#78), o que deixa espaço para mais um ícone ao lado do sino. */}
+            <Marca nomeClassName={selo ? "max-[399px]:sr-only" : undefined} />
             {selo}
-            <SeletorTema className="ml-auto" />
-            {visao === "usuario" ? <BotaoAtualizar /> : null}
-            {naoLidas !== undefined ? <SinoNotificacoes naoLidas={naoLidas} /> : null}
-            <MenuConta {...menu} compacto />
+            <div className="ml-auto flex items-center gap-2">
+              {visao === "usuario" ? <BotaoAtualizar /> : null}
+              {naoLidas !== undefined ? <SinoNotificacoes naoLidas={naoLidas} /> : null}
+              <MenuConta {...menu} compacto />
+            </div>
           </header>
           {faixa}
           <main className="mx-auto w-full max-w-5xl flex-1 px-4 pt-6 pb-[calc(6rem+env(safe-area-inset-bottom))] md:px-8 md:pb-10">

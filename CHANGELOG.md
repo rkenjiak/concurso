@@ -21,6 +21,15 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
   reabrir o PWA) mantém a aba, e voltar para a página pelo histórico também. A troca usa
   `history.replaceState`, sem requisição ao servidor nem entradas no histórico.
 
+### Alterado
+
+- Um único sino de notificações por tela (#78): o card "Próximos prazos" do dashboard perdeu o
+  sino próprio, que repetia o da navegação (cabeçalho no celular, barra lateral no desktop) com o
+  mesmo contador. O dashboard deixa de calcular as não lidas, que já vêm do layout.
+- No celular, o seletor de tema passa para dentro do menu da conta (Claro / Escuro / Sistema), o
+  que libera espaço no cabeçalho de 360 px e devolve o nome do app ao lado do ícone. No desktop o
+  seletor continua na barra lateral.
+
 ## [2.3.0] - 2026-11-02
 
 ### Adicionado

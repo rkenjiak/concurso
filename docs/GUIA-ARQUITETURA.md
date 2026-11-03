@@ -219,8 +219,9 @@ Pontos-chave:
 
 - **Não há API REST para a tela.** O componente de página é `async` e chama a query diretamente.
 - A query busca o mínimo no SQL e delega a **regra** (o que é vencido, o que é crítico) ao domínio.
-- Em paralelo, a página pede o contador do sino (`queries/notificacoes.ts`) e as sugestões de
-  status (`queries/sugestoes.ts`) — ambos calculados na hora, sem cron (seção 7.4 abaixo).
+- O layout do app pede o contador do sino (`queries/notificacoes.ts`) e a página, em paralelo, as
+  sugestões de status (`queries/sugestoes.ts`) — ambos calculados na hora, sem cron (seção 7.4
+  abaixo).
 - Componentes interativos (`"use client"`) são só as "ilhas" que precisam de estado: formulários,
   diálogos, seletor de tema, quadro arrastável.
 - A tela não se atualiza sozinha quando os dados mudam por fora (MCP, outro aparelho): o usuário

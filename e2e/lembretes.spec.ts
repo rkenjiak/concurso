@@ -26,7 +26,8 @@ test("lembretes: notificação no app, feed .ics assinável e revogado (#65)", a
   await expect(dialogo).toBeHidden();
 
   // Regra padrão (7, 1 e 0 dias): aviso "amanhã" no sino.
-  const sino = page.getByRole("link", { name: /^Notificações \(\d+ não lidas?\)/ }).first();
+  // Um único sino visível por tela (#78): sem `.first()`, o modo estrito acusa duplicatas.
+  const sino = page.getByRole("link", { name: /^Notificações \(\d+ não lidas?\)/ });
   await expect(sino).toBeVisible();
   await sino.click();
   await expect(page).toHaveURL(/\/notificacoes$/);

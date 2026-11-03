@@ -7,7 +7,6 @@ import { BadgeStatus } from "@/components/concurso/badge-status";
 import { SugestaoStatus } from "@/components/concurso/sugestao-status";
 import { ListaPrazos } from "@/components/dashboard/lista-prazos";
 import { CabecalhoPagina } from "@/components/layout/cabecalho-pagina";
-import { SinoNotificacoes } from "@/components/notificacoes/sino-notificacoes";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -25,7 +24,6 @@ import { exigirUsuarioPagina } from "@/server/auth/acesso";
 import { visaoAtual } from "@/server/auth/admin";
 import { getDb } from "@/server/db/client";
 import { obterDashboard } from "@/server/queries/dashboard";
-import { contarNotificacoesNaoLidas } from "@/server/queries/notificacoes";
 import { listarSugestoesStatus } from "@/server/queries/sugestoes";
 
 export const metadata: Metadata = { title: "Dashboard" };
@@ -68,9 +66,9 @@ export default async function DashboardPage({ searchParams }: PageProps<"/">) {
   if ((await visaoAtual(usuario)) === "admin") redirect("/admin");
   const usuarioId = usuario.id;
   const db = getDb();
-  const [dashboard, naoLidas, sugestoes] = await Promise.all([
+  // O contador de não lidas fica só no sino global, calculado no layout (#78).
+  const [dashboard, sugestoes] = await Promise.all([
     obterDashboard(db, usuarioId, hoje),
-    contarNotificacoesNaoLidas(db, usuarioId, hoje),
     listarSugestoesStatus(db, usuarioId, hoje),
   ]);
   const { porStatus, totalConcursos, ocultos } = dashboard;
@@ -119,11 +117,8 @@ export default async function DashboardPage({ searchParams }: PageProps<"/">) {
       <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <Card>
           <CardHeader>
-            {/* Sino ao lado do título (#65): não disputa largura com "Mostrar ocultos" em 360 px. */}
-            <CardTitle className="flex items-center gap-1">
-              Próximos prazos
-              <SinoNotificacoes naoLidas={naoLidas} className="-my-2" />
-            </CardTitle>
+            {/* Sem sino próprio (#78): o global (cabeçalho/barra lateral) é o único ponto de entrada. */}
+            <CardTitle>Próximos prazos</CardTitle>
             <CardDescription>
               Eventos pendentes de concursos em andamento: vencidos, hoje e próximos{" "}
               {JANELA_PADRAO_DIAS} dias.

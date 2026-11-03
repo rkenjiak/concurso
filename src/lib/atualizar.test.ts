@@ -40,8 +40,9 @@ describe("segundosRestantes", () => {
     expect(segundosRestantes(t, t + 3_600_000)).toBe(0);
   });
 
-  it("não passa do intervalo se o relógio voltou", () => {
-    expect(segundosRestantes(t, t - 3_600_000)).toBe(60);
+  it("libera se o relógio voltou (último clique no futuro)", () => {
+    expect(segundosRestantes(t, t - 1)).toBe(0);
+    expect(segundosRestantes(t, t - 3_600_000)).toBe(0);
   });
 });
 

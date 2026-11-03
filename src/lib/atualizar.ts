@@ -19,11 +19,12 @@ export function lerUltimaAtualizacao(valor: string | null | undefined): number |
 
 /**
  * Segundos inteiros (arredondados para cima) até liberar o próximo clique; 0 = liberado.
- * Nunca passa do intervalo, mesmo se o relógio do aparelho tiver voltado.
+ * Último clique "no futuro" (o relógio do aparelho voltou) libera na hora, em vez de travar o
+ * botão até o relógio alcançar a hora gravada.
  */
 export function segundosRestantes(ultima: number | null, agora: number): number {
-  if (ultima === null) return 0;
-  const faltam = Math.min(ultima + INTERVALO_ATUALIZAR_MS - agora, INTERVALO_ATUALIZAR_MS);
+  if (ultima === null || ultima > agora) return 0;
+  const faltam = ultima + INTERVALO_ATUALIZAR_MS - agora;
   return faltam > 0 ? Math.ceil(faltam / 1000) : 0;
 }
 

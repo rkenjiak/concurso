@@ -22,7 +22,6 @@ import { TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { corDoConcurso } from "@/domain/cores";
 import { ROTULO_ESCOLARIDADE, ROTULO_ESFERA } from "@/domain/labels";
 import { sugerirStatus } from "@/domain/sugestao-status";
-import { normalizarAba } from "@/lib/aba-concurso";
 import { formatarBRL, formatarDataInstante } from "@/lib/format";
 import { idSchema } from "@/lib/schemas/comum";
 import { hojeSP } from "@/lib/tz";
@@ -62,10 +61,8 @@ function Item({ rotulo, children }: { rotulo: string; children: React.ReactNode 
 
 const numero = (n: number | null) => (n == null ? "—" : n.toLocaleString("pt-BR"));
 
-export default async function ConcursoPage({ params, searchParams }: PageProps<"/concursos/[id]">) {
+export default async function ConcursoPage({ params }: PageProps<"/concursos/[id]">) {
   const c = await carregar(params);
-  // Aba na URL (#77): recarregar a página mantém a aba que estava aberta.
-  const abaInicial = normalizarAba((await searchParams).aba);
   const [{ historico, opcoes }, links, eventos, resultados] = await Promise.all([
     obterOpcoesStatus(getDb(), c.id, c.status),
     listarLinks(getDb(), c.id),
@@ -129,7 +126,8 @@ export default async function ConcursoPage({ params, searchParams }: PageProps<"
         <SugestaoStatus concursoId={c.id} para={sugestao.para} motivo={sugestao.motivo} />
       ) : null}
 
-      <AbasConcurso abaInicial={abaInicial} className="gap-4">
+      {/* Aba aberta em `?aba=` (#77): recarregar a página mantém a aba. */}
+      <AbasConcurso className="gap-4">
         <TabsList className="w-full justify-start overflow-x-auto sm:w-fit">
           <TabsTrigger value="geral">Visão geral</TabsTrigger>
           <TabsTrigger value="eventos">Eventos ({pendentes})</TabsTrigger>

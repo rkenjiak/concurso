@@ -16,8 +16,8 @@ export function ehAbaConcurso(valor: unknown): valor is AbaConcurso {
 }
 
 /**
- * Valor de `searchParams.aba` → aba válida. Valor ausente, repetido (`?aba=a&aba=b` chega como
- * array) ou desconhecido cai na aba padrão.
+ * Valor de `?aba=` → aba válida. Valor ausente, repetido (array, no `searchParams` da página) ou
+ * desconhecido cai na aba padrão.
  */
 export function normalizarAba(valor: string | string[] | undefined): AbaConcurso {
   return ehAbaConcurso(valor) ? valor : ABA_PADRAO;

@@ -278,7 +278,9 @@ senão → indefinida
   botão **Atualizar** (#77, `layout/botao-atualizar.tsx`), no cabeçalho do celular e na barra
   lateral do desktop, chama `router.refresh()` no máximo uma vez por minuto (hora do último clique
   no `sessionStorage`, regra em `lib/atualizar.ts`); na espera fica com `aria-disabled` e o rótulo
-  diz quanto falta.
+  diz quanto falta. Custo real de um clique: a requisição do refresh e mais os prefetches dos links
+  visíveis, porque o `router.refresh()` limpa o cache do roteador no navegador (cerca de 13
+  requisições no detalhe do concurso, no desktop).
 
 ### 4.5 Calendário iCalendar (RF08, #65)
 
@@ -309,7 +311,7 @@ senão → indefinida
 | `/` | **Dashboard**: próximos prazos (vencidos/hoje/30 dias), contagem por status, atalhos; ocultar/reexibir prazos, `?ocultos=1` mostra os ocultos | MVP |
 | `/concursos` | **Lista** com busca, filtros e ordenação em `searchParams` (URL compartilhável) | MVP |
 | `/concursos/novo` | **Formulário** de cadastro | MVP |
-| `/concursos/[id]` | **Detalhe** em abas: Visão geral · Eventos · Links · Resultados · Histórico; a aba aberta fica em `?aba=` (#77, gravada com `history.replaceState`, sem ir ao servidor) | MVP |
+| `/concursos/[id]` | **Detalhe** em abas: Visão geral · Eventos · Links · Resultados · Histórico; a aba aberta fica em `?aba=` (#77): abas controladas pelo `useSearchParams`, troca gravada com `history.replaceState`, sem ir ao servidor | MVP |
 | `/concursos/[id]/editar` | Formulário de edição | MVP |
 | `/configuracoes` | Aparência, regras de notificação, calendário (.ics), exportar/importar dados, token do MCP, acesso | MVP |
 | `/notificacoes` | **Central de notificações** (#65): marcar como lida, marcar todas, dispensar | v2.2 |

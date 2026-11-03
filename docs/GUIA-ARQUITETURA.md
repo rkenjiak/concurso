@@ -223,6 +223,8 @@ Pontos-chave:
   status (`queries/sugestoes.ts`) — ambos calculados na hora, sem cron (seção 7.4 abaixo).
 - Componentes interativos (`"use client"`) são só as "ilhas" que precisam de estado: formulários,
   diálogos, seletor de tema, quadro arrastável.
+- A tela não se atualiza sozinha quando os dados mudam por fora (MCP, outro aparelho): o usuário
+  usa o botão **Atualizar**, que chama `router.refresh()` no máximo uma vez por minuto (#77).
 
 ---
 

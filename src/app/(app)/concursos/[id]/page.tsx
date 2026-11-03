@@ -2,6 +2,7 @@ import { ArrowLeft, CalendarArrowDown, Pencil } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { AbasConcurso } from "@/components/concurso/abas-concurso";
 import { AlterarStatus } from "@/components/concurso/alterar-status";
 import { BadgeStatus } from "@/components/concurso/badge-status";
 import { BotaoExcluirConcurso } from "@/components/concurso/botao-excluir-concurso";
@@ -17,10 +18,11 @@ import { TimelineStatus } from "@/components/concurso/timeline-status";
 import { ValidadeConcurso } from "@/components/concurso/validade-concurso";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { corDoConcurso } from "@/domain/cores";
 import { ROTULO_ESCOLARIDADE, ROTULO_ESFERA } from "@/domain/labels";
 import { sugerirStatus } from "@/domain/sugestao-status";
+import { normalizarAba } from "@/lib/aba-concurso";
 import { formatarBRL, formatarDataInstante } from "@/lib/format";
 import { idSchema } from "@/lib/schemas/comum";
 import { hojeSP } from "@/lib/tz";
@@ -60,8 +62,10 @@ function Item({ rotulo, children }: { rotulo: string; children: React.ReactNode 
 
 const numero = (n: number | null) => (n == null ? "—" : n.toLocaleString("pt-BR"));
 
-export default async function ConcursoPage({ params }: PageProps<"/concursos/[id]">) {
+export default async function ConcursoPage({ params, searchParams }: PageProps<"/concursos/[id]">) {
   const c = await carregar(params);
+  // Aba na URL (#77): recarregar a página mantém a aba que estava aberta.
+  const abaInicial = normalizarAba((await searchParams).aba);
   const [{ historico, opcoes }, links, eventos, resultados] = await Promise.all([
     obterOpcoesStatus(getDb(), c.id, c.status),
     listarLinks(getDb(), c.id),
@@ -125,7 +129,7 @@ export default async function ConcursoPage({ params }: PageProps<"/concursos/[id
         <SugestaoStatus concursoId={c.id} para={sugestao.para} motivo={sugestao.motivo} />
       ) : null}
 
-      <Tabs defaultValue="geral" className="gap-4">
+      <AbasConcurso abaInicial={abaInicial} className="gap-4">
         <TabsList className="w-full justify-start overflow-x-auto sm:w-fit">
           <TabsTrigger value="geral">Visão geral</TabsTrigger>
           <TabsTrigger value="eventos">Eventos ({pendentes})</TabsTrigger>
@@ -289,7 +293,7 @@ export default async function ConcursoPage({ params }: PageProps<"/concursos/[id
             </CardContent>
           </Card>
         </TabsContent>
-      </Tabs>
+      </AbasConcurso>
     </div>
   );
 }

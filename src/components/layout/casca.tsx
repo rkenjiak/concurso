@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { BotaoAtualizar } from "@/components/layout/botao-atualizar";
 import { Marca } from "@/components/layout/marca";
 import { type ContaMenu, MenuConta } from "@/components/layout/menu-conta";
 import { NavegacaoInferior, NavegacaoLateral } from "@/components/layout/navegacao";
@@ -41,8 +42,12 @@ export function Casca({
           <div className="flex items-center gap-2">
             <Marca />
             {selo}
+            {visao === "usuario" ? <BotaoAtualizar className="ml-auto" /> : null}
             {naoLidas !== undefined ? (
-              <SinoNotificacoes naoLidas={naoLidas} className="ml-auto" />
+              <SinoNotificacoes
+                naoLidas={naoLidas}
+                className={visao === "usuario" ? undefined : "ml-auto"}
+              />
             ) : null}
           </div>
           <NavegacaoLateral secao={secao} />
@@ -62,6 +67,7 @@ export function Casca({
             />
             {selo}
             <SeletorTema className="ml-auto" />
+            {visao === "usuario" ? <BotaoAtualizar /> : null}
             {naoLidas !== undefined ? <SinoNotificacoes naoLidas={naoLidas} /> : null}
             <MenuConta {...menu} compacto />
           </header>

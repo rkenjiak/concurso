@@ -15,7 +15,7 @@ export function rotuloSino(naoLidas: number): string {
 
 /**
  * Sino da central de notificações (#65): leva a `/notificacoes`, com o contador de não lidas.
- * Aparece na navegação (lateral no desktop, cabeçalho no celular) e no dashboard.
+ * Fica só na navegação (lateral no desktop, cabeçalho no celular): um único sino por tela (#78).
  */
 export function SinoNotificacoes({
   naoLidas,

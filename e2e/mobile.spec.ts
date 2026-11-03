@@ -74,6 +74,14 @@ test("mobile: navegação inferior e alvos de toque de pelo menos 40 px", async 
   await expect(page).toHaveURL(/\/calendario$/);
 
   // Botões e campos crescem em telas de toque (sem mudar o desktop).
+  // Cabeçalho (#77): o botão "Atualizar" cabe em 360 px, com alvo de toque de 40 px.
+  const atualizar = page.getByRole("banner").getByTestId("botao-atualizar");
+  await expect(atualizar).toBeVisible();
+  const caixa = await atualizar.boundingBox();
+  expect(caixa?.width).toBeGreaterThanOrEqual(40);
+  expect(caixa?.height).toBeGreaterThanOrEqual(40);
+  expect((caixa?.x ?? 0) + (caixa?.width ?? 0)).toBeLessThanOrEqual(360);
+
   await page.goto("/concursos");
   const botao = page.getByRole("button", { name: "Buscar" });
   expect((await botao.boundingBox())?.height).toBeGreaterThanOrEqual(40);

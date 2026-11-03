@@ -40,23 +40,32 @@ test.describe("desktop", () => {
 test.describe("celular (360 px)", () => {
   test.use({ viewport: { width: 360, height: 740 }, hasTouch: true, isMobile: true });
 
-  test("sino único: só o do cabeçalho, com espaço para mais um ícone (#78)", async ({ page }) => {
+  test("sino único: só o do cabeçalho, com o botão Atualizar ao lado (#77, #78)", async ({
+    page,
+  }) => {
     await criarAvisoNaoLido(page);
     await umSinoNoDashboard(page);
     const cabecalho = page.getByRole("banner");
     await expect(cabecalho.getByTestId("sino-notificacoes")).toBeVisible();
 
-    // O tema saiu do cabeçalho (vai para o menu da conta) e sobra espaço livre para outro botão
-    // de 40 px (+ 8 px de espaçamento) entre a marca e o grupo de controles à direita.
+    // O tema saiu do cabeçalho (vai para o menu da conta, #78) e o espaço liberado recebe o botão
+    // "Atualizar" (#77), no mesmo grupo do sino, sem encostar na marca.
     await expect(cabecalho.getByRole("group", { name: "Tema" })).toHaveCount(0);
-    const folga = await cabecalho.evaluate((el) => {
+    const medidas = await cabecalho.evaluate((el) => {
       const marca = el.querySelector("a[href='/']")?.getBoundingClientRect();
-      const controles = el
-        .querySelector("[data-testid='sino-notificacoes']")
-        ?.parentElement?.getBoundingClientRect();
-      return marca && controles ? controles.left - marca.right : 0;
+      const sino = el.querySelector("[data-testid='sino-notificacoes']");
+      const grupo = sino?.parentElement;
+      const atualizar = grupo?.querySelector("[data-testid='botao-atualizar']");
+      const controles = grupo?.getBoundingClientRect();
+      return {
+        mesmoGrupo: Boolean(atualizar),
+        folga: marca && controles ? controles.left - marca.right : 0,
+        direita: controles?.right ?? Number.POSITIVE_INFINITY,
+      };
     });
-    expect(folga).toBeGreaterThanOrEqual(48);
+    expect(medidas.mesmoGrupo).toBe(true);
+    expect(medidas.folga).toBeGreaterThanOrEqual(8);
+    expect(medidas.direita).toBeLessThanOrEqual(360);
   });
 
   test("tema pelo menu da conta no celular (#78)", async ({ page }) => {

@@ -7,6 +7,20 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 
 ## [Unreleased]
 
+### Adicionado
+
+- Botão **Atualizar** (#77) no cabeçalho do celular e na barra lateral do desktop: busca de novo os
+  dados da tela com `router.refresh()`, sem recarregar a página nem perder aba, scroll e diálogos
+  abertos. Serve para ver o que o MCP ou outro aparelho alterou. Limite de uma vez por minuto,
+  guardado no `sessionStorage` para valer em todas as páginas; na espera o botão fica com
+  `aria-disabled` e o rótulo diz quanto falta. O ícone gira enquanto atualiza e um `aria-live`
+  avisa "Dados atualizados". Sem refresh automático, polling ou realtime, para poupar as
+  invocações do plano gratuito da hospedagem. Cada clique custa mais de uma requisição: o refresh
+  limpa o cache do roteador e os links visíveis voltam a ser pré-carregados.
+- A aba aberta no detalhe do concurso fica na URL (`?aba=links`, #77): recarregar a página (ou
+  reabrir o PWA) mantém a aba, e voltar para a página pelo histórico também. A troca usa
+  `history.replaceState`, sem requisição ao servidor nem entradas no histórico.
+
 ### Alterado
 
 - Um único sino de notificações por tela (#78): o card "Próximos prazos" do dashboard perdeu o

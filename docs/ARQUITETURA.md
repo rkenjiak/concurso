@@ -273,6 +273,14 @@ senão → indefinida
 - O contador do sino é calculado no layout do app. Toda Server Action que chama `revalidatePath`
   recebe na própria resposta a rota atual re-renderizada a partir da raiz (layout incluso), então o
   sino atualiza sem `router.refresh()` (#73).
+- Mudanças feitas fora desta aba (MCP, outro aparelho) não chegam sozinhas: não há refresh
+  automático, polling nem realtime, para poupar as invocações do plano gratuito da hospedagem. O
+  botão **Atualizar** (#77, `layout/botao-atualizar.tsx`), no cabeçalho do celular e na barra
+  lateral do desktop, chama `router.refresh()` no máximo uma vez por minuto (hora do último clique
+  no `sessionStorage`, regra em `lib/atualizar.ts`); na espera fica com `aria-disabled` e o rótulo
+  diz quanto falta. Custo real de um clique: a requisição do refresh e mais os prefetches dos links
+  visíveis, porque o `router.refresh()` limpa o cache do roteador no navegador (cerca de 13
+  requisições no detalhe do concurso, no desktop).
 
 ### 4.5 Calendário iCalendar (RF08, #65)
 
@@ -303,7 +311,7 @@ senão → indefinida
 | `/` | **Dashboard**: próximos prazos (vencidos/hoje/30 dias), contagem por status, atalhos; ocultar/reexibir prazos, `?ocultos=1` mostra os ocultos | MVP |
 | `/concursos` | **Lista** com busca, filtros e ordenação em `searchParams` (URL compartilhável) | MVP |
 | `/concursos/novo` | **Formulário** de cadastro | MVP |
-| `/concursos/[id]` | **Detalhe** em abas: Visão geral · Eventos · Links · Resultados · Histórico | MVP |
+| `/concursos/[id]` | **Detalhe** em abas: Visão geral · Eventos · Links · Resultados · Histórico; a aba aberta fica em `?aba=` (#77): abas controladas pelo `useSearchParams`, troca gravada com `history.replaceState`, sem ir ao servidor | MVP |
 | `/concursos/[id]/editar` | Formulário de edição | MVP |
 | `/configuracoes` | Aparência, regras de notificação, calendário (.ics), exportar/importar dados, token do MCP, acesso | MVP |
 | `/notificacoes` | **Central de notificações** (#65): marcar como lida, marcar todas, dispensar | v2.2 |
@@ -446,7 +454,7 @@ Decisões (issue #39):
 │   │   ├── configuracoes/          # regras de notificação, calendário .ics, export/import, token MCP
 │   │   ├── admin/                  # painel admin (#50)
 │   │   ├── auth/                   # login (Google/senha) e sair
-│   │   ├── layout/                 # casca, navegação, menu da conta
+│   │   ├── layout/                 # casca, navegação, menu da conta, botão Atualizar
 │   │   ├── notificacoes/           # sino e central de notificações (#65)
 │   │   └── tema/                   # seletor de tema (claro/escuro/sistema)
 │   ├── domain/                     # regras puras + testes *.test.ts ao lado
@@ -462,7 +470,7 @@ Decisões (issue #39):
 │   │   ├── mcp/                    # servidor MCP (ferramentas, entradas, textos)
 │   │   ├── auth/                   # sessão, senha, Google, autorização, visão admin
 │   │   └── inicializacao.ts        # checagem do ambiente e migrações ao iniciar
-│   ├── lib/                        # format, tz, normalize, csv, tema, pwa, tags, schemas Zod
+│   ├── lib/                        # format, tz, normalize, csv, tema, pwa, tags, aba-concurso, atualizar, schemas Zod
 │   ├── instrumentation.ts          # chama server/inicializacao.ts ao subir o servidor
 │   └── proxy.ts
 ├── biome.json  drizzle.config.ts  next.config.ts  vitest.config.ts  playwright.config.ts
@@ -578,7 +586,7 @@ Decisões (issue #39):
 |---|---|---|---|
 | Unitário | Vitest | `domain/*` (transições, prazos, validade, criticidade), `lib/format`, parsers BRL, schemas Zod | meta: cobertura ≥ 90% em `domain/` (medida no CI, sem limite configurado) |
 | Integração | Vitest + libSQL `:memory:` + migrações | repositories/queries (transação de status, tags, filtros, export→import ida e volta); servidor MCP com cliente em memória (`InMemoryTransport`) | casos principais |
-| E2E | Playwright (Chromium) | smoke: criar concurso → evento → aparece no dashboard → mudar status → exportar/importar; login, MCP, PWA e lembretes com auth ativa; painel admin com o usuário inicial (sem auth); busca, quadro, calendário, cor/ícone, ocultar prazos, tema, lembretes (sino, regras, feed .ics), sino único por tela e tema pelo menu no celular, PWA e layout em 360 px; `/api/mcp` com token → concurso visível no app. Dois servidores (com e sem auth) com bancos temporários em `e2e/.tmp` | poucos fluxos |
+| E2E | Playwright (Chromium) | smoke: criar concurso → evento → aparece no dashboard → mudar status → exportar/importar; login, MCP, PWA e lembretes com auth ativa; painel admin com o usuário inicial (sem auth); busca, quadro, calendário, cor/ícone, ocultar prazos, tema, lembretes (sino, regras, feed .ics), sino único por tela e tema pelo menu no celular, PWA, aba do detalhe na URL e botão Atualizar com limite de 60 s (#77) e layout em 360 px; `/api/mcp` com token → concurso visível no app. Dois servidores (com e sem auth) com bancos temporários em `e2e/.tmp` | poucos fluxos |
 
 Datas sempre fixadas (`vi.setSystemTime` / `hoje` injetado).
 

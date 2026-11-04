@@ -1,7 +1,6 @@
 import { expect, type Page, test } from "@playwright/test";
 
 const html = (page: Page) => page.locator("html");
-// O tema fica só junto ao avatar (#82): no desktop, o seletor da barra lateral.
 /** Fundo do <html> igual ao do <body> (tema), não transparente (#81). */
 async function fundoDaRaizSegueOTema(page: Page) {
   const [raiz, corpo] = await page.evaluate(() => [
@@ -12,6 +11,7 @@ async function fundoDaRaizSegueOTema(page: Page) {
   expect(raiz).toBe(corpo);
 }
 
+// O tema fica só junto ao avatar (#82): no desktop, o seletor da barra lateral.
 const seletor = (page: Page) =>
   page.getByRole("complementary").getByRole("group", { name: "Tema" });
 

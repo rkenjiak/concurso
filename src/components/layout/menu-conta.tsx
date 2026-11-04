@@ -114,6 +114,17 @@ export function MenuConta({
   const [pendente, iniciar] = useTransition();
   const nome = conta.nome ?? conta.email ?? "Usuário local";
 
+  // Sem nenhuma ação (não admin, sem login e sem tema no menu), um menu vazio seria anunciado
+  // sem itens: mostra só avatar e nome.
+  if (!ehAdmin && !podeSair && !compacto) {
+    return (
+      <div className={cn("flex min-w-0 items-center gap-2 p-1 text-sm", className)}>
+        <Avatar conta={conta} />
+        <span className="truncate font-medium">{nome}</span>
+      </div>
+    );
+  }
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger

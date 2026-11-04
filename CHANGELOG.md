@@ -21,8 +21,23 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
   reabrir o PWA) mantém a aba, e voltar para a página pelo histórico também. A troca usa
   `history.replaceState`, sem requisição ao servidor nem entradas no histórico.
 
+- **Contagem regressiva até a próxima prova** (#84): card "Próximas provas" no dashboard (até 6,
+  da mais próxima para a mais distante) e aviso no topo da página do concurso ("Prova objetiva:
+  faltam 12 dias", "é amanhã", "é hoje"). Destaque para hoje, amanhã e até 7 dias, com
+  texto acessível para leitores de tela. Considera provas objetivas, discursivas e outras fases; não aparece para
+  concursos encerrados, cancelados, com desistência ou suspensos.
+- **Pendências de status** (#85): quando um evento importante chega ou passa (publicação do
+  edital, fim das inscrições, vencimento do boleto, prova, resultado final, convocação/nomeação,
+  posse), o dashboard e a página do concurso perguntam o que aconteceu ("Você se inscreveu?",
+  "Fez a prova?", "Qual foi o resultado?"…) e a resposta muda o status com um clique, pela
+  transição validada e com registro no histórico. "Lembrar depois" esconde a pergunta por 3 dias e
+  "Não perguntar mais" a dispensa (migração `0006_pendencias_status`); se o evento for remarcado,
+  a pergunta volta.
+
 ### Alterado
 
+- A sugestão de status (#65) virou uma das pendências de status (#85): o botão "Aplicar" deu
+  lugar às respostas da pergunta, e o histórico registra "Pendência: …" em vez de "Sugestão: …".
 - Um único sino de notificações por tela (#78): o card "Próximos prazos" do dashboard perdeu o
   sino próprio, que repetia o da navegação (cabeçalho no celular, barra lateral no desktop) com o
   mesmo contador. O dashboard deixa de calcular as não lidas, que já vêm do layout.

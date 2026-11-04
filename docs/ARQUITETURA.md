@@ -113,6 +113,10 @@ obrigatório, garantido por triggers porque a coluna foi adicionada com `ALTER T
 - `notificacao_estado`: `chave` (PK, `evento-<id>:<dias>` ou `validade-<concursoId>:<dias>`),
   `concurso_id` → `concurso.id` e `evento_id` → `evento.id` (nulo no fim da validade; ambos
   `CASCADE`), `antecedencia`, `lida_em`, `dispensada_em`. A notificação em si não é guardada.
+- `pendencia_status_dispensa` (#85): `concurso_id` → `concurso.id` e `evento_id` → `evento.id`
+  (ambos `CASCADE`), `regra` (`RegraPendencia`), `data_evento`, `ate` (`null` = "não perguntar
+  mais"; data = "lembrar depois" até esse dia), `created_at`; PK (`evento_id`, `regra`). Se o
+  evento mudar de data, a dispensa deixa de valer. A pendência em si é calculada sob demanda.
 
 ### 3.1 `concurso` (RF01, RF03, RF05)
 
@@ -216,12 +220,27 @@ PROVA_REALIZADA(5) → AGUARDANDO_RESULTADO(6)`.
   e restaura o `de`), cobrindo erros de digitação sem liberar transições arbitrárias.
 - Toda mudança grava `status_historico` e atualiza `concurso.status/status_desde` na mesma transação.
 - API do domínio: `podeTransicionar(de, para)`, `transicoesPermitidas(de)`, `ehTerminal(s)`, `ehAtivo(s)`.
-- **Sugestão de status** (#65, `domain/sugestao-status.ts`), só a partir de `INSCRITO` na trilha
-  principal; "passou" = concluído ou `data < hoje`. Prova (objetiva/discursiva) passada →
-  `PROVA_REALIZADA`; prova passada e `PRAZO_RECURSO` posterior a ela também → `AGUARDANDO_RESULTADO`;
-  `INSCRITO` com prova marcada → `PROVA_AGENDADA`. Vale a mais adiantada que seja transição
-  permitida. Nunca automático: a UI (detalhe e dashboard) oferece "Aplicar", que recalcula a
-  sugestão no servidor, usa `alterarStatus` e grava o motivo na observação do histórico.
+- **Pendências de status** (#65, #85, `domain/sugestao-status.ts`, sobre `domain/eventos-chave.ts`):
+  quando um evento importante chega (`data <= hoje` ou concluído) ou passa (`data < hoje`), o app
+  pergunta o que aconteceu. Regras, em ordem de prioridade: posse (Nomeado → Empossado/Desistiu),
+  nomeação (Aprovado/Classificado → Nomeado), resultado final (Prova realizada/Aguardando →
+  Aprovado/Classificado/Reprovado), recurso posterior à prova (Prova realizada → Aguardando
+  resultado), prova passada, a partir do dia seguinte (Inscrito/Prova agendada: "Fez a prova?" →
+  Prova realizada/Desistiu), boleto
+  vencido e pendente ("Pagou o boleto?": antes da inscrição → Inscrito/Não inscrito; já inscrito →
+  mantém e conclui o boleto / Desistiu), prova futura (Inscrito → Prova agendada), fim das
+  inscrições (Previsto/Edital → Inscrito/Não inscrito) e edital (Previsto → Edital publicado). Só
+  respostas que são transições permitidas. Nada para concursos terminais ou suspensos. Nunca
+  automático: a UI (detalhe e card "Pendências de status" do dashboard) mostra a primeira pendência
+  não dispensada; responder recalcula a pendência no servidor, usa `alterarStatus` e grava
+  pergunta, resposta e motivo na observação do histórico. "Lembrar depois" (3 dias) e "Não
+  perguntar mais" ficam em `pendencia_status_dispensa`. Respostas que levam a Desistiu pedem
+  confirmação. Status e conclusão do evento (boleto pago) são gravados na mesma transação; "Sim"
+  ao boleto já inscrito só conclui o evento (sem registro no histórico, que só guarda mudanças).
+- **Contagem regressiva** (#84, `domain/contagem.ts`): próximo evento de prova (objetiva,
+  discursiva, outra fase) não concluído com `data >= hoje`, para concursos em andamento (não
+  terminais nem suspensos). Destaque para hoje, amanhã e até 7 dias; texto acessível (`sr-only`)
+  "Prova objetiva em 12 dias, 14/11/2026". Exibida no detalhe do concurso e no card "Próximas provas" do dashboard.
 
 ### 4.2 Próximos prazos (RF06)
 
@@ -356,7 +375,8 @@ Os ícones são gerados de `assets/logo.svg` por `pnpm icones` (`scripts/gerar-i
 | `marcarNotificacaoLidaAcao(chave)`, `dispensarNotificacaoAcao(chave)`, `marcarTodasLidasAcao()` | #65 — estado das notificações (`evento-<id>:<dias>` / `validade-<id>:<dias>`) |
 | `salvarRegrasNotificacaoAcao(regras)`, `restaurarRegrasPadraoAcao()`, `silenciarConcursoAcao(id, silenciado)` | #65 — regras e silenciamento por concurso |
 | `gerarTokenIcsAcao`, `revogarTokenIcsAcao`, `salvarOpcoesIcsAcao(opcoes)` | #65 — feed de calendário |
-| `aplicarSugestaoStatus(id, esperado)` | #65 — aplica a sugestão recalculada no servidor |
+| `responderPendenciaStatus(id, chave, resposta)` | #65, #85 — responde à pendência de status recalculada no servidor (`<regra>-<eventoId>`) |
+| `dispensarPendenciaStatus(id, chave, modo)` | #85 — `"lembrar"` (3 dias) ou `"dispensar"` a pendência |
 | `alternarVisaoAcao(visao)` | #50 — "usuario" ou "admin" (só admins); grava o cookie da visão e leva a `/` ou `/admin` |
 | `definirPapelAcao(id, papel)`, `definirBloqueioAcao(id, bloqueado)` | #50 — admin; protege o último admin ativo e os de `ADMIN_EMAILS` |
 | `adicionarEmailPermitidoAcao(email)`, `removerEmailPermitidoAcao(email)` | #50 — admin; allowlist do painel |
@@ -463,7 +483,8 @@ Decisões (issue #39):
 │   │   ├── enums.ts  labels.ts  erros.ts
 │   │   ├── status.ts  prazos.ts  validade.ts
 │   │   ├── calendario.ts  quadro.ts  cores.ts  duplicados.ts
-│   │   └── notificacoes.ts  icalendar.ts  sugestao-status.ts   # lembretes (#65)
+│   │   ├── notificacoes.ts  icalendar.ts  sugestao-status.ts   # lembretes (#65, #85)
+│   │   └── eventos-chave.ts  contagem.ts   # evento relevante e contagem regressiva (#84, #85)
 │   ├── server/
 │   │   ├── db/                     # schema.ts, client.ts, migrate.ts, url.ts, backup.ts
 │   │   ├── queries/                # leituras (lista, dashboard, detalhe, notificações, .ics)

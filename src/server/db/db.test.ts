@@ -60,6 +60,7 @@ describe("migrações", () => {
       "evento",
       "link",
       "notificacao_estado",
+      "pendencia_status_dispensa",
       "regra_notificacao",
       "resultado_fase",
       "status_historico",

@@ -1,7 +1,6 @@
 "use client";
 
-import { LogOut, Settings } from "lucide-react";
-import Link from "next/link";
+import { LogOut } from "lucide-react";
 import { useId, useTransition } from "react";
 import { ICONE_TEMA, useTema } from "@/components/tema/seletor-tema";
 import {
@@ -101,7 +100,8 @@ function Avatar({ conta }: { conta: ContaMenu }) {
 
 /**
  * Menu da conta (avatar): nome, alternância "Visão usuário" ↔ "Visão admin" (só admins, #50),
- * tema (só no modo compacto, #78), Configurações e Sair. A troca de visão não exige novo login.
+ * tema (só no modo compacto, #78) e Sair. A troca de visão não exige novo login. Configurações fica
+ * só na navegação principal (#82).
  */
 export function MenuConta({
   conta,
@@ -150,15 +150,7 @@ export function MenuConta({
           </>
         ) : null}
         {compacto ? <ItensTema /> : null}
-        {visao === "usuario" || podeSair ? <DropdownMenuSeparator /> : null}
-        {visao === "usuario" ? (
-          <DropdownMenuItem asChild>
-            <Link href="/configuracoes">
-              <Settings aria-hidden />
-              Configurações
-            </Link>
-          </DropdownMenuItem>
-        ) : null}
+        {podeSair ? <DropdownMenuSeparator /> : null}
         {podeSair ? (
           <DropdownMenuItem
             onSelect={() => {

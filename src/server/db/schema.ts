@@ -22,6 +22,7 @@ import {
   TIPO_EVENTO,
   TIPO_LINK,
 } from "../../domain/enums";
+import { REGRAS_PENDENCIA } from "../../domain/sugestao-status";
 
 /** Epoch ms atual no SQLite (default de banco para inserções fora do Drizzle). */
 const agoraMs = sql`(cast(unixepoch('subsecond') * 1000 as integer))`;
@@ -315,6 +316,30 @@ export const notificacaoEstado = sqliteTable(
   ],
 );
 
+// pendencia_status_dispensa (#85): pendências de status dispensadas ("não perguntar mais",
+// `ate = null`) ou adiadas ("lembrar depois", `ate` = data em que volta a aparecer). A pendência
+// em si é calculada sob demanda (`domain/sugestao-status`); se o evento mudar de data
+// (`data_evento`), a dispensa deixa de valer. O dono vem pelo concurso.
+export const pendenciaStatusDispensa = sqliteTable(
+  "pendencia_status_dispensa",
+  {
+    concursoId: integer("concurso_id")
+      .notNull()
+      .references(() => concurso.id, { onDelete: "cascade" }),
+    eventoId: integer("evento_id")
+      .notNull()
+      .references(() => evento.id, { onDelete: "cascade" }),
+    regra: text("regra", { enum: REGRAS_PENDENCIA }).notNull(),
+    dataEvento: text("data_evento").notNull(),
+    ate: text("ate"),
+    createdAt: criadoEm(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.eventoId, t.regra] }),
+    index("pendencia_status_dispensa_concurso_idx").on(t.concursoId),
+  ],
+);
+
 export type Usuario = typeof usuario.$inferSelect;
 export type NovoUsuario = typeof usuario.$inferInsert;
 export type EmailPermitido = typeof emailPermitido.$inferSelect;
@@ -325,6 +350,7 @@ export type Link = typeof link.$inferSelect;
 export type NovoLink = typeof link.$inferInsert;
 export type Evento = typeof evento.$inferSelect;
 export type NovoEvento = typeof evento.$inferInsert;
+export type PendenciaStatusDispensa = typeof pendenciaStatusDispensa.$inferSelect;
 export type StatusHistorico = typeof statusHistorico.$inferSelect;
 export type NovoStatusHistorico = typeof statusHistorico.$inferInsert;
 export type ResultadoFase = typeof resultadoFase.$inferSelect;

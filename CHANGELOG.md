@@ -7,6 +7,63 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 
 ## [Unreleased]
 
+## [2.4.0] - 2026-11-03
+
+### Adicionado
+
+- Botão **Atualizar** (#77) no cabeçalho do celular e na barra lateral do desktop: busca de novo os
+  dados da tela com `router.refresh()`, sem recarregar a página nem perder aba, scroll e diálogos
+  abertos. Serve para ver o que o MCP ou outro aparelho alterou. Limite de uma vez por minuto,
+  guardado no `sessionStorage` para valer em todas as páginas; na espera o botão fica com
+  `aria-disabled` e o rótulo diz quanto falta. O ícone gira enquanto atualiza e um `aria-live`
+  avisa "Dados atualizados". Sem refresh automático, polling ou realtime, para poupar as
+  invocações do plano gratuito da hospedagem. Cada clique custa mais de uma requisição: o refresh
+  limpa o cache do roteador e os links visíveis voltam a ser pré-carregados.
+- A aba aberta no detalhe do concurso fica na URL (`?aba=links`, #77): recarregar a página (ou
+  reabrir o PWA) mantém a aba, e voltar para a página pelo histórico também. A troca usa
+  `history.replaceState`, sem requisição ao servidor nem entradas no histórico.
+
+- **Contagem regressiva até a próxima prova** (#84): card "Próximas provas" no dashboard (até 6,
+  da mais próxima para a mais distante) e aviso no topo da página do concurso ("Prova objetiva:
+  faltam 12 dias", "é amanhã", "é hoje"). Destaque para hoje, amanhã e até 7 dias, com
+  texto acessível para leitores de tela. Considera provas objetivas, discursivas e outras fases; não aparece para
+  concursos encerrados, cancelados, com desistência ou suspensos.
+- **Pendências de status** (#85): quando um evento importante chega ou passa (publicação do
+  edital, fim das inscrições, vencimento do boleto, prova, resultado final, convocação/nomeação,
+  posse), o dashboard e a página do concurso perguntam o que aconteceu ("Você se inscreveu?",
+  "Fez a prova?", "Qual foi o resultado?"…) e a resposta muda o status com um clique, pela
+  transição validada e com registro no histórico. "Lembrar depois" esconde a pergunta por 3 dias e
+  "Não perguntar mais" a dispensa (migração `0006_pendencias_status`); se o evento for remarcado,
+  a pergunta volta.
+- **Calendário: navegação rápida e filtro de concursos** (#83). Clicar no título do mês abre um
+  seletor com os 12 meses do ano e a quantidade de eventos de cada um, com setas para trocar de ano:
+  qualquer mês fica a dois ou três toques, no desktop e no celular. Atalhos "Próximos eventos"
+  (próximo mês com eventos) e "Próxima prova" (com a contagem regressiva do #84). A legenda de
+  concursos virou filtro: cada concurso liga e desliga com um clique (`aria-pressed`), com "só
+  este" e "Mostrar todos". Mês e seleção ficam na URL (`?mes=2026-11&concursos=1,3`), que continua
+  compartilhável, e a seleção se mantém ao trocar de mês.
+
+### Alterado
+
+- A sugestão de status (#65) virou uma das pendências de status (#85): o botão "Aplicar" deu
+  lugar às respostas da pergunta, e o histórico registra "Pendência: …" em vez de "Sugestão: …".
+- Um único sino de notificações por tela (#78): o card "Próximos prazos" do dashboard perdeu o
+  sino próprio, que repetia o da navegação (cabeçalho no celular, barra lateral no desktop) com o
+  mesmo contador. O dashboard deixa de calcular as não lidas, que já vêm do layout.
+- No celular, o seletor de tema passa para dentro do menu da conta (Claro / Escuro / Sistema), o
+  que libera espaço no cabeçalho de 360 px e devolve o nome do app ao lado do ícone. No desktop o
+  seletor continua na barra lateral.
+- Sem opções duplicadas (#82): a seção Aparência saiu de Configurações (o tema fica só junto ao
+  avatar: barra lateral no desktop, menu da conta no celular) e o link Configurações saiu do menu
+  da conta (fica na navegação principal).
+
+### Corrigido
+
+- Barra de navegação/gestos do Android branca no tema escuro (#81): o `<html>` passa a ter o
+  fundo do tema (área atrás da barra com `viewport-fit=cover`) e o layout declara
+  `<meta name="color-scheme" content="light dark">`, além do `color-scheme` que o script de tema
+  já aplicava no `<html>`.
+
 ## [2.3.0] - 2026-11-02
 
 ### Adicionado

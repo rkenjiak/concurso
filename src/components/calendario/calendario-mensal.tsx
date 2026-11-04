@@ -1,13 +1,16 @@
 import { AlertTriangle, Check, Clock } from "lucide-react";
 import { DetalhesEvento } from "@/components/calendario/detalhes-evento";
+import { FiltroConcursos } from "@/components/calendario/filtro-concursos";
 import { MarcadorConcurso } from "@/components/concurso/marcador-concurso";
 import { BORDA_CRITICIDADE, nomePrazo } from "@/components/dashboard/lista-prazos";
 import {
   agruparPorData,
   DIAS_SEMANA,
   type DiaGrade,
+  type MesISO,
   proximosDoConcurso,
 } from "@/domain/calendario";
+import { concursoVisivel, type SelecaoConcursos } from "@/domain/navegacao-calendario";
 import { formatarDataLonga } from "@/lib/format";
 import type { DataISO } from "@/lib/tz";
 import { cn } from "@/lib/utils";
@@ -161,12 +164,19 @@ function CelulaDia({
 }
 
 /** Agenda do mês (celular): só os dias com itens, em ordem. */
-export function AgendaMes({ itens, hoje }: { itens: readonly ItemDoCalendario[]; hoje: DataISO }) {
+export function AgendaMes({
+  itens,
+  hoje,
+  vazio = "Nenhum evento neste mês.",
+}: {
+  itens: readonly ItemDoCalendario[];
+  hoje: DataISO;
+  /** Texto quando não há itens (ex.: todos ocultos pelo filtro de concursos). */
+  vazio?: string;
+}) {
   const porData = agruparPorData(itens);
   if (porData.size === 0) {
-    return (
-      <p className="py-6 text-center text-muted-foreground text-sm">Nenhum evento neste mês.</p>
-    );
+    return <p className="py-6 text-center text-muted-foreground text-sm">{vazio}</p>;
   }
   return (
     <ol className="space-y-4">
@@ -234,28 +244,51 @@ export function AgendaMes({ itens, hoje }: { itens: readonly ItemDoCalendario[];
   );
 }
 
+type ConcursoDoItem = ItemDoCalendario["concurso"];
+
+const compararConcursos = (a: ConcursoDoItem, b: ConcursoDoItem) =>
+  a.orgao.localeCompare(b.orgao, "pt-BR") || a.cargo.localeCompare(b.cargo, "pt-BR");
+
 /** Concursos com itens no mês, sem repetição, na ordem de órgão e cargo. */
-export function concursosDoMes(itens: readonly ItemDoCalendario[]): ItemDoCalendario["concurso"][] {
+export function concursosDoMes(itens: readonly ItemDoCalendario[]): ConcursoDoItem[] {
   const porId = new Map(itens.map((i) => [i.concurso.id, i.concurso]));
-  return [...porId.values()].sort(
-    (a, b) => a.orgao.localeCompare(b.orgao, "pt-BR") || a.cargo.localeCompare(b.cargo, "pt-BR"),
-  );
+  return [...porId.values()].sort(compararConcursos);
 }
 
-/** Legenda cor/ícone → concurso (#46), com os concursos que têm itens no mês. */
-export function LegendaConcursos({ itens }: { itens: readonly ItemDoCalendario[] }) {
-  const concursos = concursosDoMes(itens);
-  if (concursos.length === 0) return null;
+/**
+ * Legenda cor/ícone → concurso (#46), clicável para filtrar o calendário (#83). Lista os
+ * concursos com itens no mês (antes do filtro, para poder religá-los) e os selecionados, mesmo
+ * sem itens no mês, para que a seleção fique sempre visível.
+ */
+export function LegendaConcursos({
+  mes,
+  itens,
+  concursos,
+  selecao,
+}: {
+  mes: MesISO;
+  /** Itens do mês sem o filtro de concursos. */
+  itens: readonly ItemDoCalendario[];
+  /** Todos os concursos do usuário. */
+  concursos: readonly ConcursoDoItem[];
+  selecao: SelecaoConcursos;
+}) {
+  const doMes = concursosDoMes(itens);
+  const ids = new Set(doMes.map((c) => c.id));
+  const selecionados = concursos.filter((c) => !ids.has(c.id) && concursoVisivel(selecao, c.id));
+  const listados = selecao === null ? doMes : [...doMes, ...selecionados].sort(compararConcursos);
   return (
-    <ul aria-label="Concursos" className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
-      {concursos.map((c) => (
-        <li key={c.id} data-concurso-id={c.id} className="inline-flex min-w-0 items-center gap-1.5">
-          <MarcadorConcurso cor={c.cor} icone={c.icone} rotulado />
-          <span className="truncate">
-            {c.orgao} — {c.cargo}
-          </span>
-        </li>
-      ))}
-    </ul>
+    <FiltroConcursos
+      mes={mes}
+      concursos={listados.map(({ id, orgao, cargo, cor, icone }) => ({
+        id,
+        orgao,
+        cargo,
+        cor,
+        icone,
+      }))}
+      todos={concursos.map((c) => c.id)}
+      selecao={selecao}
+    />
   );
 }

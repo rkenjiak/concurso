@@ -1,8 +1,8 @@
 "use client";
 
-import { LogOut, Settings } from "lucide-react";
-import Link from "next/link";
-import { useTransition } from "react";
+import { LogOut } from "lucide-react";
+import { useId, useTransition } from "react";
+import { ICONE_TEMA, useTema } from "@/components/tema/seletor-tema";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,6 +13,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { normalizarTema, ROTULO_TEMA, TEMAS } from "@/lib/tema";
 import { cn } from "@/lib/utils";
 import { logout } from "@/server/actions/auth";
 import { alternarVisaoAcao } from "@/server/actions/visao";
@@ -31,9 +32,43 @@ interface MenuContaProps {
   visao: Visao;
   /** Há login configurado (mostra "Sair"). */
   podeSair: boolean;
-  /** Só o avatar (cabeçalho do celular). */
+  /**
+   * Cabeçalho do celular: só o avatar, e o tema passa para dentro do menu (#78), liberando espaço
+   * no cabeçalho de ~360 px. No desktop o seletor de tema fica visível na barra lateral.
+   */
   compacto?: boolean;
   className?: string;
+}
+
+/** Claro / Escuro / Sistema dentro do menu (modo compacto). Fica aberto ao escolher. */
+function ItensTema() {
+  const [tema, escolher] = useTema();
+  const idRotulo = useId();
+  return (
+    <>
+      <DropdownMenuSeparator />
+      <DropdownMenuLabel id={idRotulo}>Tema</DropdownMenuLabel>
+      <DropdownMenuRadioGroup
+        aria-labelledby={idRotulo}
+        value={tema}
+        onValueChange={(v) => escolher(normalizarTema(v))}
+      >
+        {TEMAS.map((opcao) => {
+          const Icone = ICONE_TEMA[opcao];
+          return (
+            <DropdownMenuRadioItem
+              key={opcao}
+              value={opcao}
+              onSelect={(evento) => evento.preventDefault()}
+            >
+              <Icone aria-hidden />
+              {ROTULO_TEMA[opcao]}
+            </DropdownMenuRadioItem>
+          );
+        })}
+      </DropdownMenuRadioGroup>
+    </>
+  );
 }
 
 function iniciais(conta: ContaMenu): string {
@@ -65,7 +100,8 @@ function Avatar({ conta }: { conta: ContaMenu }) {
 
 /**
  * Menu da conta (avatar): nome, alternância "Visão usuário" ↔ "Visão admin" (só admins, #50),
- * Configurações e Sair. A troca de visão não exige novo login.
+ * tema (só no modo compacto, #78) e Sair. A troca de visão não exige novo login. Configurações fica
+ * só na navegação principal (#82).
  */
 export function MenuConta({
   conta,
@@ -77,6 +113,17 @@ export function MenuConta({
 }: MenuContaProps) {
   const [pendente, iniciar] = useTransition();
   const nome = conta.nome ?? conta.email ?? "Usuário local";
+
+  // Sem nenhuma ação (não admin, sem login e sem tema no menu), um menu vazio seria anunciado
+  // sem itens: mostra só avatar e nome.
+  if (!ehAdmin && !podeSair && !compacto) {
+    return (
+      <div className={cn("flex min-w-0 items-center gap-2 p-1 text-sm", className)}>
+        <Avatar conta={conta} />
+        <span className="truncate font-medium">{nome}</span>
+      </div>
+    );
+  }
 
   return (
     <DropdownMenu>
@@ -113,15 +160,8 @@ export function MenuConta({
             </DropdownMenuRadioGroup>
           </>
         ) : null}
-        {visao === "usuario" || podeSair ? <DropdownMenuSeparator /> : null}
-        {visao === "usuario" ? (
-          <DropdownMenuItem asChild>
-            <Link href="/configuracoes">
-              <Settings aria-hidden />
-              Configurações
-            </Link>
-          </DropdownMenuItem>
-        ) : null}
+        {compacto ? <ItensTema /> : null}
+        {podeSair ? <DropdownMenuSeparator /> : null}
         {podeSair ? (
           <DropdownMenuItem
             onSelect={() => {

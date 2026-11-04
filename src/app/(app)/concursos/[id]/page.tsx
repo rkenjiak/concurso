@@ -2,10 +2,12 @@ import { ArrowLeft, CalendarArrowDown, Pencil } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { AbasConcurso } from "@/components/concurso/abas-concurso";
 import { AlterarStatus } from "@/components/concurso/alterar-status";
 import { BadgeStatus } from "@/components/concurso/badge-status";
 import { BotaoExcluirConcurso } from "@/components/concurso/botao-excluir-concurso";
 import { BotaoSilenciarConcurso } from "@/components/concurso/botao-silenciar-concurso";
+import { ContagemProva } from "@/components/concurso/contagem-prova";
 import { EventosConcurso } from "@/components/concurso/eventos-concurso";
 import { LinksConcurso } from "@/components/concurso/links-concurso";
 import { ListaTags } from "@/components/concurso/lista-tags";
@@ -17,10 +19,10 @@ import { TimelineStatus } from "@/components/concurso/timeline-status";
 import { ValidadeConcurso } from "@/components/concurso/validade-concurso";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { contagemRegressiva } from "@/domain/contagem";
 import { corDoConcurso } from "@/domain/cores";
 import { ROTULO_ESCOLARIDADE, ROTULO_ESFERA } from "@/domain/labels";
-import { sugerirStatus } from "@/domain/sugestao-status";
 import { formatarBRL, formatarDataInstante } from "@/lib/format";
 import { idSchema } from "@/lib/schemas/comum";
 import { hojeSP } from "@/lib/tz";
@@ -31,6 +33,7 @@ import { listarEventos } from "@/server/queries/eventos";
 import { obterOpcoesStatus } from "@/server/queries/historico";
 import { listarLinks } from "@/server/queries/links";
 import { listarResultadosFase } from "@/server/queries/resultados";
+import { obterPendenciaConcurso } from "@/server/queries/sugestoes";
 
 async function carregar(params: Promise<{ id: string }>) {
   const id = idSchema.safeParse((await params).id);
@@ -69,7 +72,9 @@ export default async function ConcursoPage({ params }: PageProps<"/concursos/[id
     listarResultadosFase(getDb(), c.id),
   ]);
   const pendentes = eventos.filter((e) => !e.concluido).length;
-  const sugestao = sugerirStatus(c.status, eventos, hojeSP());
+  const hoje = hojeSP();
+  const pendencia = await obterPendenciaConcurso(getDb(), c.id, c.status, eventos, hoje);
+  const contagem = contagemRegressiva(c.status, eventos, hoje);
   const local = [c.cidade, c.uf].filter(Boolean).join(" / ");
 
   return (
@@ -98,6 +103,7 @@ export default async function ConcursoPage({ params }: PageProps<"/concursos/[id
           <div className="pt-1">
             <ListaTags tags={c.tags} />
           </div>
+          {contagem ? <ContagemProva contagem={contagem} className="mt-2" /> : null}
         </div>
         <div className="flex flex-wrap gap-2">
           <Button asChild variant="outline">
@@ -121,11 +127,24 @@ export default async function ConcursoPage({ params }: PageProps<"/concursos/[id
         </div>
       </header>
 
-      {sugestao ? (
-        <SugestaoStatus concursoId={c.id} para={sugestao.para} motivo={sugestao.motivo} />
+      {pendencia ? (
+        <SugestaoStatus
+          key={pendencia.chave}
+          concursoId={c.id}
+          chave={pendencia.chave}
+          pergunta={pendencia.pergunta}
+          motivo={pendencia.motivo}
+          respostas={pendencia.respostas.map(({ id, rotulo, para, confirmar }) => ({
+            id,
+            rotulo,
+            para,
+            confirmar,
+          }))}
+        />
       ) : null}
 
-      <Tabs defaultValue="geral" className="gap-4">
+      {/* Aba aberta em `?aba=` (#77): recarregar a página mantém a aba. */}
+      <AbasConcurso className="gap-4">
         <TabsList className="w-full justify-start overflow-x-auto sm:w-fit">
           <TabsTrigger value="geral">Visão geral</TabsTrigger>
           <TabsTrigger value="eventos">Eventos ({pendentes})</TabsTrigger>
@@ -169,7 +188,7 @@ export default async function ConcursoPage({ params }: PageProps<"/concursos/[id
               <CardTitle>Validade do concurso</CardTitle>
             </CardHeader>
             <CardContent>
-              <ValidadeConcurso dados={c} hoje={hojeSP()} />
+              <ValidadeConcurso dados={c} hoje={hoje} />
             </CardContent>
           </Card>
 
@@ -289,7 +308,7 @@ export default async function ConcursoPage({ params }: PageProps<"/concursos/[id
             </CardContent>
           </Card>
         </TabsContent>
-      </Tabs>
+      </AbasConcurso>
     </div>
   );
 }

@@ -43,6 +43,13 @@
       "when": 1793588804385,
       "tag": "0005_lembretes",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1793753675597,
+      "tag": "0006_pendencias_status",
+      "breakpoints": true
     }
   ]
 }

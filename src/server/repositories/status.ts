@@ -10,7 +10,7 @@ import type { Db } from "../db/client";
 import { concurso, statusHistorico } from "../db/schema";
 import { listarHistorico } from "../queries/historico";
 import { doUsuario } from "./concursos";
-import type { Transacao } from "./tipos";
+import type { Executor, Transacao } from "./tipos";
 
 /** Status atual do concurso do usuário; lança {@link ErroDominio} se não houver. */
 async function statusAtual(tx: Transacao, usuarioId: number, id: number): Promise<Status> {
@@ -24,7 +24,7 @@ async function statusAtual(tx: Transacao, usuarioId: number, id: number): Promis
 
 /** Altera o status validando a transição. Lança {@link ErroDominio} se não permitida. */
 export async function alterarStatus(
-  db: Db,
+  db: Executor,
   usuarioId: number,
   id: number,
   para: Status,

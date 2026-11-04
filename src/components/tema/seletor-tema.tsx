@@ -16,7 +16,7 @@ import {
 } from "@/lib/tema";
 import { cn } from "@/lib/utils";
 
-const ICONE_TEMA = { claro: Sun, escuro: Moon, sistema: Monitor } as const;
+export const ICONE_TEMA = { claro: Sun, escuro: Moon, sistema: Monitor } as const;
 
 /** Avisa os seletores desta aba (o evento `storage` só dispara nas outras abas). */
 const EVENTO_TEMA = "concurso:tema";
@@ -44,8 +44,11 @@ function aplicar(tema: Tema): void {
   sincronizarCorTema(document, efetivo === "escuro");
 }
 
-/** Alternância Claro / Escuro / Sistema, persistida no `localStorage`. */
-export function SeletorTema({ className }: { className?: string }) {
+/**
+ * Tema escolhido e função para trocá-lo. Quem usa o hook também reaplica o tema antes da pintura
+ * e, no modo "sistema", acompanha o sistema operacional (várias instâncias não conflitam).
+ */
+export function useTema(): [Tema, (novo: Tema) => void] {
   const tema = useSyncExternalStore(assinar, lerTema, () => TEMA_PADRAO);
 
   // Reaplica antes da pintura (o remount do Strict Mode em dev limpa a classe do <html>).
@@ -69,6 +72,13 @@ export function SeletorTema({ className }: { className?: string }) {
     aplicar(novo);
     window.dispatchEvent(new Event(EVENTO_TEMA));
   }, []);
+
+  return [tema, escolher];
+}
+
+/** Alternância Claro / Escuro / Sistema, persistida no `localStorage`. */
+export function SeletorTema({ className }: { className?: string }) {
+  const [tema, escolher] = useTema();
 
   return (
     <fieldset

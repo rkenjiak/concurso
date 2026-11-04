@@ -133,16 +133,16 @@ restore do serviço e o export JSON periódico.
 
 ## Lembretes: notificações e calendário
 
-**Notificações no app.** O sino (na navegação e no dashboard) conta os avisos não lidos e leva à
-central (`/notificacoes`), onde cada aviso pode ser marcado como lido ou dispensado. Os avisos são
-calculados na hora a partir dos eventos pendentes — não há cron, então funciona até localmente — e
-seguem as **regras de notificação** de **Configurações → Notificações**: para cada tipo de evento,
-ligar/desligar e as antecedências em dias (0 = no dia). O padrão: fim das inscrições em 7, 1 e 0
-dias; isenção e boleto em 2 e 0; provas e demais fases em 7 e 1; recursos em 1 e 0; convocação,
-nomeação e posse em 3 e 0; fim da validade em 90 e 30. "Restaurar padrão" desfaz as mudanças. No
-detalhe do concurso, **Silenciar** cala os avisos e alarmes só daquele concurso. Eventos concluídos
-e concursos encerrados não notificam. Se a data de um evento muda (retificação), o aviso acompanha
-a nova data, sem duplicar.
+**Notificações no app.** O sino (na navegação: cabeçalho no celular, barra lateral no desktop) conta
+os avisos não lidos e leva à central (`/notificacoes`), onde cada aviso pode ser marcado como lido
+ou dispensado. Os avisos são calculados na hora a partir dos eventos pendentes — não há cron, então
+funciona até localmente — e seguem as **regras de notificação** de **Configurações → Notificações**:
+para cada tipo de evento, ligar/desligar e as antecedências em dias (0 = no dia). O padrão: fim das
+inscrições em 7, 1 e 0 dias; isenção e boleto em 2 e 0; provas e demais fases em 7 e 1; recursos em
+1 e 0; convocação, nomeação e posse em 3 e 0; fim da validade em 90 e 30. "Restaurar padrão" desfaz
+as mudanças. No detalhe do concurso, **Silenciar** cala os avisos e alarmes só daquele concurso.
+Eventos concluídos e concursos encerrados não notificam. Se a data de um evento muda (retificação),
+o aviso acompanha a nova data, sem duplicar.
 
 **Calendário (.ics).** Em **Configurações → Calendário**, "Gerar link de assinatura" cria um link
 pessoal (`/api/calendario.ics?token=…`, exibido uma única vez; o banco guarda só o resumo

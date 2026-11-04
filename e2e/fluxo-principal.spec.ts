@@ -28,18 +28,30 @@ test("cadastrar concurso → mudar status → adicionar evento → ver no dashbo
   await expect(dialogo).toBeHidden();
   await expect(page.getByText(titulo, { exact: true })).toBeVisible();
 
-  // Inscrito com prova marcada: o app sugere "Prova agendada" (#65); aplicar grava no histórico.
+  // Contagem regressiva até a prova (#84).
+  // Texto acessível num trecho sr-only (aria-label em elemento estático nem sempre é lido).
+  await expect(page.getByTestId("contagem-prova").locator(".sr-only")).toHaveText(
+    new RegExp(`^${titulo} em 5 dias, `),
+  );
+
+  // Inscrito com prova marcada: o app pergunta se muda para "Prova agendada" (#65, #85);
+  // responder grava no histórico.
   const sugestao = page.getByTestId("sugestao-status");
   await expect(sugestao).toContainText(`${titulo} marcada para`);
   await expect(sugestao).toContainText("Prova agendada");
-  await sugestao.getByRole("button", { name: "Aplicar" }).click();
+  await sugestao.getByRole("button", { name: "Sim", exact: true }).click();
   await expect(sugestao).toBeHidden();
   await page.getByRole("tab", { name: "Histórico" }).click();
-  await expect(page.getByText(/^Sugestão: .*marcada para/)).toBeVisible();
+  await expect(page.getByText(/^Pendência: .*marcada para/)).toBeVisible();
 
-  // Dashboard: o prazo aparece com o concurso e leva ao detalhe.
+  // Dashboard: a contagem e o prazo aparecem com o concurso; o prazo leva ao detalhe.
   await page.goto("/");
-  const prazo = page.getByRole("link", { name: new RegExp(titulo) });
+  await expect(
+    page.getByTestId("lista-contagens").getByRole("link", { name: new RegExp(orgao) }),
+  ).toBeVisible();
+  const prazo = page
+    .getByRole("region", { name: /^Próximos \d+ dias$/ })
+    .getByRole("link", { name: new RegExp(titulo) });
   await expect(prazo).toBeVisible();
   await expect(prazo).toContainText(orgao);
   await prazo.click();

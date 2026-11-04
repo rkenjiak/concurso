@@ -1,32 +1,62 @@
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowRight, ChevronLeft, ChevronRight, GraduationCap } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { connection } from "next/server";
 import { AgendaMes, GradeMes, LegendaConcursos } from "@/components/calendario/calendario-mensal";
+import { SeletorMes } from "@/components/calendario/seletor-mes";
 import { CabecalhoPagina } from "@/components/layout/cabecalho-pagina";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { deslocarMes, lerMes, mesDaData, montarGradeMes } from "@/domain/calendario";
+import {
+  contarPorMes,
+  filtrarPorSelecao,
+  hrefCalendario,
+  itensDoMes,
+  lerSelecaoConcursos,
+  normalizarSelecao,
+  PARAM_CONCURSOS,
+  PARAM_MES,
+  proximaProva,
+  proximoMesComEventos,
+} from "@/domain/navegacao-calendario";
 import { formatarMes } from "@/lib/format";
 import { hojeSP } from "@/lib/tz";
 import { exigirUsuarioPagina } from "@/server/auth/acesso";
 import { getDb } from "@/server/db/client";
-import { obterCalendario } from "@/server/queries/calendario";
+import { obterCalendarioCompleto } from "@/server/queries/calendario";
 
 export const metadata: Metadata = { title: "Calendário" };
-
-const hrefMes = (mes: string) => `/calendario?mes=${mes}`;
 
 export default async function CalendarioPage({ searchParams }: PageProps<"/calendario">) {
   await connection();
   const hoje = hojeSP();
-  const mes = lerMes((await searchParams).mes, hoje);
+  const params = await searchParams;
+  const mes = lerMes(params[PARAM_MES], hoje);
+  const mesHoje = mesDaData(hoje);
   const { id: usuarioId } = await exigirUsuarioPagina();
-  const itens = await obterCalendario(getDb(), usuarioId, mes, hoje);
+  const { concursos, itens: todosItens } = await obterCalendarioCompleto(getDb(), usuarioId, hoje);
+  const selecao = normalizarSelecao(
+    lerSelecaoConcursos(params[PARAM_CONCURSOS]),
+    concursos.map((c) => c.id),
+  );
+  const visiveis = filtrarPorSelecao(todosItens, selecao);
+  const doMesSemFiltro = itensDoMes(todosItens, mes);
+  const itens = filtrarPorSelecao(doMesSemFiltro, selecao);
+  const contagens = contarPorMes(visiveis);
+  const proximoComEventos = proximoMesComEventos(contagens, mes);
+  const prova = proximaProva(visiveis, hoje);
   const grade = montarGradeMes(mes, hoje);
   const titulo = formatarMes(mes);
   const anterior = deslocarMes(mes, -1);
   const seguinte = deslocarMes(mes, 1);
+  const href = (m: string) => hrefCalendario(m, selecao);
+  const vazio =
+    selecao?.length === 0
+      ? "Nenhum concurso selecionado. Use “Mostrar todos” abaixo."
+      : doMesSemFiltro.length > itens.length
+        ? "Nenhum evento dos concursos selecionados neste mês."
+        : undefined;
 
   return (
     <div className="space-y-6">
@@ -37,43 +67,91 @@ export default async function CalendarioPage({ searchParams }: PageProps<"/calen
 
       <Card>
         <CardContent className="space-y-4">
-          <nav
-            aria-label="Navegação entre meses"
-            className="flex flex-wrap items-center justify-between gap-2"
-          >
-            <h2 className="font-semibold text-lg first-letter:uppercase" aria-live="polite">
-              {titulo}
-            </h2>
-            <div className="flex items-center gap-1">
-              <Button asChild variant="outline" size="icon" aria-label="Mês anterior">
-                <Link href={hrefMes(anterior)} title={formatarMes(anterior)}>
-                  <ChevronLeft aria-hidden />
-                </Link>
-              </Button>
-              <Button asChild variant="outline">
-                <Link
-                  href={hrefMes(mesDaData(hoje))}
-                  aria-current={mes === mesDaData(hoje) ? "page" : undefined}
-                >
-                  Hoje
-                </Link>
-              </Button>
-              <Button asChild variant="outline" size="icon" aria-label="Próximo mês">
-                <Link href={hrefMes(seguinte)} title={formatarMes(seguinte)}>
-                  <ChevronRight aria-hidden />
-                </Link>
-              </Button>
+          <nav aria-label="Navegação entre meses" className="space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              {/* Anuncia só o mês ao navegar, não o rótulo inteiro do botão do seletor. */}
+              <p className="sr-only" aria-live="polite">
+                {titulo}
+              </p>
+              <h2 className="text-lg">
+                <SeletorMes
+                  mes={mes}
+                  mesHoje={mesHoje}
+                  contagens={Object.fromEntries(contagens)}
+                  selecao={selecao}
+                />
+              </h2>
+              <div className="flex items-center gap-1">
+                <Button asChild variant="outline" size="icon" aria-label="Mês anterior">
+                  <Link href={href(anterior)} title={formatarMes(anterior)}>
+                    <ChevronLeft aria-hidden />
+                  </Link>
+                </Button>
+                <Button asChild variant="outline">
+                  <Link href={href(mesHoje)} aria-current={mes === mesHoje ? "page" : undefined}>
+                    Hoje
+                  </Link>
+                </Button>
+                <Button asChild variant="outline" size="icon" aria-label="Próximo mês">
+                  <Link href={href(seguinte)} title={formatarMes(seguinte)}>
+                    <ChevronRight aria-hidden />
+                  </Link>
+                </Button>
+              </div>
             </div>
+            {proximoComEventos || prova ? (
+              <ul aria-label="Atalhos" className="flex flex-wrap gap-2">
+                {proximoComEventos ? (
+                  <li>
+                    <Button asChild variant="secondary" size="sm">
+                      <Link
+                        href={href(proximoComEventos)}
+                        aria-label={`Próximos eventos: ${formatarMes(proximoComEventos)}`}
+                      >
+                        Próximos eventos
+                        <span className="text-muted-foreground">
+                          · {formatarMes(proximoComEventos)}
+                        </span>
+                        <ArrowRight aria-hidden />
+                      </Link>
+                    </Button>
+                  </li>
+                ) : null}
+                {prova ? (
+                  <li>
+                    <Button asChild variant="secondary" size="sm">
+                      <Link
+                        href={href(mesDaData(prova.item.data))}
+                        aria-label={`Próxima prova: ${prova.contagem.rotulo}, ${prova.item.concurso.orgao}`}
+                        title={`${prova.contagem.rotulo} · ${prova.item.concurso.orgao}`}
+                      >
+                        <GraduationCap aria-hidden />
+                        Próxima prova
+                        <span className="text-muted-foreground">· {prova.contagem.texto}</span>
+                      </Link>
+                    </Button>
+                  </li>
+                ) : null}
+              </ul>
+            ) : null}
           </nav>
 
-          <div className="hidden md:block">
+          <div className="hidden space-y-2 md:block">
+            {vazio && itens.length === 0 ? (
+              <p className="text-muted-foreground text-sm">{vazio}</p>
+            ) : null}
             <GradeMes grade={grade} itens={itens} titulo={titulo} hoje={hoje} />
           </div>
           <div className="md:hidden">
-            <AgendaMes itens={itens} hoje={hoje} />
+            <AgendaMes itens={itens} hoje={hoje} vazio={vazio} />
           </div>
 
-          <LegendaConcursos itens={itens} />
+          <LegendaConcursos
+            mes={mes}
+            itens={doMesSemFiltro}
+            concursos={concursos}
+            selecao={selecao}
+          />
 
           <ul
             aria-label="Legenda"

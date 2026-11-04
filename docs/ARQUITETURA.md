@@ -113,6 +113,10 @@ obrigatório, garantido por triggers porque a coluna foi adicionada com `ALTER T
 - `notificacao_estado`: `chave` (PK, `evento-<id>:<dias>` ou `validade-<concursoId>:<dias>`),
   `concurso_id` → `concurso.id` e `evento_id` → `evento.id` (nulo no fim da validade; ambos
   `CASCADE`), `antecedencia`, `lida_em`, `dispensada_em`. A notificação em si não é guardada.
+- `pendencia_status_dispensa` (#85): `concurso_id` → `concurso.id` e `evento_id` → `evento.id`
+  (ambos `CASCADE`), `regra` (`RegraPendencia`), `data_evento`, `ate` (`null` = "não perguntar
+  mais"; data = "lembrar depois" até esse dia), `created_at`; PK (`evento_id`, `regra`). Se o
+  evento mudar de data, a dispensa deixa de valer. A pendência em si é calculada sob demanda.
 
 ### 3.1 `concurso` (RF01, RF03, RF05)
 
@@ -216,12 +220,27 @@ PROVA_REALIZADA(5) → AGUARDANDO_RESULTADO(6)`.
   e restaura o `de`), cobrindo erros de digitação sem liberar transições arbitrárias.
 - Toda mudança grava `status_historico` e atualiza `concurso.status/status_desde` na mesma transação.
 - API do domínio: `podeTransicionar(de, para)`, `transicoesPermitidas(de)`, `ehTerminal(s)`, `ehAtivo(s)`.
-- **Sugestão de status** (#65, `domain/sugestao-status.ts`), só a partir de `INSCRITO` na trilha
-  principal; "passou" = concluído ou `data < hoje`. Prova (objetiva/discursiva) passada →
-  `PROVA_REALIZADA`; prova passada e `PRAZO_RECURSO` posterior a ela também → `AGUARDANDO_RESULTADO`;
-  `INSCRITO` com prova marcada → `PROVA_AGENDADA`. Vale a mais adiantada que seja transição
-  permitida. Nunca automático: a UI (detalhe e dashboard) oferece "Aplicar", que recalcula a
-  sugestão no servidor, usa `alterarStatus` e grava o motivo na observação do histórico.
+- **Pendências de status** (#65, #85, `domain/sugestao-status.ts`, sobre `domain/eventos-chave.ts`):
+  quando um evento importante chega (`data <= hoje` ou concluído) ou passa (`data < hoje`), o app
+  pergunta o que aconteceu. Regras, em ordem de prioridade: posse (Nomeado → Empossado/Desistiu),
+  nomeação (Aprovado/Classificado → Nomeado), resultado final (Prova realizada/Aguardando →
+  Aprovado/Classificado/Reprovado), recurso posterior à prova (Prova realizada → Aguardando
+  resultado), prova passada, a partir do dia seguinte (Inscrito/Prova agendada: "Fez a prova?" →
+  Prova realizada/Desistiu), boleto
+  vencido e pendente ("Pagou o boleto?": antes da inscrição → Inscrito/Não inscrito; já inscrito →
+  mantém e conclui o boleto / Desistiu), prova futura (Inscrito → Prova agendada), fim das
+  inscrições (Previsto/Edital → Inscrito/Não inscrito) e edital (Previsto → Edital publicado). Só
+  respostas que são transições permitidas. Nada para concursos terminais ou suspensos. Nunca
+  automático: a UI (detalhe e card "Pendências de status" do dashboard) mostra a primeira pendência
+  não dispensada; responder recalcula a pendência no servidor, usa `alterarStatus` e grava
+  pergunta, resposta e motivo na observação do histórico. "Lembrar depois" (3 dias) e "Não
+  perguntar mais" ficam em `pendencia_status_dispensa`. Respostas que levam a Desistiu pedem
+  confirmação. Status e conclusão do evento (boleto pago) são gravados na mesma transação; "Sim"
+  ao boleto já inscrito só conclui o evento (sem registro no histórico, que só guarda mudanças).
+- **Contagem regressiva** (#84, `domain/contagem.ts`): próximo evento de prova (objetiva,
+  discursiva, outra fase) não concluído com `data >= hoje`, para concursos em andamento (não
+  terminais nem suspensos). Destaque para hoje, amanhã e até 7 dias; texto acessível (`sr-only`)
+  "Prova objetiva em 12 dias, 14/11/2026". Exibida no detalhe do concurso e no card "Próximas provas" do dashboard.
 
 ### 4.2 Próximos prazos (RF06)
 
@@ -273,6 +292,14 @@ senão → indefinida
 - O contador do sino é calculado no layout do app. Toda Server Action que chama `revalidatePath`
   recebe na própria resposta a rota atual re-renderizada a partir da raiz (layout incluso), então o
   sino atualiza sem `router.refresh()` (#73).
+- Mudanças feitas fora desta aba (MCP, outro aparelho) não chegam sozinhas: não há refresh
+  automático, polling nem realtime, para poupar as invocações do plano gratuito da hospedagem. O
+  botão **Atualizar** (#77, `layout/botao-atualizar.tsx`), no cabeçalho do celular e na barra
+  lateral do desktop, chama `router.refresh()` no máximo uma vez por minuto (hora do último clique
+  no `sessionStorage`, regra em `lib/atualizar.ts`); na espera fica com `aria-disabled` e o rótulo
+  diz quanto falta. Custo real de um clique: a requisição do refresh e mais os prefetches dos links
+  visíveis, porque o `router.refresh()` limpa o cache do roteador no navegador (cerca de 13
+  requisições no detalhe do concurso, no desktop).
 
 ### 4.5 Calendário iCalendar (RF08, #65)
 
@@ -292,6 +319,32 @@ senão → indefinida
 - Opções: incluir concluídos e concursos encerrados (feed e download geral); o download de um
   concurso traz todos os eventos dele.
 
+### 4.6 Navegação e filtro do calendário (#83)
+
+`domain/navegacao-calendario.ts`, puro, com `hoje` injetado. A URL é a fonte da verdade e continua
+compartilhável: `?mes=AAAA-MM` (ausente ou inválido = mês de hoje) e `?concursos=1,3` (IDs dos
+concursos exibidos; ausente = todos, vazio = nenhum). `lerSelecaoConcursos` ignora IDs inválidos
+(sem nenhum válido, vale "todos"); `normalizarSelecao` descarta IDs que não são do usuário e volta a
+"todos" quando a seleção cobre todos os concursos, para a URL ficar limpa e concursos novos
+aparecerem. `hrefCalendario(mes, selecao)` monta todos os links de navegação (anterior, hoje,
+seguinte, seletor e atalhos), então o filtro se mantém ao trocar de mês.
+
+- A página lê **todos** os itens do usuário (`obterCalendarioCompleto`: eventos de qualquer data e
+  validades calculadas) e recorta o mês (`itensDoMes`). O resto alimenta a contagem por mês
+  (`contarPorMes`) e os atalhos: um app pessoal tem poucas centenas de eventos, e uma leitura só é
+  mais simples que várias consultas agregadas.
+- **Seletor de mês e ano** (`calendario/seletor-mes.tsx`): o título do mês abre um popover com os
+  12 meses do ano e a quantidade de eventos de cada um (com o filtro aplicado), e setas de ano que
+  não vão ao servidor. Cada mês é um link, então funciona igual no desktop e no celular. Faz as
+  vezes da visão anual sem uma tela a mais.
+- **Atalhos**: "Próximos eventos" (`proximoMesComEventos`: primeiro mês depois do exibido com
+  itens visíveis) e "Próxima prova" (`proximaProva`, com a regra da contagem regressiva do #84:
+  `contagemRegressiva` + `compararContagens` sobre provas e outras fases de concursos em andamento).
+- **Filtro de concursos** (`calendario/filtro-concursos.tsx`): a legenda cor/ícone (#46) virou
+  toggles com `aria-pressed` e o nome do concurso como rótulo, mais "só este" e "Mostrar todos".
+  Lista os concursos com itens no mês (antes do filtro, para poder religá-los) e os selecionados.
+  Desligar um partindo de "todos" seleciona os demais (`alternarConcurso`).
+
 ---
 
 ## 5. Rotas, telas e ações
@@ -303,9 +356,9 @@ senão → indefinida
 | `/` | **Dashboard**: próximos prazos (vencidos/hoje/30 dias), contagem por status, atalhos; ocultar/reexibir prazos, `?ocultos=1` mostra os ocultos | MVP |
 | `/concursos` | **Lista** com busca, filtros e ordenação em `searchParams` (URL compartilhável) | MVP |
 | `/concursos/novo` | **Formulário** de cadastro | MVP |
-| `/concursos/[id]` | **Detalhe** em abas: Visão geral · Eventos · Links · Resultados · Histórico | MVP |
+| `/concursos/[id]` | **Detalhe** em abas: Visão geral · Eventos · Links · Resultados · Histórico; a aba aberta fica em `?aba=` (#77): abas controladas pelo `useSearchParams`, troca gravada com `history.replaceState`, sem ir ao servidor | MVP |
 | `/concursos/[id]/editar` | Formulário de edição | MVP |
-| `/configuracoes` | Aparência, regras de notificação, calendário (.ics), exportar/importar dados, token do MCP, acesso | MVP |
+| `/configuracoes` | Regras de notificação, calendário (.ics), exportar/importar dados, token do MCP, acesso | MVP |
 | `/notificacoes` | **Central de notificações** (#65): marcar como lida, marcar todas, dispensar | v2.2 |
 | `/login` | Login Google e/ou senha única (só se auth habilitada) | MVP |
 | `/admin` | **Painel admin** (#50, só papel `ADMIN`; 403 para os demais): visão geral com totais de usuários, concursos e eventos e ações recentes | v1.4 |
@@ -313,12 +366,16 @@ senão → indefinida
 | `/admin/acesso` | Allowlist do login Google: e-mails das variáveis (só leitura) e liberados no painel (adicionar/retirar) | v1.4 |
 | `/admin/auditoria` | Log das ações administrativas (últimas 200) | v1.4 |
 | `/concursos?visao=quadro` | Quadro por status (kanban; arrastar ou “Mover para” = transição validada) | v1.1 |
-| `/calendario?mes=AAAA-MM` | Visão mensal de eventos (agenda em lista no celular); clique abre os detalhes do evento; cor/ícone por concurso com legenda (#46) | v1.1 |
+| `/calendario?mes=AAAA-MM&concursos=1,3` | Visão mensal de eventos (agenda em lista no celular); clique abre os detalhes do evento; cor/ícone por concurso com legenda (#46); seletor de mês e ano com eventos por mês, atalhos "Próximos eventos" e "Próxima prova", e filtro de concursos pela legenda (#83, §4.6) | v1.1 |
 
 Layout responsivo (alvo: 360 px sem rolagem horizontal, #48): navegação lateral no desktop, barra
-inferior no celular; menu da conta (avatar) com Configurações, Sair e, só para admins, o seletor de
-visão (§7.1). Em telas de toque (`pointer: coarse`), botões, campos, abas e seletores crescem para
-36–40 px, sem mudar o desktop. Tabelas largas rolam dentro do próprio contêiner (`relative
+inferior no celular; menu da conta (avatar) com Sair e, só para admins, o seletor de
+visão (§7.1). No celular o cabeçalho tem só marca, sino de notificações e menu da conta (na
+visão admin, o selo no lugar do sino); o tema fica dentro do menu (#78). Um único sino por tela,
+e sobra espaço para mais um ícone em 360 px. Configurações fica só na navegação principal e o
+tema só junto ao avatar (barra lateral no desktop, menu da conta no celular), sem duplicação (#82).
+Em telas de toque (`pointer: coarse`), botões,
+campos, abas e seletores crescem para 36–40 px, sem mudar o desktop. Tabelas largas rolam dentro do próprio contêiner (`relative
 overflow-x-auto`, para o `sr-only` não escapar). Links externos com
 `target="_blank" rel="noopener noreferrer"`.
 
@@ -344,7 +401,8 @@ Os ícones são gerados de `assets/logo.svg` por `pnpm icones` (`scripts/gerar-i
 | `marcarNotificacaoLidaAcao(chave)`, `dispensarNotificacaoAcao(chave)`, `marcarTodasLidasAcao()` | #65 — estado das notificações (`evento-<id>:<dias>` / `validade-<id>:<dias>`) |
 | `salvarRegrasNotificacaoAcao(regras)`, `restaurarRegrasPadraoAcao()`, `silenciarConcursoAcao(id, silenciado)` | #65 — regras e silenciamento por concurso |
 | `gerarTokenIcsAcao`, `revogarTokenIcsAcao`, `salvarOpcoesIcsAcao(opcoes)` | #65 — feed de calendário |
-| `aplicarSugestaoStatus(id, esperado)` | #65 — aplica a sugestão recalculada no servidor |
+| `responderPendenciaStatus(id, chave, resposta)` | #65, #85 — responde à pendência de status recalculada no servidor (`<regra>-<eventoId>`) |
+| `dispensarPendenciaStatus(id, chave, modo)` | #85 — `"lembrar"` (3 dias) ou `"dispensar"` a pendência |
 | `alternarVisaoAcao(visao)` | #50 — "usuario" ou "admin" (só admins); grava o cookie da visão e leva a `/` ou `/admin` |
 | `definirPapelAcao(id, papel)`, `definirBloqueioAcao(id, bloqueado)` | #50 — admin; protege o último admin ativo e os de `ADMIN_EMAILS` |
 | `adicionarEmailPermitidoAcao(email)`, `removerEmailPermitidoAcao(email)` | #50 — admin; allowlist do painel |
@@ -439,19 +497,20 @@ Decisões (issue #39):
 │   ├── components/
 │   │   ├── ui/                     # shadcn/ui
 │   │   ├── concurso/               # formulários, cards, quadro, badges, sugestão de status
-│   │   ├── calendario/             # visão mensal e detalhes do evento
+│   │   ├── calendario/             # visão mensal, detalhes do evento, seletor de mês, filtro (#83)
 │   │   ├── dashboard/              # lista de prazos, ocultar/reexibir
 │   │   ├── configuracoes/          # regras de notificação, calendário .ics, export/import, token MCP
 │   │   ├── admin/                  # painel admin (#50)
 │   │   ├── auth/                   # login (Google/senha) e sair
-│   │   ├── layout/                 # casca, navegação, menu da conta
+│   │   ├── layout/                 # casca, navegação, menu da conta, botão Atualizar
 │   │   ├── notificacoes/           # sino e central de notificações (#65)
 │   │   └── tema/                   # seletor de tema (claro/escuro/sistema)
 │   ├── domain/                     # regras puras + testes *.test.ts ao lado
 │   │   ├── enums.ts  labels.ts  erros.ts
 │   │   ├── status.ts  prazos.ts  validade.ts
-│   │   ├── calendario.ts  quadro.ts  cores.ts  duplicados.ts
-│   │   └── notificacoes.ts  icalendar.ts  sugestao-status.ts   # lembretes (#65)
+│   │   ├── calendario.ts  navegacao-calendario.ts  quadro.ts  cores.ts  duplicados.ts
+│   │   ├── notificacoes.ts  icalendar.ts  sugestao-status.ts   # lembretes (#65, #85)
+│   │   └── eventos-chave.ts  contagem.ts   # evento relevante e contagem regressiva (#84, #85)
 │   ├── server/
 │   │   ├── db/                     # schema.ts, client.ts, migrate.ts, url.ts, backup.ts
 │   │   ├── queries/                # leituras (lista, dashboard, detalhe, notificações, .ics)
@@ -460,7 +519,7 @@ Decisões (issue #39):
 │   │   ├── mcp/                    # servidor MCP (ferramentas, entradas, textos)
 │   │   ├── auth/                   # sessão, senha, Google, autorização, visão admin
 │   │   └── inicializacao.ts        # checagem do ambiente e migrações ao iniciar
-│   ├── lib/                        # format, tz, normalize, csv, tema, pwa, tags, schemas Zod
+│   ├── lib/                        # format, tz, normalize, csv, tema, pwa, tags, aba-concurso, atualizar, schemas Zod
 │   ├── instrumentation.ts          # chama server/inicializacao.ts ao subir o servidor
 │   └── proxy.ts
 ├── biome.json  drizzle.config.ts  next.config.ts  vitest.config.ts  playwright.config.ts
@@ -541,11 +600,17 @@ Decisões (issue #39):
 
 ### 7.3 Tema claro/escuro
 - Preferência **Claro / Escuro / Sistema** (padrão: Sistema, via `prefers-color-scheme`), salva no
-  `localStorage` (`concurso:tema`). Seletor na navegação (lateral e cabeçalho do celular) e em
-  Configurações (`components/tema/seletor-tema.tsx`); no modo Sistema acompanha mudanças do SO.
+  `localStorage` (`concurso:tema`). Seletor só junto ao avatar: barra lateral (desktop) e menu
+  da conta do celular (#78, #82) (`components/tema/seletor-tema.tsx`, hook `useTema`); no modo
+  Sistema acompanha mudanças do SO.
 - Sem flash: script inline no `<head>` do layout raiz (`SCRIPT_TEMA`, `lib/tema.ts`) aplica a classe
   `dark` e o `color-scheme` no `<html>` antes da primeira pintura; o variant `dark:` do Tailwind usa
   essa classe.
+- Barra de gestos do Android (#81): `<meta name="color-scheme" content="light dark">`,
+  `color-scheme` no `<html>` (SCRIPT_TEMA; `:root`/`.dark` sem JS) e `bg-background` no `<html>` e
+  no `<body>`; com
+  `viewport-fit=cover`, o fundo da raiz e a barra inferior fixa (com
+  `env(safe-area-inset-bottom)`) cobrem a área atrás da barra de gestos.
 - Cores sempre por tokens CSS (`globals.css`, `:root` e `.dark`), nunca fixas por tema. Atenção/aviso
   usa `--aviso` (borda/fundo) e `--aviso-foreground` (texto, contraste AA nos dois temas).
 
@@ -560,7 +625,8 @@ Decisões (issue #39):
   leituras de prazos/calendário já entregam a cor resolvida.
 - Ícone: um único grafema (emoji com modificadores/ZWJ incluído), validado com `Intl.Segmenter`.
 - Exibição via `components/concurso/marcador-concurso.tsx`: itens e diálogo de detalhes do
-  calendário, legenda cor → concurso (concursos com itens no mês), próximos prazos do dashboard,
+  calendário, legenda cor → concurso (concursos com itens no mês, que também filtra o calendário,
+  #83), próximos prazos do dashboard,
   lista, quadro e cabeçalho do detalhe. Formulário: rádios nativos com amostras ("Automática"
   mostra a cor derivada na edição) e campo de ícone com sugestões.
 - Backup JSON (`schemaVersion` 1): `concursos[].cor`/`icone` opcionais (ausentes = `null`). MCP:
@@ -575,7 +641,7 @@ Decisões (issue #39):
 |---|---|---|---|
 | Unitário | Vitest | `domain/*` (transições, prazos, validade, criticidade), `lib/format`, parsers BRL, schemas Zod | meta: cobertura ≥ 90% em `domain/` (medida no CI, sem limite configurado) |
 | Integração | Vitest + libSQL `:memory:` + migrações | repositories/queries (transação de status, tags, filtros, export→import ida e volta); servidor MCP com cliente em memória (`InMemoryTransport`) | casos principais |
-| E2E | Playwright (Chromium) | smoke: criar concurso → evento → aparece no dashboard → mudar status → exportar/importar; login, MCP, PWA e lembretes com auth ativa; painel admin com o usuário inicial (sem auth); busca, quadro, calendário, cor/ícone, ocultar prazos, tema, lembretes (sino, regras, feed .ics), PWA e layout em 360 px; `/api/mcp` com token → concurso visível no app. Dois servidores (com e sem auth) com bancos temporários em `e2e/.tmp` | poucos fluxos |
+| E2E | Playwright (Chromium) | smoke: criar concurso → evento → aparece no dashboard → mudar status → exportar/importar; login, MCP, PWA e lembretes com auth ativa; painel admin com o usuário inicial (sem auth); busca, quadro, calendário (navegação rápida e filtro de concursos no desktop e em 360 px, #83), cor/ícone, ocultar prazos, tema, lembretes (sino, regras, feed .ics), sino único por tela e tema pelo menu no celular, tema e Configurações sem duplicação (#82), PWA, aba do detalhe na URL e botão Atualizar com limite de 60 s (#77) e layout em 360 px; `/api/mcp` com token → concurso visível no app. Dois servidores (com e sem auth) com bancos temporários em `e2e/.tmp` | poucos fluxos |
 
 Datas sempre fixadas (`vi.setSystemTime` / `hoje` injetado).
 
@@ -652,7 +718,8 @@ Cada item = uma branch `feature/*` a partir de `develop`; cada milestone fecha c
 | **PWA e celular** → `v2.2.0` | `feature/pwa-mobile` (#66, #48) | App instalável (manifest, ícones) e responsividade em 360 px |
 | **M6 — Lembretes** → `v2.2.0` | `feature/lembretes` (#65): feed/download .ics, notificações no app com regras configuráveis, sugestão de status. E-mail descartado (2026-11-01) | RF08 |
 | **Desempenho** → `v2.3.0` | `feature/performance-mutacoes` (#73) | Mutações com uma viagem só ao servidor e esqueletos de carregamento |
-| **M7 — Anexos** → `v2.4.0` | `feature/anexos` | RF02 desejável |
+| **Uso diário** → `v2.4.0` | `feature/atualizar-dados` (#77) · `feature/sino-unico` (#78) · `feature/tema-layout` (#81, #82) · `feature/eventos-dashboard` (#84, #85) · `feature/calendario-navegacao` (#83) | Botão Atualizar, contagem regressiva das provas, pendências de status e navegação rápida no calendário |
+| **M7 — Anexos** → `v2.5.0` | `feature/anexos` | RF02 desejável |
 
 ---
 

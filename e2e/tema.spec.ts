@@ -1,12 +1,24 @@
 import { expect, type Page, test } from "@playwright/test";
 
 const html = (page: Page) => page.locator("html");
-const seletor = (page: Page) => page.getByRole("main").getByRole("group", { name: "Tema" });
+/** Fundo do <html> igual ao do <body> (tema), não transparente (#81). */
+async function fundoDaRaizSegueOTema(page: Page) {
+  const [raiz, corpo] = await page.evaluate(() => [
+    getComputedStyle(document.documentElement).backgroundColor,
+    getComputedStyle(document.body).backgroundColor,
+  ]);
+  expect(raiz).not.toBe("rgba(0, 0, 0, 0)");
+  expect(raiz).toBe(corpo);
+}
+
+// O tema fica só junto ao avatar (#82): no desktop, o seletor da barra lateral.
+const seletor = (page: Page) =>
+  page.getByRole("complementary").getByRole("group", { name: "Tema" });
 
 test("tema: padrão do sistema, alternância e persistência sem flash", async ({ page }) => {
   // Padrão "Sistema": segue prefers-color-scheme.
   await page.emulateMedia({ colorScheme: "dark" });
-  await page.goto("/configuracoes");
+  await page.goto("/");
   await expect(html(page)).toHaveClass(/\bdark\b/);
   await expect(seletor(page).getByRole("button", { name: "Sistema" })).toHaveAttribute(
     "aria-pressed",
@@ -18,10 +30,9 @@ test("tema: padrão do sistema, alternância e persistência sem flash", async (
   // Escuro explícito vence o sistema claro e persiste após recarregar.
   await seletor(page).getByRole("button", { name: "Escuro" }).click();
   await expect(html(page)).toHaveClass(/\bdark\b/);
-  // Seletor da navegação lateral acompanha a escolha.
-  await expect(
-    page.getByRole("complementary").getByRole("button", { name: "Escuro" }),
-  ).toHaveAttribute("aria-pressed", "true");
+  // `color-scheme` e fundo da raiz seguem o tema (barra de gestos do Android, #81).
+  await expect(html(page)).toHaveCSS("color-scheme", "dark");
+  await fundoDaRaizSegueOTema(page);
 
   // Sem flash: o tema já está no <html> assim que o documento é analisado, antes da hidratação.
   await page.reload({ waitUntil: "domcontentloaded" });
@@ -38,10 +49,12 @@ test("tema: padrão do sistema, alternância e persistência sem flash", async (
   await page.goto("/calendario");
   await expect(html(page)).not.toHaveClass(/\bdark\b/);
   await expect(html(page)).toHaveCSS("color-scheme", "light");
+  await fundoDaRaizSegueOTema(page);
+  await expect(page.locator('meta[name="color-scheme"]')).toHaveAttribute("content", "light dark");
 
   // A cor da barra de status (PWA, #66) segue o tema escolhido, inclusive após navegar no app.
   const corBarra = page.locator('meta[name="theme-color"]');
-  await page.goto("/configuracoes");
+  await page.goto("/");
   await seletor(page).getByRole("button", { name: "Escuro" }).click();
   await expect(corBarra).toHaveAttribute("content", "#0a0a0a");
   await page.getByRole("complementary").getByRole("link", { name: "Calendário" }).click();
@@ -50,7 +63,7 @@ test("tema: padrão do sistema, alternância e persistência sem flash", async (
   await expect(corBarra).toHaveAttribute("content", "#0a0a0a");
 
   // Volta ao padrão.
-  await page.goto("/configuracoes");
+  await page.goto("/");
   await seletor(page).getByRole("button", { name: "Sistema" }).click();
   await expect(html(page)).toHaveClass(/\bdark\b/);
 });

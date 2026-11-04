@@ -4,10 +4,10 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { BadgeStatus } from "@/components/concurso/badge-status";
+import { ListaContagens } from "@/components/concurso/contagem-prova";
 import { SugestaoStatus } from "@/components/concurso/sugestao-status";
 import { ListaPrazos } from "@/components/dashboard/lista-prazos";
 import { CabecalhoPagina } from "@/components/layout/cabecalho-pagina";
-import { SinoNotificacoes } from "@/components/notificacoes/sino-notificacoes";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -24,9 +24,9 @@ import { hojeSP } from "@/lib/tz";
 import { exigirUsuarioPagina } from "@/server/auth/acesso";
 import { visaoAtual } from "@/server/auth/admin";
 import { getDb } from "@/server/db/client";
+import { listarContagens } from "@/server/queries/contagem";
 import { obterDashboard } from "@/server/queries/dashboard";
-import { contarNotificacoesNaoLidas } from "@/server/queries/notificacoes";
-import { listarSugestoesStatus } from "@/server/queries/sugestoes";
+import { listarPendenciasStatus } from "@/server/queries/sugestoes";
 
 export const metadata: Metadata = { title: "Dashboard" };
 
@@ -59,6 +59,9 @@ function Grupo({
 /** `?ocultos=1` exibe também os prazos ocultos pelo usuário (#44). */
 const PARAM_OCULTOS = "ocultos";
 
+/** Provas exibidas na contagem regressiva do dashboard (#84); as demais ficam no calendário. */
+const MAX_CONTAGENS = 6;
+
 export default async function DashboardPage({ searchParams }: PageProps<"/">) {
   await connection();
   const hoje = hojeSP();
@@ -68,10 +71,11 @@ export default async function DashboardPage({ searchParams }: PageProps<"/">) {
   if ((await visaoAtual(usuario)) === "admin") redirect("/admin");
   const usuarioId = usuario.id;
   const db = getDb();
-  const [dashboard, naoLidas, sugestoes] = await Promise.all([
+  // O contador de não lidas fica só no sino global, calculado no layout (#78).
+  const [dashboard, pendencias, contagens] = await Promise.all([
     obterDashboard(db, usuarioId, hoje),
-    contarNotificacoesNaoLidas(db, usuarioId, hoje),
-    listarSugestoesStatus(db, usuarioId, hoje),
+    listarPendenciasStatus(db, usuarioId, hoje),
+    listarContagens(db, usuarioId, hoje),
   ]);
   const { porStatus, totalConcursos, ocultos } = dashboard;
   const prazos = mostrarOcultos ? dashboard.prazos : semOcultos(dashboard.prazos);
@@ -119,11 +123,8 @@ export default async function DashboardPage({ searchParams }: PageProps<"/">) {
       <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <Card>
           <CardHeader>
-            {/* Sino ao lado do título (#65): não disputa largura com "Mostrar ocultos" em 360 px. */}
-            <CardTitle className="flex items-center gap-1">
-              Próximos prazos
-              <SinoNotificacoes naoLidas={naoLidas} className="-my-2" />
-            </CardTitle>
+            {/* Sem sino próprio (#78): o global (cabeçalho/barra lateral) é o único ponto de entrada. */}
+            <CardTitle>Próximos prazos</CardTitle>
             <CardDescription>
               Eventos pendentes de concursos em andamento: vencidos, hoje e próximos{" "}
               {JANELA_PADRAO_DIAS} dias.
@@ -196,25 +197,55 @@ export default async function DashboardPage({ searchParams }: PageProps<"/">) {
 
         {/* min-w-0: item de grid não encolhe abaixo do conteúdo (nome do concurso truncado). */}
         <div className="flex min-w-0 flex-col gap-6">
-          {sugestoes.length > 0 ? (
+          {pendencias.length > 0 ? (
             <Card>
               <CardHeader>
-                <CardTitle>Atualizar status?</CardTitle>
+                <CardTitle>Pendências de status</CardTitle>
                 <CardDescription>
-                  Eventos que já passaram sugerem um novo status. Nada muda sem você aplicar.
+                  Eventos que chegaram ou passaram. Responda para atualizar o status; nada muda sem
+                  você.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-2">
-                {sugestoes.map((c) => (
+                {pendencias.map((c) => (
                   <SugestaoStatus
-                    key={c.id}
+                    key={c.pendencia.chave}
                     concursoId={c.id}
-                    para={c.sugestao.para}
-                    motivo={c.sugestao.motivo}
+                    chave={c.pendencia.chave}
+                    pergunta={c.pendencia.pergunta}
+                    motivo={c.pendencia.motivo}
+                    respostas={c.pendencia.respostas.map(({ id, rotulo, para, confirmar }) => ({
+                      id,
+                      rotulo,
+                      para,
+                      confirmar,
+                    }))}
                     nomeConcurso={`${c.icone ? `${c.icone} ` : ""}${c.orgao} — ${c.cargo}`}
                     compacta
                   />
                 ))}
+              </CardContent>
+            </Card>
+          ) : null}
+          {contagens.length > 0 ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>Próximas provas</CardTitle>
+                <CardDescription>
+                  Contagem regressiva até a próxima prova de cada concurso.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <ListaContagens itens={contagens.slice(0, MAX_CONTAGENS)} />
+                {contagens.length > MAX_CONTAGENS ? (
+                  <p className="text-muted-foreground text-xs">
+                    E mais {contagens.length - MAX_CONTAGENS} no{" "}
+                    <Link href="/calendario" className="underline underline-offset-2">
+                      calendário
+                    </Link>
+                    .
+                  </p>
+                ) : null}
               </CardContent>
             </Card>
           ) : null}

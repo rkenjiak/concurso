@@ -27,7 +27,7 @@ async function contarViagens(page: Page, acao: () => Promise<void>) {
 }
 
 const naoLidas = async (page: Page) => {
-  const sino = page.getByRole("link", { name: /^Notificações/ }).first();
+  const sino = page.getByRole("link", { name: /^Notificações/ });
   const nome = (await sino.getAttribute("aria-label")) ?? "";
   return Number(/\((\d+) não/.exec(nome)?.[1] ?? 0);
 };

@@ -6,7 +6,6 @@ import { ExportarImportar } from "@/components/configuracoes/exportar-importar";
 import { RegrasNotificacao } from "@/components/configuracoes/regras-notificacao";
 import { TokenMcp } from "@/components/configuracoes/token-mcp";
 import { CabecalhoPagina } from "@/components/layout/cabecalho-pagina";
-import { SeletorTema } from "@/components/tema/seletor-tema";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { exigirUsuarioPagina } from "@/server/auth/acesso";
 import { lerConfigAuth } from "@/server/auth/config";
@@ -40,19 +39,8 @@ export default async function ConfiguracoesPage() {
     <div className="space-y-6">
       <CabecalhoPagina
         titulo="Configurações"
-        descricao="Aparência, notificações, calendário, backup dos dados, integração com LLM e acesso."
+        descricao="Notificações, calendário, backup dos dados, integração com LLM e acesso."
       />
-      <Card>
-        <CardHeader>
-          <CardTitle>Aparência</CardTitle>
-          <CardDescription>
-            Tema claro, escuro ou do sistema (padrão). A escolha fica salva neste navegador.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <SeletorTema />
-        </CardContent>
-      </Card>
       <Card id="notificacoes" className="scroll-mt-20">
         <CardHeader>
           <CardTitle>Notificações</CardTitle>

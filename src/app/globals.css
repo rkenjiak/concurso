@@ -154,7 +154,9 @@
   body {
     @apply bg-background text-foreground;
   }
+  /* Fundo também no <html> (#81): com `viewport-fit=cover`, a área atrás da barra de gestos do
+     Android e o overscroll mostram o fundo da raiz, que precisa seguir o tema. */
   html {
-    @apply font-sans;
+    @apply bg-background font-sans;
   }
 }

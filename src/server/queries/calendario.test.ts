@@ -2,6 +2,7 @@ import type { Client } from "@libsql/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { corPadrao } from "@/domain/cores";
 import type { Status } from "@/domain/enums";
+import { itensDoMes } from "@/domain/navegacao-calendario";
 import { concursoSchema, VALORES_INICIAIS_CONCURSO } from "@/lib/schemas/concurso";
 import {
   type EventoFormValores,
@@ -13,7 +14,7 @@ import { criarBancoTeste } from "../db/banco-teste";
 import type { Db } from "../db/client";
 import { criarConcurso } from "../repositories/concursos";
 import { criarEvento } from "../repositories/eventos";
-import { obterCalendario } from "./calendario";
+import { obterCalendario, obterCalendarioCompleto } from "./calendario";
 
 let db: Db;
 let client: Client;
@@ -95,5 +96,33 @@ describe("obterCalendario", () => {
     ]);
     expect(itens[1]?.evento).toMatchObject({ hora: "13:00", concursoId: trf });
     expect(itens[2]).toMatchObject({ derivado: true, concurso: { id: cr } });
+  });
+});
+
+describe("obterCalendarioCompleto", () => {
+  it("banco vazio", async () => {
+    expect(await obterCalendarioCompleto(db, U, HOJE)).toEqual({ concursos: [], itens: [] });
+  });
+
+  it("todos os concursos e os itens de qualquer data; o recorte do mês bate com obterCalendario", async () => {
+    const trf = await novoConcurso("TRF", "INSCRITO");
+    const semEventos = await novoConcurso("Sem eventos", "PREVISTO");
+    const cr = await novoConcurso("CR", "CLASSIFICADO", {
+      homologacaoData: "2025-11-20",
+      validadeMeses: "12",
+    });
+    await novoEvento(trf, { tipo: "OUTRO", data: "2025-03-01" });
+    await novoEvento(trf, { tipo: "PROVA_OBJETIVA", data: "2026-11-02" });
+    await novoEvento(trf, { tipo: "RESULTADO_FINAL", data: "2027-06-15" });
+
+    const { concursos, itens } = await obterCalendarioCompleto(db, U, HOJE);
+    expect(concursos.map((c) => c.id).sort()).toEqual([trf, semEventos, cr].sort());
+    expect(itens.map((i) => [i.concurso.id, i.tipo, i.data])).toEqual([
+      [trf, "OUTRO", "2025-03-01"],
+      [trf, "PROVA_OBJETIVA", "2026-11-02"],
+      [cr, "VALIDADE", "2026-11-20"],
+      [trf, "RESULTADO_FINAL", "2027-06-15"],
+    ]);
+    expect(itensDoMes(itens, "2026-11")).toEqual(await obterCalendario(db, U, "2026-11", HOJE));
   });
 });

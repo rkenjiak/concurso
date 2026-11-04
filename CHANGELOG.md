@@ -7,6 +7,8 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 
 ## [Unreleased]
 
+## [2.4.0] - 2026-11-03
+
 ### Adicionado
 
 - Botão **Atualizar** (#77) no cabeçalho do celular e na barra lateral do desktop: busca de novo os

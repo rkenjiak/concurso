@@ -134,7 +134,12 @@ export default async function ConcursoPage({ params }: PageProps<"/concursos/[id
           chave={pendencia.chave}
           pergunta={pendencia.pergunta}
           motivo={pendencia.motivo}
-          respostas={pendencia.respostas.map(({ id, rotulo, para }) => ({ id, rotulo, para }))}
+          respostas={pendencia.respostas.map(({ id, rotulo, para, confirmar }) => ({
+            id,
+            rotulo,
+            para,
+            confirmar,
+          }))}
         />
       ) : null}
 

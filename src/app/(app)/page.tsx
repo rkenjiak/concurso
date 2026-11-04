@@ -214,10 +214,11 @@ export default async function DashboardPage({ searchParams }: PageProps<"/">) {
                     chave={c.pendencia.chave}
                     pergunta={c.pendencia.pergunta}
                     motivo={c.pendencia.motivo}
-                    respostas={c.pendencia.respostas.map(({ id, rotulo, para }) => ({
+                    respostas={c.pendencia.respostas.map(({ id, rotulo, para, confirmar }) => ({
                       id,
                       rotulo,
                       para,
+                      confirmar,
                     }))}
                     nomeConcurso={`${c.icone ? `${c.icone} ` : ""}${c.orgao} — ${c.cargo}`}
                     compacta

@@ -29,7 +29,8 @@ test("cadastrar concurso → mudar status → adicionar evento → ver no dashbo
   await expect(page.getByText(titulo, { exact: true })).toBeVisible();
 
   // Contagem regressiva até a prova (#84).
-  await expect(page.getByTestId("contagem-prova")).toHaveAccessibleName(
+  // Texto acessível num trecho sr-only (aria-label em elemento estático nem sempre é lido).
+  await expect(page.getByTestId("contagem-prova").locator(".sr-only")).toHaveText(
     new RegExp(`^${titulo} em 5 dias, `),
   );
 

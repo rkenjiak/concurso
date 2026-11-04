@@ -225,7 +225,8 @@ PROVA_REALIZADA(5) → AGUARDANDO_RESULTADO(6)`.
   pergunta o que aconteceu. Regras, em ordem de prioridade: posse (Nomeado → Empossado/Desistiu),
   nomeação (Aprovado/Classificado → Nomeado), resultado final (Prova realizada/Aguardando →
   Aprovado/Classificado/Reprovado), recurso posterior à prova (Prova realizada → Aguardando
-  resultado), prova (Inscrito/Prova agendada: "Fez a prova?" → Prova realizada/Desistiu), boleto
+  resultado), prova passada, a partir do dia seguinte (Inscrito/Prova agendada: "Fez a prova?" →
+  Prova realizada/Desistiu), boleto
   vencido e pendente ("Pagou o boleto?": antes da inscrição → Inscrito/Não inscrito; já inscrito →
   mantém e conclui o boleto / Desistiu), prova futura (Inscrito → Prova agendada), fim das
   inscrições (Previsto/Edital → Inscrito/Não inscrito) e edital (Previsto → Edital publicado). Só
@@ -233,11 +234,13 @@ PROVA_REALIZADA(5) → AGUARDANDO_RESULTADO(6)`.
   automático: a UI (detalhe e card "Pendências de status" do dashboard) mostra a primeira pendência
   não dispensada; responder recalcula a pendência no servidor, usa `alterarStatus` e grava
   pergunta, resposta e motivo na observação do histórico. "Lembrar depois" (3 dias) e "Não
-  perguntar mais" ficam em `pendencia_status_dispensa`.
+  perguntar mais" ficam em `pendencia_status_dispensa`. Respostas que levam a Desistiu pedem
+  confirmação. Status e conclusão do evento (boleto pago) são gravados na mesma transação; "Sim"
+  ao boleto já inscrito só conclui o evento (sem registro no histórico, que só guarda mudanças).
 - **Contagem regressiva** (#84, `domain/contagem.ts`): próximo evento de prova (objetiva,
   discursiva, outra fase) não concluído com `data >= hoje`, para concursos em andamento (não
-  terminais nem suspensos). Destaque para hoje, amanhã e até 7 dias; `aria-label` "Prova objetiva
-  em 12 dias, 14/11/2026". Exibida no detalhe do concurso e no card "Próximas provas" do dashboard.
+  terminais nem suspensos). Destaque para hoje, amanhã e até 7 dias; texto acessível (`sr-only`)
+  "Prova objetiva em 12 dias, 14/11/2026". Exibida no detalhe do concurso e no card "Próximas provas" do dashboard.
 
 ### 4.2 Próximos prazos (RF06)
 

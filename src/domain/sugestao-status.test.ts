@@ -62,7 +62,13 @@ describe("pendências por evento (#85)", () => {
     // Inscrito: "Sim" mantém o status e conclui o boleto; "Não" → Desistiu.
     expect(primeira("INSCRITO", [boleto])?.respostas).toEqual([
       { id: "sim", rotulo: "Sim", para: null, concluirEvento: true },
-      { id: "nao", rotulo: "Não (desisti)", para: "DESISTIU", concluirEvento: false },
+      {
+        id: "nao",
+        rotulo: "Não paguei, desisti",
+        para: "DESISTIU",
+        concluirEvento: false,
+        confirmar: "Marcar como Desistiu? O concurso sai das contagens e pendências.",
+      },
     ]);
     // Boleto concluído ou ainda no prazo: nada a perguntar.
     expect(primeira("INSCRITO", [ev("VENCIMENTO_BOLETO", "2026-11-08", true)])).toBeNull();
@@ -89,8 +95,8 @@ describe("pendências por evento (#85)", () => {
     ]);
   });
 
-  it("prova no dia ou depois → Fez a prova? Sim → Prova realizada · Não → Desistiu", () => {
-    for (const data of [HOJE, "2026-11-08"]) {
+  it("prova passou → Fez a prova? Sim → Prova realizada · Não → Desistiu (com confirmação)", () => {
+    for (const data of ["2026-11-09", "2026-11-08"]) {
       for (const s of ["INSCRITO", "PROVA_AGENDADA"] as const) {
         const p = primeira(s, [ev("PROVA_OBJETIVA", data)]);
         expect(p?.pergunta).toBe("Fez a prova?");
@@ -104,6 +110,11 @@ describe("pendências por evento (#85)", () => {
       "Prova discursiva foi em 08/11/2026.",
     );
     expect(primeira("PROVA_AGENDADA", [ev("PROVA_OBJETIVA", "2026-11-11")])).toBeNull();
+    // No próprio dia ainda não pergunta (a prova pode não ter acontecido); concluída, pergunta.
+    expect(primeira("PROVA_AGENDADA", [ev("PROVA_OBJETIVA", HOJE)])).toBeNull();
+    expect(primeira("PROVA_AGENDADA", [ev("PROVA_OBJETIVA", HOJE, true)])?.regra).toBe("PROVA");
+    const nao = primeira("PROVA_AGENDADA", [ev("PROVA_OBJETIVA", "2026-11-08")])?.respostas[1];
+    expect(nao).toMatchObject({ rotulo: "Não, desisti", confirmar: expect.any(String) });
   });
 
   it("prova passada e recurso posterior encerrado: Sim → Aguardando resultado", () => {

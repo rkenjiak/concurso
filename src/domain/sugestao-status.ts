@@ -12,7 +12,7 @@
  * | `NOMEACAO`       | Aprovado, Classificado         | Convocação/nomeação/posse chegou       | Sim → Nomeado                          |
  * | `RESULTADO`      | Prova realizada, Aguardando    | Resultado final chegou                 | Aprovado · Classificado · Reprovado    |
  * | `RECURSO`        | Prova realizada                | Recurso posterior à prova passou       | Sim → Aguardando resultado             |
- * | `PROVA`          | Inscrito, Prova agendada       | Prova objetiva/discursiva chegou       | Sim → Prova realizada¹ · Não → Desistiu|
+ * | `PROVA`          | Inscrito, Prova agendada       | Prova objetiva/discursiva passou⁴      | Sim → Prova realizada¹ · Não → Desistiu|
  * | `BOLETO`         | Previsto, Edital, Inscrito     | Vencimento do boleto passou (pendente) | Sim → Inscrito² · Não → Não inscrito³  |
  * | `PROVA_AGENDADA` | Inscrito                       | Prova futura cadastrada                | Sim → Prova agendada                   |
  * | `INSCRICAO`      | Previsto, Edital publicado     | Fim das inscrições passou              | Sim → Inscrito · Não → Não inscrito    |
@@ -20,7 +20,11 @@
  *
  * ¹ Ou "Aguardando resultado", se o recurso posterior à prova também já terminou.
  * ² Já inscrito: "Sim" mantém o status e marca o boleto como concluído.
- * ³ Já inscrito: "Não" → Desistiu (a trilha não permite voltar de Inscrito para Não inscrito).
+ * ³ Já inscrito: "Não paguei, desisti" → Desistiu (a trilha não permite voltar de Inscrito para
+ *   Não inscrito). Quem ainda vai pagar usa "Lembrar depois".
+ * ⁴ A partir do dia seguinte: no próprio dia a prova pode não ter acontecido ainda.
+ *
+ * Respostas que levam a Desistiu (status final) pedem confirmação na UI (`confirmar`).
  *
  * As pendências saem na ordem da tabela (etapa mais adiantada primeiro); a UI mostra a primeira
  * que não foi dispensada nem adiada ("lembrar depois").
@@ -77,6 +81,8 @@ export interface RespostaPendencia {
   para: Status | null;
   /** Marca o evento da pendência como concluído (ex.: boleto pago). */
   concluirEvento: boolean;
+  /** Texto de confirmação antes de aplicar (respostas que levam a um status final). */
+  confirmar?: string;
 }
 
 export interface PendenciaStatus {
@@ -112,6 +118,9 @@ const nao = (para: Status, rotulo = "Não"): RespostaPendencia => ({
   rotulo,
   para,
   concluirEvento: false,
+  ...(para === "DESISTIU"
+    ? { confirmar: "Marcar como Desistiu? O concurso sai das contagens e pendências." }
+    : {}),
 });
 
 function chegou(e: EventoChave, hoje: DataISO): string {
@@ -219,12 +228,13 @@ export function pendenciasStatus(
   }
 
   if (em(status, "INSCRITO", "PROVA_AGENDADA")) {
-    const prova = ultimo(TIPOS_PROVA);
+    // Só depois do dia da prova: no próprio dia ela pode ainda não ter acontecido.
+    const prova = ultimo(TIPOS_PROVA, false);
     if (prova) {
       lista.push(
         pendencia("PROVA", prova, "Fez a prova?", chegou(prova, hoje), [
           sim(recurso ? "AGUARDANDO_RESULTADO" : "PROVA_REALIZADA"),
-          nao("DESISTIU"),
+          nao("DESISTIU", "Não, desisti"),
         ]),
       );
     }
@@ -239,7 +249,7 @@ export function pendenciasStatus(
       lista.push(
         pendencia("BOLETO", boleto, "Pagou o boleto?", passou(boleto, hoje), [
           sim(inscrito ? null : "INSCRITO", true),
-          inscrito ? nao("DESISTIU", "Não (desisti)") : nao("NAO_INSCRITO"),
+          inscrito ? nao("DESISTIU", "Não paguei, desisti") : nao("NAO_INSCRITO"),
         ]),
       );
     }

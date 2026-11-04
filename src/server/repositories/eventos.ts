@@ -126,7 +126,7 @@ export async function salvarEventos(
 
 /** Marca ou desmarca o evento como concluído. */
 export async function definirConcluido(
-  db: Db,
+  db: Executor,
   usuarioId: number,
   concursoId: number,
   eventoId: number,

@@ -24,7 +24,7 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 - **Contagem regressiva até a próxima prova** (#84): card "Próximas provas" no dashboard (até 6,
   da mais próxima para a mais distante) e aviso no topo da página do concurso ("Prova objetiva:
   faltam 12 dias", "é amanhã", "é hoje"). Destaque para hoje, amanhã e até 7 dias, com
-  `aria-label` acessível. Considera provas objetivas, discursivas e outras fases; não aparece para
+  texto acessível para leitores de tela. Considera provas objetivas, discursivas e outras fases; não aparece para
   concursos encerrados, cancelados, com desistência ou suspensos.
 - **Pendências de status** (#85): quando um evento importante chega ou passa (publicação do
   edital, fim das inscrições, vencimento do boleto, prova, resultado final, convocação/nomeação,

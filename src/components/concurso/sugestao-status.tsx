@@ -13,6 +13,8 @@ export interface RespostaExibida {
   id: string;
   rotulo: string;
   para: Status | null;
+  /** Pede confirmação antes de aplicar (status final, ex.: Desistiu). */
+  confirmar?: string;
 }
 
 /**
@@ -41,22 +43,35 @@ export function SugestaoStatus({
   const [pendente, iniciar] = useTransition();
   const [erro, setErro] = useState<string | null>(null);
   const [escondida, setEscondida] = useState(false);
+  /** Botão clicado (mostra o indicador nele). */
+  const [acao, setAcao] = useState<string | null>(null);
+  /** Resposta aguardando confirmação. */
+  const [confirmando, setConfirmando] = useState<RespostaExibida | null>(null);
   if (escondida) return null;
 
-  function executar(acao: () => Promise<{ ok: boolean; erros?: { _form?: string[] } }>) {
+  function executar(
+    qual: string,
+    acaoServidor: () => Promise<{ ok: boolean; erros?: { _form?: string[] } }>,
+  ) {
     setErro(null);
+    setAcao(qual);
     iniciar(async () => {
-      const r = await acao();
+      const r = await acaoServidor();
       if (r.ok) setEscondida(true);
       else setErro(r.erros?._form?.[0] ?? "Não foi possível concluir a operação.");
     });
   }
 
   const unica = respostas.length === 1 ? respostas[0] : undefined;
+  const responder = (r: RespostaExibida) =>
+    executar(r.id, () => responderPendenciaStatus(concursoId, chave, r.id));
+  const carregando = (qual: string) =>
+    pendente && acao === qual ? <Loader2 className="animate-spin" aria-hidden /> : null;
 
   return (
     <section
       aria-label={nomeConcurso ? `${pergunta} — ${nomeConcurso}` : pergunta}
+      aria-busy={pendente}
       data-testid="sugestao-status"
       className={cn(
         "flex flex-wrap items-center gap-3 rounded-lg border border-aviso bg-aviso/10 p-3 text-sm",
@@ -72,49 +87,82 @@ export function SugestaoStatus({
             <span className="text-muted-foreground"> ({ROTULO_STATUS[unica.para]})</span>
           ) : null}
         </p>
+        {confirmando?.confirmar ? (
+          <p role="alert" className="font-medium">
+            {confirmando.confirmar}
+          </p>
+        ) : null}
         {erro ? (
           <p role="alert" className="text-destructive">
             {erro}
           </p>
         ) : null}
       </div>
-      <div className="flex flex-wrap gap-2">
-        {respostas.map((r, i) => (
+      {confirmando ? (
+        <div className="flex flex-wrap gap-2">
           <Button
-            key={r.id}
             type="button"
             size="sm"
-            variant={i === 0 ? "default" : "outline"}
-            onClick={() => executar(() => responderPendenciaStatus(concursoId, chave, r.id))}
+            variant="destructive"
+            onClick={() => responder(confirmando)}
             disabled={pendente}
-            title={r.para ? `Mudar o status para ${ROTULO_STATUS[r.para]}` : "Manter o status"}
           >
-            {pendente && i === 0 ? <Loader2 className="animate-spin" aria-hidden /> : null}
-            {r.rotulo}
+            {carregando(confirmando.id)}
+            Confirmar: {confirmando.rotulo}
           </Button>
-        ))}
-        <Button
-          type="button"
-          size="sm"
-          variant="ghost"
-          onClick={() => executar(() => dispensarPendenciaStatus(concursoId, chave, "lembrar"))}
-          disabled={pendente}
-          title={`Perguntar de novo em ${DIAS_LEMBRAR_DEPOIS} dias`}
-        >
-          <Clock aria-hidden />
-          Lembrar depois
-        </Button>
-        <Button
-          type="button"
-          size="sm"
-          variant="ghost"
-          onClick={() => executar(() => dispensarPendenciaStatus(concursoId, chave, "dispensar"))}
-          disabled={pendente}
-        >
-          <BellOff aria-hidden />
-          Não perguntar mais
-        </Button>
-      </div>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => setConfirmando(null)}
+            disabled={pendente}
+          >
+            Cancelar
+          </Button>
+        </div>
+      ) : (
+        <div className="flex flex-wrap gap-2">
+          {respostas.map((r, i) => (
+            <Button
+              key={r.id}
+              type="button"
+              size="sm"
+              variant={i === 0 ? "default" : "outline"}
+              onClick={() => (r.confirmar ? setConfirmando(r) : responder(r))}
+              disabled={pendente}
+              title={r.para ? `Mudar o status para ${ROTULO_STATUS[r.para]}` : "Manter o status"}
+            >
+              {carregando(r.id)}
+              {r.rotulo}
+            </Button>
+          ))}
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            onClick={() =>
+              executar("lembrar", () => dispensarPendenciaStatus(concursoId, chave, "lembrar"))
+            }
+            disabled={pendente}
+            title={`Perguntar de novo em ${DIAS_LEMBRAR_DEPOIS} dias`}
+          >
+            {carregando("lembrar") ?? <Clock aria-hidden />}
+            Lembrar depois
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            onClick={() =>
+              executar("dispensar", () => dispensarPendenciaStatus(concursoId, chave, "dispensar"))
+            }
+            disabled={pendente}
+          >
+            {carregando("dispensar") ?? <BellOff aria-hidden />}
+            Não perguntar mais
+          </Button>
+        </div>
+      )}
     </section>
   );
 }

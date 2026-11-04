@@ -88,18 +88,22 @@ export async function responderPendenciaStatus(
     if (!pendencia || !resposta) {
       return falha("Esta pergunta não vale mais. Atualize a página.");
     }
-    if (resposta.para) {
-      await repo.alterarStatus(
-        db,
-        usuarioId,
-        id.data,
-        resposta.para,
-        observacaoResposta(pendencia, resposta),
-      );
-    }
-    if (resposta.concluirEvento) {
-      await definirConcluido(db, usuarioId, id.data, pendencia.eventoId, true);
-    }
+    const { para, concluirEvento } = resposta;
+    // Status e conclusão do evento (ex.: boleto pago) juntos: se um falhar, nada muda.
+    await db.transaction(async (tx) => {
+      if (concluirEvento) {
+        await definirConcluido(tx, usuarioId, id.data, pendencia.eventoId, true);
+      }
+      if (para) {
+        await repo.alterarStatus(
+          tx,
+          usuarioId,
+          id.data,
+          para,
+          observacaoResposta(pendencia, resposta),
+        );
+      }
+    });
     revalidar(id.data);
     return sucesso({ status: resposta.para ?? concurso.status });
   });

@@ -27,7 +27,8 @@ function Numero({ contagem }: { contagem: Contagem }) {
 
 /**
  * Contagem regressiva até a próxima prova do concurso (#84), para a página do concurso. O texto
- * acessível vai no `aria-label` ("Prova objetiva em 12 dias, 14/11/2026").
+ * acessível ("Prova objetiva em 12 dias, 14/11/2026") vai num trecho `sr-only`: `aria-label` em
+ * elemento estático nem sempre é lido.
  */
 export function ContagemProva({ contagem, className }: { contagem: Contagem; className?: string }) {
   return (
@@ -35,7 +36,6 @@ export function ContagemProva({ contagem, className }: { contagem: Contagem; cla
       role="note"
       data-testid="contagem-prova"
       data-destaque={contagem.destaque}
-      aria-label={contagem.rotulo}
       className={cn(
         "inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm",
         ESTILO_DESTAQUE[contagem.destaque],
@@ -43,6 +43,7 @@ export function ContagemProva({ contagem, className }: { contagem: Contagem; cla
       )}
     >
       <CalendarClock className="size-4 shrink-0" aria-hidden />
+      <span className="sr-only">{contagem.rotulo}</span>
       <span aria-hidden>
         {nomeEvento(contagem.evento)}: {contagem.texto} ·{" "}
         <span className="tabular-nums">{formatarData(contagem.evento.data)}</span>
@@ -69,13 +70,13 @@ export function ListaContagens({ itens }: { itens: readonly ItemContagem[] }) {
         <li key={c.concursoId}>
           <Link
             href={`/concursos/${c.concursoId}`}
-            aria-label={`${c.orgao} — ${c.cargo}: ${c.contagem.rotulo}`}
             data-destaque={c.contagem.destaque}
             className={cn(
               "flex items-center gap-3 rounded-lg border p-3 transition-colors hover:bg-accent/50 focus-visible:outline-2 focus-visible:outline-ring",
               c.contagem.destaque !== "NORMAL" && ESTILO_DESTAQUE[c.contagem.destaque],
             )}
           >
+            {/* Nome acessível = texto visível + complemento (WCAG 2.5.3, comando de voz). */}
             <div className="w-16 shrink-0 text-center text-sm leading-tight">
               <Numero contagem={c.contagem} />
             </div>
@@ -84,6 +85,9 @@ export function ListaContagens({ itens }: { itens: readonly ItemContagem[] }) {
                 <MarcadorConcurso cor={c.cor} icone={c.icone} tamanho="sm" />
                 <span className="truncate">{c.orgao}</span>
               </p>
+              <span className="sr-only">
+                {c.cargo}. {c.contagem.rotulo}.
+              </span>
               <p className="truncate text-muted-foreground text-xs">
                 {nomeEvento(c.contagem.evento)} · {formatarData(c.contagem.evento.data)}
                 {c.contagem.evento.hora ? ` às ${c.contagem.evento.hora}` : null}

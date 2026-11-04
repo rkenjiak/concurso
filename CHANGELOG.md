@@ -33,6 +33,13 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
   transição validada e com registro no histórico. "Lembrar depois" esconde a pergunta por 3 dias e
   "Não perguntar mais" a dispensa (migração `0006_pendencias_status`); se o evento for remarcado,
   a pergunta volta.
+- **Calendário: navegação rápida e filtro de concursos** (#83). Clicar no título do mês abre um
+  seletor com os 12 meses do ano e a quantidade de eventos de cada um, com setas para trocar de ano:
+  qualquer mês fica a dois ou três toques, no desktop e no celular. Atalhos "Próximos eventos"
+  (próximo mês com eventos) e "Próxima prova" (com a contagem regressiva do #84). A legenda de
+  concursos virou filtro: cada concurso liga e desliga com um clique (`aria-pressed`), com "só
+  este" e "Mostrar todos". Mês e seleção ficam na URL (`?mes=2026-11&concursos=1,3`), que continua
+  compartilhável, e a seleção se mantém ao trocar de mês.
 
 ### Alterado
 

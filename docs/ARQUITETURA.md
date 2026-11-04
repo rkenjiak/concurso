@@ -319,6 +319,32 @@ senão → indefinida
 - Opções: incluir concluídos e concursos encerrados (feed e download geral); o download de um
   concurso traz todos os eventos dele.
 
+### 4.6 Navegação e filtro do calendário (#83)
+
+`domain/navegacao-calendario.ts`, puro, com `hoje` injetado. A URL é a fonte da verdade e continua
+compartilhável: `?mes=AAAA-MM` (ausente ou inválido = mês de hoje) e `?concursos=1,3` (IDs dos
+concursos exibidos; ausente = todos, vazio = nenhum). `lerSelecaoConcursos` ignora IDs inválidos
+(sem nenhum válido, vale "todos"); `normalizarSelecao` descarta IDs que não são do usuário e volta a
+"todos" quando a seleção cobre todos os concursos, para a URL ficar limpa e concursos novos
+aparecerem. `hrefCalendario(mes, selecao)` monta todos os links de navegação (anterior, hoje,
+seguinte, seletor e atalhos), então o filtro se mantém ao trocar de mês.
+
+- A página lê **todos** os itens do usuário (`obterCalendarioCompleto`: eventos de qualquer data e
+  validades calculadas) e recorta o mês (`itensDoMes`). O resto alimenta a contagem por mês
+  (`contarPorMes`) e os atalhos: um app pessoal tem poucas centenas de eventos, e uma leitura só é
+  mais simples que várias consultas agregadas.
+- **Seletor de mês e ano** (`calendario/seletor-mes.tsx`): o título do mês abre um popover com os
+  12 meses do ano e a quantidade de eventos de cada um (com o filtro aplicado), e setas de ano que
+  não vão ao servidor. Cada mês é um link, então funciona igual no desktop e no celular. Faz as
+  vezes da visão anual sem uma tela a mais.
+- **Atalhos**: "Próximos eventos" (`proximoMesComEventos`: primeiro mês depois do exibido com
+  itens visíveis) e "Próxima prova" (`proximaProva`, com a regra da contagem regressiva do #84:
+  `contagemRegressiva` + `compararContagens` sobre provas e outras fases de concursos em andamento).
+- **Filtro de concursos** (`calendario/filtro-concursos.tsx`): a legenda cor/ícone (#46) virou
+  toggles com `aria-pressed` e o nome do concurso como rótulo, mais "só este" e "Mostrar todos".
+  Lista os concursos com itens no mês (antes do filtro, para poder religá-los) e os selecionados.
+  Desligar um partindo de "todos" seleciona os demais (`alternarConcurso`).
+
 ---
 
 ## 5. Rotas, telas e ações
@@ -340,7 +366,7 @@ senão → indefinida
 | `/admin/acesso` | Allowlist do login Google: e-mails das variáveis (só leitura) e liberados no painel (adicionar/retirar) | v1.4 |
 | `/admin/auditoria` | Log das ações administrativas (últimas 200) | v1.4 |
 | `/concursos?visao=quadro` | Quadro por status (kanban; arrastar ou “Mover para” = transição validada) | v1.1 |
-| `/calendario?mes=AAAA-MM` | Visão mensal de eventos (agenda em lista no celular); clique abre os detalhes do evento; cor/ícone por concurso com legenda (#46) | v1.1 |
+| `/calendario?mes=AAAA-MM&concursos=1,3` | Visão mensal de eventos (agenda em lista no celular); clique abre os detalhes do evento; cor/ícone por concurso com legenda (#46); seletor de mês e ano com eventos por mês, atalhos "Próximos eventos" e "Próxima prova", e filtro de concursos pela legenda (#83, §4.6) | v1.1 |
 
 Layout responsivo (alvo: 360 px sem rolagem horizontal, #48): navegação lateral no desktop, barra
 inferior no celular; menu da conta (avatar) com Sair e, só para admins, o seletor de
@@ -471,7 +497,7 @@ Decisões (issue #39):
 │   ├── components/
 │   │   ├── ui/                     # shadcn/ui
 │   │   ├── concurso/               # formulários, cards, quadro, badges, sugestão de status
-│   │   ├── calendario/             # visão mensal e detalhes do evento
+│   │   ├── calendario/             # visão mensal, detalhes do evento, seletor de mês, filtro (#83)
 │   │   ├── dashboard/              # lista de prazos, ocultar/reexibir
 │   │   ├── configuracoes/          # regras de notificação, calendário .ics, export/import, token MCP
 │   │   ├── admin/                  # painel admin (#50)
@@ -482,7 +508,7 @@ Decisões (issue #39):
 │   ├── domain/                     # regras puras + testes *.test.ts ao lado
 │   │   ├── enums.ts  labels.ts  erros.ts
 │   │   ├── status.ts  prazos.ts  validade.ts
-│   │   ├── calendario.ts  quadro.ts  cores.ts  duplicados.ts
+│   │   ├── calendario.ts  navegacao-calendario.ts  quadro.ts  cores.ts  duplicados.ts
 │   │   ├── notificacoes.ts  icalendar.ts  sugestao-status.ts   # lembretes (#65, #85)
 │   │   └── eventos-chave.ts  contagem.ts   # evento relevante e contagem regressiva (#84, #85)
 │   ├── server/
@@ -599,7 +625,8 @@ Decisões (issue #39):
   leituras de prazos/calendário já entregam a cor resolvida.
 - Ícone: um único grafema (emoji com modificadores/ZWJ incluído), validado com `Intl.Segmenter`.
 - Exibição via `components/concurso/marcador-concurso.tsx`: itens e diálogo de detalhes do
-  calendário, legenda cor → concurso (concursos com itens no mês), próximos prazos do dashboard,
+  calendário, legenda cor → concurso (concursos com itens no mês, que também filtra o calendário,
+  #83), próximos prazos do dashboard,
   lista, quadro e cabeçalho do detalhe. Formulário: rádios nativos com amostras ("Automática"
   mostra a cor derivada na edição) e campo de ícone com sugestões.
 - Backup JSON (`schemaVersion` 1): `concursos[].cor`/`icone` opcionais (ausentes = `null`). MCP:
@@ -614,7 +641,7 @@ Decisões (issue #39):
 |---|---|---|---|
 | Unitário | Vitest | `domain/*` (transições, prazos, validade, criticidade), `lib/format`, parsers BRL, schemas Zod | meta: cobertura ≥ 90% em `domain/` (medida no CI, sem limite configurado) |
 | Integração | Vitest + libSQL `:memory:` + migrações | repositories/queries (transação de status, tags, filtros, export→import ida e volta); servidor MCP com cliente em memória (`InMemoryTransport`) | casos principais |
-| E2E | Playwright (Chromium) | smoke: criar concurso → evento → aparece no dashboard → mudar status → exportar/importar; login, MCP, PWA e lembretes com auth ativa; painel admin com o usuário inicial (sem auth); busca, quadro, calendário, cor/ícone, ocultar prazos, tema, lembretes (sino, regras, feed .ics), sino único por tela e tema pelo menu no celular, tema e Configurações sem duplicação (#82), PWA, aba do detalhe na URL e botão Atualizar com limite de 60 s (#77) e layout em 360 px; `/api/mcp` com token → concurso visível no app. Dois servidores (com e sem auth) com bancos temporários em `e2e/.tmp` | poucos fluxos |
+| E2E | Playwright (Chromium) | smoke: criar concurso → evento → aparece no dashboard → mudar status → exportar/importar; login, MCP, PWA e lembretes com auth ativa; painel admin com o usuário inicial (sem auth); busca, quadro, calendário (navegação rápida e filtro de concursos no desktop e em 360 px, #83), cor/ícone, ocultar prazos, tema, lembretes (sino, regras, feed .ics), sino único por tela e tema pelo menu no celular, tema e Configurações sem duplicação (#82), PWA, aba do detalhe na URL e botão Atualizar com limite de 60 s (#77) e layout em 360 px; `/api/mcp` com token → concurso visível no app. Dois servidores (com e sem auth) com bancos temporários em `e2e/.tmp` | poucos fluxos |
 
 Datas sempre fixadas (`vi.setSystemTime` / `hoje` injetado).
 

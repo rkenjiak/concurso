@@ -13,7 +13,7 @@ import { criarBancoTeste, criarUsuarioTeste } from "./db/banco-teste";
 import type { Db } from "./db/client";
 import { ID_USUARIO_INICIAL } from "./db/schema";
 import * as op from "./mcp/operacoes";
-import { obterCalendario } from "./queries/calendario";
+import { obterCalendario, obterCalendarioCompleto } from "./queries/calendario";
 import { listarConcursos, obterConcurso } from "./queries/concursos";
 import { contarPorStatus, obterDashboard } from "./queries/dashboard";
 import { listarEventos } from "./queries/eventos";
@@ -89,6 +89,10 @@ describe("leituras", () => {
     expect((await obterDashboard(db, ANA, HOJE)).totalPrazos).toBe(1);
     expect(await obterCalendario(db, bia, "2026-11", HOJE)).toEqual([]);
     expect(await obterCalendario(db, ANA, "2026-11", HOJE)).toHaveLength(1);
+    const calendarioBia = await obterCalendarioCompleto(db, bia, HOJE);
+    expect(calendarioBia.itens).toEqual([]);
+    expect(calendarioBia.concursos.map((c) => c.orgao)).toEqual(["Prefeitura da Bia"]);
+    expect((await obterCalendarioCompleto(db, ANA, HOJE)).itens.length).toBeGreaterThan(0);
 
     const backup = await exportarDados(db, bia);
     expect(backup.dados.concursos.map((c) => c.orgao)).toEqual(["Prefeitura da Bia"]);

@@ -29,6 +29,16 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 - No celular, o seletor de tema passa para dentro do menu da conta (Claro / Escuro / Sistema), o
   que libera espaço no cabeçalho de 360 px e devolve o nome do app ao lado do ícone. No desktop o
   seletor continua na barra lateral.
+- Sem opções duplicadas (#82): a seção Aparência saiu de Configurações (o tema fica só junto ao
+  avatar: barra lateral no desktop, menu da conta no celular) e o link Configurações saiu do menu
+  da conta (fica na navegação principal).
+
+### Corrigido
+
+- Barra de navegação/gestos do Android branca no tema escuro (#81): o `<html>` passa a ter o
+  fundo do tema (área atrás da barra com `viewport-fit=cover`) e o layout declara
+  `<meta name="color-scheme" content="light dark">`, além do `color-scheme` que o script de tema
+  já aplicava no `<html>`.
 
 ## [2.3.0] - 2026-11-02
 

@@ -18,6 +18,9 @@ export default function manifest(): MetadataRoute.Manifest {
     scope: "/",
     display: "standalone",
     orientation: "any",
+    // O manifest é estático e não segue o tema (#81): `theme_color` só vale até a página carregar,
+    // quando a `<meta name="theme-color">` do SCRIPT_TEMA assume (claro ou escuro). Fica o claro,
+    // que é o tema sem JS. `background_color` é só o fundo da tela de abertura (cor do ícone).
     background_color: COR_TEMA.fundoSplash,
     theme_color: COR_TEMA.claro,
     categories: ["productivity", "education"],

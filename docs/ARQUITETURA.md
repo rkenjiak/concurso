@@ -313,7 +313,7 @@ senão → indefinida
 | `/concursos/novo` | **Formulário** de cadastro | MVP |
 | `/concursos/[id]` | **Detalhe** em abas: Visão geral · Eventos · Links · Resultados · Histórico; a aba aberta fica em `?aba=` (#77): abas controladas pelo `useSearchParams`, troca gravada com `history.replaceState`, sem ir ao servidor | MVP |
 | `/concursos/[id]/editar` | Formulário de edição | MVP |
-| `/configuracoes` | Aparência, regras de notificação, calendário (.ics), exportar/importar dados, token do MCP, acesso | MVP |
+| `/configuracoes` | Regras de notificação, calendário (.ics), exportar/importar dados, token do MCP, acesso | MVP |
 | `/notificacoes` | **Central de notificações** (#65): marcar como lida, marcar todas, dispensar | v2.2 |
 | `/login` | Login Google e/ou senha única (só se auth habilitada) | MVP |
 | `/admin` | **Painel admin** (#50, só papel `ADMIN`; 403 para os demais): visão geral com totais de usuários, concursos e eventos e ações recentes | v1.4 |
@@ -324,10 +324,12 @@ senão → indefinida
 | `/calendario?mes=AAAA-MM` | Visão mensal de eventos (agenda em lista no celular); clique abre os detalhes do evento; cor/ícone por concurso com legenda (#46) | v1.1 |
 
 Layout responsivo (alvo: 360 px sem rolagem horizontal, #48): navegação lateral no desktop, barra
-inferior no celular; menu da conta (avatar) com Configurações, Sair e, só para admins, o seletor de
+inferior no celular; menu da conta (avatar) com Sair e, só para admins, o seletor de
 visão (§7.1). No celular o cabeçalho tem só marca, sino de notificações e menu da conta (na
 visão admin, o selo no lugar do sino); o tema fica dentro do menu (#78). Um único sino por tela,
-e sobra espaço para mais um ícone em 360 px. Em telas de toque (`pointer: coarse`), botões,
+e sobra espaço para mais um ícone em 360 px. Configurações fica só na navegação principal e o
+tema só junto ao avatar (barra lateral no desktop, menu da conta no celular), sem duplicação (#82).
+Em telas de toque (`pointer: coarse`), botões,
 campos, abas e seletores crescem para 36–40 px, sem mudar o desktop. Tabelas largas rolam dentro do próprio contêiner (`relative
 overflow-x-auto`, para o `sr-only` não escapar). Links externos com
 `target="_blank" rel="noopener noreferrer"`.
@@ -551,12 +553,17 @@ Decisões (issue #39):
 
 ### 7.3 Tema claro/escuro
 - Preferência **Claro / Escuro / Sistema** (padrão: Sistema, via `prefers-color-scheme`), salva no
-  `localStorage` (`concurso:tema`). Seletor na barra lateral (desktop), no menu da conta do
-  celular (#78) e em Configurações (`components/tema/seletor-tema.tsx`, hook `useTema`); no
-  modo Sistema acompanha mudanças do SO.
+  `localStorage` (`concurso:tema`). Seletor só junto ao avatar: barra lateral (desktop) e menu
+  da conta do celular (#78, #82) (`components/tema/seletor-tema.tsx`, hook `useTema`); no modo
+  Sistema acompanha mudanças do SO.
 - Sem flash: script inline no `<head>` do layout raiz (`SCRIPT_TEMA`, `lib/tema.ts`) aplica a classe
   `dark` e o `color-scheme` no `<html>` antes da primeira pintura; o variant `dark:` do Tailwind usa
   essa classe.
+- Barra de gestos do Android (#81): `<meta name="color-scheme" content="light dark">`,
+  `color-scheme` no `<html>` (SCRIPT_TEMA; `:root`/`.dark` sem JS) e `bg-background` no `<html>` e
+  no `<body>`; com
+  `viewport-fit=cover`, o fundo da raiz e a barra inferior fixa (com
+  `env(safe-area-inset-bottom)`) cobrem a área atrás da barra de gestos.
 - Cores sempre por tokens CSS (`globals.css`, `:root` e `.dark`), nunca fixas por tema. Atenção/aviso
   usa `--aviso` (borda/fundo) e `--aviso-foreground` (texto, contraste AA nos dois temas).
 
@@ -586,7 +593,7 @@ Decisões (issue #39):
 |---|---|---|---|
 | Unitário | Vitest | `domain/*` (transições, prazos, validade, criticidade), `lib/format`, parsers BRL, schemas Zod | meta: cobertura ≥ 90% em `domain/` (medida no CI, sem limite configurado) |
 | Integração | Vitest + libSQL `:memory:` + migrações | repositories/queries (transação de status, tags, filtros, export→import ida e volta); servidor MCP com cliente em memória (`InMemoryTransport`) | casos principais |
-| E2E | Playwright (Chromium) | smoke: criar concurso → evento → aparece no dashboard → mudar status → exportar/importar; login, MCP, PWA e lembretes com auth ativa; painel admin com o usuário inicial (sem auth); busca, quadro, calendário, cor/ícone, ocultar prazos, tema, lembretes (sino, regras, feed .ics), sino único por tela e tema pelo menu no celular, PWA, aba do detalhe na URL e botão Atualizar com limite de 60 s (#77) e layout em 360 px; `/api/mcp` com token → concurso visível no app. Dois servidores (com e sem auth) com bancos temporários em `e2e/.tmp` | poucos fluxos |
+| E2E | Playwright (Chromium) | smoke: criar concurso → evento → aparece no dashboard → mudar status → exportar/importar; login, MCP, PWA e lembretes com auth ativa; painel admin com o usuário inicial (sem auth); busca, quadro, calendário, cor/ícone, ocultar prazos, tema, lembretes (sino, regras, feed .ics), sino único por tela e tema pelo menu no celular, tema e Configurações sem duplicação (#82), PWA, aba do detalhe na URL e botão Atualizar com limite de 60 s (#77) e layout em 360 px; `/api/mcp` com token → concurso visível no app. Dois servidores (com e sem auth) com bancos temporários em `e2e/.tmp` | poucos fluxos |
 
 Datas sempre fixadas (`vi.setSystemTime` / `hoje` injetado).
 

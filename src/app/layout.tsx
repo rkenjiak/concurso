@@ -23,6 +23,10 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
+  // `<meta name="color-scheme" content="light dark">` (#81): avisa o navegador, antes do CSS, que a
+  // página tem os dois esquemas; o esquema efetivo é o `color-scheme` que o SCRIPT_TEMA põe no
+  // <html>. É estática, então o Next recriá-la a cada navegação não desfaz a escolha do usuário.
+  colorScheme: "light dark",
   // Sem `themeColor`: a `<meta name="theme-color">` é criada pelo SCRIPT_TEMA e segue o tema
   // efetivo, inclusive o escolhido no app (o Next recriaria a dele a cada navegação, #66).
 };

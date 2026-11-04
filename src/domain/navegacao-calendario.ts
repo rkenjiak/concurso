@@ -56,7 +56,8 @@ export function normalizarSelecao(
   selecao: SelecaoConcursos,
   todos: readonly number[],
 ): SelecaoConcursos {
-  if (selecao === null) return null;
+  // Sem concursos não há o que filtrar (evita "nenhum selecionado" sem ter o que mostrar).
+  if (selecao === null || todos.length === 0) return null;
   const existentes = new Set(todos);
   const ids = ordenarIds(selecao.filter((id) => existentes.has(id)));
   if (existentes.size > 0 && ids.length === existentes.size) return null;

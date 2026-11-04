@@ -59,7 +59,13 @@ export function FiltroConcursos({
             : `Mostrando ${exibidos} de ${todos.length}.`}
         </p>
         {selecao !== null ? (
-          <Button variant="link" size="sm" className="h-auto p-0 text-xs" onClick={() => ir(null)}>
+          <Button
+            variant="link"
+            size="sm"
+            className="h-auto p-0 text-xs"
+            onClick={() => ir(null)}
+            disabled={pendente}
+          >
             Mostrar todos
           </Button>
         ) : null}
@@ -69,7 +75,8 @@ export function FiltroConcursos({
           {concursos.map((c) => {
             const nome = `${c.orgao} — ${c.cargo}`;
             const visivel = concursoVisivel(selecao, c.id);
-            const unico = selecao?.length === 1 && selecao[0] === c.id;
+            // Com um concurso só, "só este" seria o mesmo que "todos".
+            const unico = todos.length <= 1 || (selecao?.length === 1 && selecao[0] === c.id);
             return (
               <li
                 key={c.id}
@@ -88,6 +95,9 @@ export function FiltroConcursos({
                 <button
                   type="button"
                   aria-pressed={visivel}
+                  // Desabilitado durante a navegação: dois cliques rápidos partiriam da mesma
+                  // seleção antiga e o primeiro se perderia.
+                  disabled={pendente}
                   title={visivel ? `Ocultar ${nome}` : `Mostrar ${nome}`}
                   onClick={() => ir(alternarConcurso(selecao, c.id, todos))}
                   className={cn(
@@ -108,6 +118,7 @@ export function FiltroConcursos({
                     aria-label={`Mostrar só ${nome}`}
                     title={`Mostrar só ${nome}`}
                     onClick={() => ir([c.id])}
+                    disabled={pendente}
                     className="min-h-8 shrink-0 cursor-pointer rounded-full border-l px-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
                   >
                     só este

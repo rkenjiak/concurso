@@ -69,7 +69,11 @@ export default async function CalendarioPage({ searchParams }: PageProps<"/calen
         <CardContent className="space-y-4">
           <nav aria-label="Navegação entre meses" className="space-y-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <h2 className="text-lg" aria-live="polite">
+              {/* Anuncia só o mês ao navegar, não o rótulo inteiro do botão do seletor. */}
+              <p className="sr-only" aria-live="polite">
+                {titulo}
+              </p>
+              <h2 className="text-lg">
                 <SeletorMes
                   mes={mes}
                   mesHoje={mesHoje}

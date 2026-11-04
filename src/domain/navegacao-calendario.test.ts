@@ -62,6 +62,11 @@ describe("normalizarSelecao", () => {
     expect(normalizarSelecao([99], todos)).toBeNull();
     expect(normalizarSelecao([], todos)).toEqual([]);
   });
+
+  it("sem concursos = todos (null)", () => {
+    expect(normalizarSelecao([], [])).toBeNull();
+    expect(normalizarSelecao([1], [])).toBeNull();
+  });
 });
 
 describe("serializarSelecao e hrefCalendario", () => {

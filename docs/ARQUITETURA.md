@@ -718,7 +718,8 @@ Cada item = uma branch `feature/*` a partir de `develop`; cada milestone fecha c
 | **PWA e celular** → `v2.2.0` | `feature/pwa-mobile` (#66, #48) | App instalável (manifest, ícones) e responsividade em 360 px |
 | **M6 — Lembretes** → `v2.2.0` | `feature/lembretes` (#65): feed/download .ics, notificações no app com regras configuráveis, sugestão de status. E-mail descartado (2026-11-01) | RF08 |
 | **Desempenho** → `v2.3.0` | `feature/performance-mutacoes` (#73) | Mutações com uma viagem só ao servidor e esqueletos de carregamento |
-| **M7 — Anexos** → `v2.4.0` | `feature/anexos` | RF02 desejável |
+| **Uso diário** → `v2.4.0` | `feature/atualizar-dados` (#77) · `feature/sino-unico` (#78) · `feature/tema-layout` (#81, #82) · `feature/eventos-dashboard` (#84, #85) · `feature/calendario-navegacao` (#83) | Botão Atualizar, contagem regressiva das provas, pendências de status e navegação rápida no calendário |
+| **M7 — Anexos** → `v2.5.0` | `feature/anexos` | RF02 desejável |
 
 ---
 

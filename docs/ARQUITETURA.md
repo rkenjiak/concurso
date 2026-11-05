@@ -409,7 +409,8 @@ Os ícones são gerados de `assets/logo.svg` por `pnpm icones` (`scripts/gerar-i
 
 Todas: checagem de sessão (`exigirUsuarioAcao`, ou `exigirAdminAcao` no painel) → validação Zod →
 `executar` (transação no repositório; `ErroDominio` vira mensagem, exceção inesperada vira
-mensagem genérica) → `revalidatePath`. Retorno padronizado `{ ok: true, data } | { ok: false, erros }`
+mensagem genérica e uma linha `acao.erro` no log com `{ acao, usuarioId }`, §9.4; erros de
+controle do Next são relançados com `unstable_rethrow`) → `revalidatePath`. Retorno padronizado `{ ok: true, data } | { ok: false, erros }`
 (`actions/resultado.ts`).
 
 O `revalidatePath` faz a resposta da action trazer a tela atual já re-renderizada (uma viagem só ao
@@ -518,9 +519,11 @@ Decisões (issue #39):
 │   │   ├── actions/                # Server Actions
 │   │   ├── mcp/                    # servidor MCP (ferramentas, entradas, textos)
 │   │   ├── auth/                   # sessão, senha, Google, autorização, visão admin
+│   │   ├── log.ts                  # logger estruturado (§9.4)
+│   │   ├── erro-requisicao.ts      # onRequestError → log (§9.4)
 │   │   └── inicializacao.ts        # checagem do ambiente e migrações ao iniciar
 │   ├── lib/                        # format, tz, normalize, csv, tema, pwa, tags, aba-concurso, atualizar, schemas Zod
-│   ├── instrumentation.ts          # chama server/inicializacao.ts ao subir o servidor
+│   ├── instrumentation.ts          # inicialização ao subir o servidor e onRequestError (§9.4)
 │   └── proxy.ts
 ├── biome.json  drizzle.config.ts  next.config.ts  vitest.config.ts  playwright.config.ts
 ├── .env.example  .nvmrc  CHANGELOG.md  package.json
@@ -696,6 +699,68 @@ O mesmo código atende ambas: só muda `DATABASE_URL` (`file:./data/concurso.db`
 - **Universal:** export JSON em `/configuracoes` (RF09), restaurável via import — também serve para
   migrar entre local ↔ hospedado.
 - Não usar artefatos do GitHub Actions para backup (visíveis se o repositório for público).
+
+### 9.4 Logs e observabilidade (#91)
+
+`src/server/log.ts`: logger próprio, sem dependências. Uma linha por evento, no stdout (`debug`,
+`info`) ou no stderr (`warn`, `error`), que é o que a plataforma já coleta: terminal do
+`pnpm dev`/`pnpm start`, `docker logs` e *Runtime Logs* da Vercel. Nada é gravado em arquivo nem
+no banco; a retenção é a do ambiente (na Vercel, a do plano; no Docker, a do driver de log).
+
+```ts
+log.warn("auth.login_falhou", { metodo: "senha", motivo: "senha_incorreta", ip });
+```
+
+| Variável | Padrão | Efeito |
+|---|---|---|
+| `LOG_LEVEL` | `info` em produção, `debug` em dev, `silent` em teste | nível mínimo: `debug`, `info`, `warn`, `error` ou `silent` |
+| `LOG_FORMAT` | `json` em produção, `texto` fora dela | `json` (uma linha JSON `{ ts, nivel, evento, ...campos }`) ou `texto` legível, com a stack nas linhas seguintes |
+
+**Erros de servidor.** `onRequestError` (`src/instrumentation.ts` → `server/erro-requisicao.ts`)
+registra `requisicao.erro` com método, caminho, `routePath`, `routeType`
+(`render`/`route`/`action`/`proxy`), `renderSource` e `digest` de todo erro que o Next captura.
+O Next continua imprimindo o erro no formato dele: a linha estruturada é acrescentada, e o `digest`
+liga as duas (é o mesmo exibido ao usuário na página de erro). Erros de controle (`redirect`,
+`notFound`…) são ignorados, e o mesmo objeto de erro é registrado uma vez só (o Next chama o hook
+de novo quando layout e página caem na mesma query memorizada). O hook só vê o que **escapa** do código: `executar` (Server Actions e
+MCP), `/api/import`, `/api/health` e o `onerror` do MCP tratam o erro e registram por conta própria.
+
+**Catálogo de eventos.**
+
+| Evento | Nível | Campos |
+|---|---|---|
+| `requisicao.erro` | error | `metodo`, `caminho`, `rota`, `tipo`, `origem`, `digest`, `erro` |
+| `acao.erro` | error | `acao` (ex.: `concursos.criarConcurso`, `mcp.cadastrar`), `usuarioId`, `erro` |
+| `acao.recusada` | debug | `acao`, `usuarioId`, `motivo` (mensagem do `ErroDominio`) |
+| `auth.login_ok` | info | `metodo` (`senha`/`google`), `usuarioId` |
+| `auth.login_falhou` | warn | `metodo`, `motivo` (`senha_incorreta`, `conta_bloqueada`, `nao_autorizado`, `bloqueado`, `erro_google`), `ip` (senha), `email` mascarado (Google), `erro` (Google) |
+| `auth.limite_tentativas` | warn | `rota` (`login`, `mcp`, `ics`), `ip`, `esperaMs`: só quando uma falha **inicia** um bloqueio, não a cada tentativa recusada durante a espera |
+| `auth.token_invalido` | warn | `rota` (`mcp`, `ics`), `ip`, `ausente` |
+| `auth.logout` | info | `usuarioId` |
+| `auth.config_invalida` | error | `erro` (proxy) |
+| `dados.importacao` / `dados.importacao_recusada` / `dados.importacao_erro` | info / info / error | `usuarioId`, contagens do resumo, `motivo` ou `erro` |
+| `dados.exportacao` | info | `usuarioId`, `formato`, `concurso` |
+| `mcp.ferramenta` | info (error se lançar) | `usuarioId`, `ferramenta`, `ok`, `duracaoMs`, sem os argumentos |
+| `mcp.erro` | error | `erro` (transporte/protocolo) |
+| `health.falhou` | error | `erro` |
+| `inicio.*` | info/warn/error | migrações aplicadas ou com falha, auth desligada, config inválida, `MCP_TOKEN` obsoleto |
+
+**Privacidade.** Nunca são registrados senha, tokens (sessão, MCP, `.ics`), cookies, cabeçalhos,
+corpo da importação nem os argumentos das ferramentas MCP. O logger ainda omite qualquer campo
+cujo nome lembre um segredo (`senha`, `token`, `secret`, `cookie`, `authorization`…) e remove
+`token=`, `code=` e `state=` de qualquer texto (o feed `.ics` leva o token na URL, e o
+`onRequestError` recebe o caminho com a query). Das mensagens de erro do Drizzle sai a linha
+`params: …` (valores da query, que podem ter e-mails e dados do usuário); a SQL fica. E-mails saem mascarados (`r***@gmail.com`); quando
+há usuário, registra-se o `usuarioId`. O `ip` (de `x-forwarded-for`/`x-real-ip`, ou `local`) só
+aparece em eventos de segurança; fora de um proxy confiável ele pode ser forjado pelo cliente.
+IP e e-mail mascarado são dados pessoais (LGPD): ficam apenas com a retenção do provedor de logs.
+
+**MCP stdio.** `pnpm mcp` usa o stdout como canal JSON-RPC: `scripts/mcp.ts` chama
+`configurarLog({ saida: "stderr" })` antes de tudo, e todo log vai para o stderr.
+
+**Log da aplicação × auditoria.** `auditoria_admin` (§3.0, painel `/admin/auditoria`) é a trilha
+permanente, no banco, das ações administrativas, visível ao admin. Os logs são operacionais e
+efêmeros: servem para investigar erros e tentativas de acesso.
 
 ---
 

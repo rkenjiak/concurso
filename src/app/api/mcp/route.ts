@@ -10,6 +10,7 @@ import { revalidatePath } from "next/cache";
 import { chaveCliente } from "@/server/auth/acesso";
 import { LimitadorTentativas } from "@/server/auth/limitador";
 import { getDb } from "@/server/db/client";
+import { log } from "@/server/log";
 import { tokenBearer } from "@/server/mcp/config";
 import { criarServidorMcp } from "@/server/mcp/servidor";
 import { usuarioDoTokenMcp } from "@/server/repositories/usuarios";
@@ -34,7 +35,7 @@ function obterHandler(): McpHttpHandler {
         aoAlterar: () => revalidatePath("/", "layout"),
       });
     },
-    { onerror: (erro) => console.error("MCP:", erro) },
+    { onerror: (erro) => log.error("mcp.erro", { erro }) },
   );
   return handler;
 }
@@ -60,7 +61,11 @@ async function atender(request: Request): Promise<Response> {
   const token = tokenBearer(request.headers.get("authorization"));
   const usuario = token === null ? null : await usuarioDoTokenMcp(getDb(), token);
   if (token === null || usuario === null) {
-    limitador.registrarFalha(chave);
+    log.warn("auth.token_invalido", { rota: "mcp", ip: chave, ausente: token === null });
+    const bloqueio = limitador.registrarFalha(chave);
+    if (bloqueio > 0) {
+      log.warn("auth.limite_tentativas", { rota: "mcp", ip: chave, esperaMs: bloqueio });
+    }
     return texto("Token ausente ou inválido.", 401, { "WWW-Authenticate": 'Bearer realm="mcp"' });
   }
   limitador.registrarSucesso(chave);

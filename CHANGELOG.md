@@ -7,6 +7,22 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 
 ## [Unreleased]
 
+### Adicionado
+
+- **Logs da aplicação** (#91): logger estruturado próprio (`src/server/log.ts`, sem dependências),
+  em JSON em produção e texto em dev, com `LOG_LEVEL` e `LOG_FORMAT`. Erros de servidor
+  capturados pelo Next viram `requisicao.erro` via `onRequestError`, com rota, tipo e `digest`;
+  erros inesperados das Server Actions e do MCP saem como `acao.erro` com a ação e o usuário.
+  Novos eventos: logins (sucesso e falha), início de bloqueio por tentativas, tokens MCP/`.ics`
+  inválidos, logout, importação, exportação e cada chamada de ferramenta MCP (nome, resultado e
+  duração). Senhas, tokens, cookies e argumentos nunca são registrados; e-mails saem mascarados e
+  `token=` é removido das URLs. No `pnpm mcp` (stdio) todo log vai para o stderr. Catálogo em
+  `ARQUITETURA.md` §9.4.
+
+### Alterado
+
+- O login Google recusado não registra mais o e-mail completo (agora `r***@dominio`).
+
 ## [2.4.0] - 2026-11-03
 
 ### Adicionado

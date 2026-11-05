@@ -12,15 +12,21 @@ import { executar, type ResultadoAcao, sucesso } from "./resultado";
 export async function gerarTokenMcpAcao(): Promise<ResultadoAcao<{ token: string }>> {
   const sessao = await exigirUsuarioAcao();
   if (!sessao.ok) return sessao;
-  return executar(async () => sucesso({ token: await gerarTokenMcp(getDb(), sessao.usuario.id) }));
+  return executar(async () => sucesso({ token: await gerarTokenMcp(getDb(), sessao.usuario.id) }), {
+    acao: "tokenMcp.gerarTokenMcpAcao",
+    usuarioId: sessao.usuario.id,
+  });
 }
 
 /** Revoga o token pessoal do MCP. */
 export async function revogarTokenMcpAcao(): Promise<ResultadoAcao> {
   const sessao = await exigirUsuarioAcao();
   if (!sessao.ok) return sessao;
-  return executar(async () => {
-    await revogarTokenMcp(getDb(), sessao.usuario.id);
-    return sucesso(null);
-  });
+  return executar(
+    async () => {
+      await revogarTokenMcp(getDb(), sessao.usuario.id);
+      return sucesso(null);
+    },
+    { acao: "tokenMcp.revogarTokenMcpAcao", usuarioId: sessao.usuario.id },
+  );
 }

@@ -30,11 +30,14 @@ async function marcar(chaveBruta: unknown, acao: AcaoNotificacao): Promise<Resul
   if (!sessao.ok) return sessao;
   const alvo = lerChaveNotificacao(chaveBruta);
   if (!alvo) return falha("Notificação não encontrada.");
-  return executar(async () => {
-    await marcarNotificacoes(getDb(), sessao.usuario.id, [alvo], acao);
-    revalidarTudo();
-    return sucesso(null);
-  });
+  return executar(
+    async () => {
+      await marcarNotificacoes(getDb(), sessao.usuario.id, [alvo], acao);
+      revalidarTudo();
+      return sucesso(null);
+    },
+    { acao: `notificacoes.marcar.${acao}`, usuarioId: sessao.usuario.id },
+  );
 }
 
 /** Marca uma notificação (`evento-<id>:<dias>` / `validade-<concursoId>:<dias>`) como lida. */
@@ -52,18 +55,21 @@ export async function marcarTodasLidasAcao(): Promise<ResultadoAcao<{ marcadas: 
   const sessao = await exigirUsuarioAcao();
   if (!sessao.ok) return sessao;
   const usuarioId = sessao.usuario.id;
-  return executar(async () => {
-    const db = getDb();
-    const alvos = (await obterNotificacoes(db, usuarioId, hojeSP()))
-      .filter((n) => !n.lida)
-      .flatMap((n) => {
-        const alvo = lerChaveNotificacao(n.chave);
-        return alvo ? [alvo] : [];
-      });
-    await marcarNotificacoes(db, usuarioId, alvos, "LER");
-    revalidarTudo();
-    return sucesso({ marcadas: alvos.length });
-  });
+  return executar(
+    async () => {
+      const db = getDb();
+      const alvos = (await obterNotificacoes(db, usuarioId, hojeSP()))
+        .filter((n) => !n.lida)
+        .flatMap((n) => {
+          const alvo = lerChaveNotificacao(n.chave);
+          return alvo ? [alvo] : [];
+        });
+      await marcarNotificacoes(db, usuarioId, alvos, "LER");
+      revalidarTudo();
+      return sucesso({ marcadas: alvos.length });
+    },
+    { acao: "notificacoes.marcarTodasLidasAcao", usuarioId },
+  );
 }
 
 const regrasSchema = z
@@ -98,22 +104,28 @@ export async function salvarRegrasNotificacaoAcao(entrada: unknown): Promise<Res
   if (Object.keys(erros).length > 0) {
     return { ok: false, erros: { ...erros, _form: ["Corrija as antecedências destacadas."] } };
   }
-  return executar(async () => {
-    await salvarRegras(getDb(), sessao.usuario.id, regras);
-    revalidarTudo();
-    return sucesso(null);
-  });
+  return executar(
+    async () => {
+      await salvarRegras(getDb(), sessao.usuario.id, regras);
+      revalidarTudo();
+      return sucesso(null);
+    },
+    { acao: "notificacoes.salvarRegrasNotificacaoAcao", usuarioId: sessao.usuario.id },
+  );
 }
 
 /** Volta todas as regras ao padrão. */
 export async function restaurarRegrasPadraoAcao(): Promise<ResultadoAcao> {
   const sessao = await exigirUsuarioAcao();
   if (!sessao.ok) return sessao;
-  return executar(async () => {
-    await restaurarRegrasPadrao(getDb(), sessao.usuario.id);
-    revalidarTudo();
-    return sucesso(null);
-  });
+  return executar(
+    async () => {
+      await restaurarRegrasPadrao(getDb(), sessao.usuario.id);
+      revalidarTudo();
+      return sucesso(null);
+    },
+    { acao: "notificacoes.restaurarRegrasPadraoAcao", usuarioId: sessao.usuario.id },
+  );
 }
 
 const booleano = z.boolean({ error: "Valor inválido." });
@@ -129,9 +141,12 @@ export async function silenciarConcursoAcao(
   if (!id.success) return falha("Concurso não encontrado.");
   const silenciado = booleano.safeParse(silenciadoBruto);
   if (!silenciado.success) return falha("Valor inválido.");
-  return executar(async () => {
-    await definirConcursoSilenciado(getDb(), sessao.usuario.id, id.data, silenciado.data);
-    revalidarTudo();
-    return sucesso(null);
-  });
+  return executar(
+    async () => {
+      await definirConcursoSilenciado(getDb(), sessao.usuario.id, id.data, silenciado.data);
+      revalidarTudo();
+      return sucesso(null);
+    },
+    { acao: "notificacoes.silenciarConcursoAcao", usuarioId: sessao.usuario.id },
+  );
 }

@@ -2,6 +2,7 @@
  * Tarefas executadas uma vez ao iniciar o servidor (via `src/instrumentation.ts`).
  */
 import { ErroConfigAuth, lerConfigAuth } from "./auth/config";
+import { log } from "./log";
 
 /** Durante `next build` o app não atende requisições: as checagens valem para a execução. */
 const emBuild = () => process.env.NEXT_PHASE === "phase-production-build";
@@ -15,16 +16,19 @@ export function verificarAmbienteAoIniciar(): void {
   try {
     const config = lerConfigAuth();
     if (!config.habilitada && process.env.NODE_ENV === "production") {
-      console.warn("Atenção: autenticação desligada (ALLOW_NO_AUTH=true).");
+      log.warn("inicio.auth_desligada", {
+        mensagem: "Atenção: autenticação desligada (ALLOW_NO_AUTH=true).",
+      });
     }
     if (process.env.MCP_TOKEN) {
-      console.warn(
-        "Atenção: MCP_TOKEN não é mais usado. Gere um token pessoal em Configurações (#49).",
-      );
+      log.warn("inicio.mcp_token_obsoleto", {
+        mensagem:
+          "Atenção: MCP_TOKEN não é mais usado. Gere um token pessoal em Configurações (#49).",
+      });
     }
   } catch (erro) {
     if (!(erro instanceof ErroConfigAuth)) throw erro;
-    console.error(`\nO app não pode iniciar: ${erro.message}\n`);
+    log.error("inicio.config_invalida", { mensagem: `O app não pode iniciar: ${erro.message}` });
     process.exit(1);
   }
 }
@@ -39,9 +43,12 @@ export async function migrarAoIniciar(): Promise<void> {
   const { aplicarMigracoes } = await import("./db/migrate");
   try {
     await aplicarMigracoes(getDb());
-    console.log("Migrações aplicadas.");
+    log.info("inicio.migracoes", { mensagem: "Migrações aplicadas." });
   } catch (erro) {
-    console.error("\nO app não pode iniciar: falha ao aplicar as migrações.\n", erro);
+    log.error("inicio.migracoes_erro", {
+      mensagem: "O app não pode iniciar: falha ao aplicar as migrações.",
+      erro,
+    });
     process.exit(1);
   }
 }

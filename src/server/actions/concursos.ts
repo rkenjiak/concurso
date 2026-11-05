@@ -24,12 +24,15 @@ export async function criarConcurso(entrada: unknown): Promise<ResultadoAcao> {
   const usuarioId = sessao.usuario.id;
   const dados = concursoSchema.safeParse(entrada);
   if (!dados.success) return falhaValidacao(dados.error);
-  const r = await executar(async () => {
-    const id = await repo.criarConcurso(getDb(), usuarioId, dados.data);
-    revalidatePath("/concursos");
-    revalidatePath("/");
-    return sucesso({ id });
-  });
+  const r = await executar(
+    async () => {
+      const id = await repo.criarConcurso(getDb(), usuarioId, dados.data);
+      revalidatePath("/concursos");
+      revalidatePath("/");
+      return sucesso({ id });
+    },
+    { acao: "concursos.criarConcurso", usuarioId },
+  );
   if (r.ok) redirect(`/concursos/${r.data.id}`);
   return r;
 }
@@ -45,14 +48,17 @@ export async function atualizarConcurso(
   if (!id.success) return falha(NAO_ENCONTRADO);
   const dados = concursoEdicaoSchema.safeParse(entrada);
   if (!dados.success) return falhaValidacao(dados.error);
-  const r = await executar(async () => {
-    if (!(await repo.atualizarConcurso(getDb(), usuarioId, id.data, dados.data)))
-      return falha(NAO_ENCONTRADO);
-    revalidatePath("/concursos");
-    revalidatePath(`/concursos/${id.data}`);
-    revalidatePath("/");
-    return sucesso(null);
-  });
+  const r = await executar(
+    async () => {
+      if (!(await repo.atualizarConcurso(getDb(), usuarioId, id.data, dados.data)))
+        return falha(NAO_ENCONTRADO);
+      revalidatePath("/concursos");
+      revalidatePath(`/concursos/${id.data}`);
+      revalidatePath("/");
+      return sucesso(null);
+    },
+    { acao: "concursos.atualizarConcurso", usuarioId },
+  );
   if (r.ok) redirect(`/concursos/${id.data}`);
   return r;
 }
@@ -63,12 +69,15 @@ export async function excluirConcurso(idBruto: unknown): Promise<ResultadoAcao> 
   const usuarioId = sessao.usuario.id;
   const id = idSchema.safeParse(idBruto);
   if (!id.success) return falha(NAO_ENCONTRADO);
-  const r = await executar(async () => {
-    if (!(await repo.excluirConcurso(getDb(), usuarioId, id.data))) return falha(NAO_ENCONTRADO);
-    revalidatePath("/concursos");
-    revalidatePath("/");
-    return sucesso(null);
-  });
+  const r = await executar(
+    async () => {
+      if (!(await repo.excluirConcurso(getDb(), usuarioId, id.data))) return falha(NAO_ENCONTRADO);
+      revalidatePath("/concursos");
+      revalidatePath("/");
+      return sucesso(null);
+    },
+    { acao: "concursos.excluirConcurso", usuarioId },
+  );
   if (r.ok) redirect("/concursos");
   return r;
 }

@@ -1,9 +1,14 @@
+import { notFound, redirect } from "next/navigation";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { ErroDominio } from "@/domain/erros";
+import { configurarLog } from "../log";
 import { executar, falha, falhaValidacao, sucesso } from "./resultado";
 
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+  vi.restoreAllMocks();
+  configurarLog({});
+});
 
 describe("resultado de ações", () => {
   it("sucesso e falha", () => {
@@ -30,14 +35,47 @@ describe("resultado de ações", () => {
     expect(r).toEqual({ ok: false, erros: { _form: ["regra violada"] } });
   });
 
-  it("executar esconde erros inesperados", async () => {
-    const log = vi.spyOn(console, "error").mockImplementation(() => {});
-    const r = await executar(async () => {
-      throw new Error("detalhe interno");
-    });
+  it("executar esconde erros inesperados e os registra com o contexto", async () => {
+    configurarLog({ nivel: "error", formato: "json" });
+    const saida = vi.spyOn(console, "error").mockImplementation(() => {});
+    const r = await executar(
+      async () => {
+        throw new Error("detalhe interno");
+      },
+      { acao: "concursos.criar", usuarioId: 7 },
+    );
     expect(r.ok).toBe(false);
     expect(r.ok ? null : r.erros._form?.[0]).toMatch(/Não foi possível/);
-    expect(log).toHaveBeenCalled();
+    expect(saida).toHaveBeenCalledOnce();
+    const linha = JSON.parse(String(saida.mock.calls[0]?.[0]));
+    expect(linha).toMatchObject({
+      nivel: "error",
+      evento: "acao.erro",
+      acao: "concursos.criar",
+      usuarioId: 7,
+      erro: { nome: "Error", mensagem: "detalhe interno" },
+    });
+  });
+
+  it("executar não registra erro de domínio como falha", async () => {
+    configurarLog({ nivel: "info" });
+    const erro = vi.spyOn(console, "error").mockImplementation(() => {});
+    const info = vi.spyOn(console, "log").mockImplementation(() => {});
+    await executar(async () => {
+      throw new ErroDominio("regra violada");
+    });
+    expect(erro).not.toHaveBeenCalled();
+    expect(info).not.toHaveBeenCalled();
+  });
+
+  it("executar relança redirect e notFound sem registrar", async () => {
+    configurarLog({ nivel: "debug" });
+    const erro = vi.spyOn(console, "error").mockImplementation(() => {});
+    await expect(executar(async () => redirect("/x"))).rejects.toMatchObject({
+      digest: expect.stringMatching(/^NEXT_REDIRECT/),
+    });
+    await expect(executar(async () => notFound())).rejects.toBeDefined();
+    expect(erro).not.toHaveBeenCalled();
   });
 
   it("executar repassa o resultado", async () => {

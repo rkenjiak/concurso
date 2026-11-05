@@ -11,6 +11,7 @@ import { CONFIRMACAO_IMPORTACAO, TAMANHO_MAX_BACKUP, validarBackup } from "@/lib
 import { falha, sucesso } from "@/server/actions/resultado";
 import { exigirUsuarioRota } from "@/server/auth/acesso";
 import { getDb } from "@/server/db/client";
+import { log } from "@/server/log";
 import { substituirTudo } from "@/server/repositories/importacao";
 
 const erro = (mensagem: string, status = 400) => Response.json(falha(mensagem), { status });
@@ -45,10 +46,14 @@ export async function POST(request: Request): Promise<Response> {
   try {
     const resumo = await substituirTudo(getDb(), usuario.id, validarBackup(json));
     revalidatePath("/", "layout");
+    log.info("dados.importacao", { usuarioId: usuario.id, ...resumo });
     return Response.json(sucesso(resumo));
   } catch (e) {
-    if (e instanceof ErroDominio) return erro(e.message);
-    console.error(e);
+    if (e instanceof ErroDominio) {
+      log.info("dados.importacao_recusada", { usuarioId: usuario.id, motivo: e.message });
+      return erro(e.message);
+    }
+    log.error("dados.importacao_erro", { usuarioId: usuario.id, erro: e });
     return erro("Não foi possível importar o backup. Nenhum dado foi alterado.", 500);
   }
 }

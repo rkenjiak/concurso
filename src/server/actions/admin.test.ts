@@ -31,6 +31,7 @@ vi.mock("next/headers", () => ({
   }),
 }));
 vi.mock("next/navigation", () => ({
+  unstable_rethrow: () => {},
   redirect: (url: string) => {
     throw new Error(`REDIRECT ${url}`);
   },

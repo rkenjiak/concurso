@@ -15,6 +15,10 @@ process.chdir(fileURLToPath(new URL("..", import.meta.url)));
 const { carregarEnv } = await import("./env");
 carregarEnv();
 
+// Logs da aplicação (#91) também só no stderr: o stdout é do protocolo.
+const { configurarLog, log } = await import("../src/server/log");
+configurarLog({ saida: "stderr" });
+
 const { serveStdio } = await import("@modelcontextprotocol/server/stdio");
 const { criarDb, urlDoBanco } = await import("../src/server/db/client");
 const { aplicarMigracoes } = await import("../src/server/db/migrate");
@@ -25,6 +29,6 @@ const { db } = criarDb();
 await aplicarMigracoes(db);
 
 serveStdio(() => criarServidorMcp({ db, usuarioId: ID_USUARIO_INICIAL }), {
-  onerror: (erro) => console.error("MCP:", erro),
+  onerror: (erro) => log.error("mcp.erro", { erro }),
 });
 console.error(`Servidor MCP "concurso" pronto (stdio, banco ${urlDoBanco()}).`);

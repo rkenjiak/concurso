@@ -11,6 +11,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { ehArquivoPwaPublico } from "./lib/pwa";
 import { type ConfigAuth, lerConfigAuth } from "./server/auth/config";
 import { COOKIE_SESSAO, tokenSessaoValido } from "./server/auth/sessao";
+import { log } from "./server/log";
 
 const ROTAS_PUBLICAS = new Set([
   "/login",
@@ -26,7 +27,7 @@ export async function proxy(request: NextRequest) {
   try {
     config = lerConfigAuth();
   } catch (erro) {
-    console.error(erro);
+    log.error("auth.config_invalida", { erro });
     return new NextResponse("Configuração de autenticação inválida. Veja os logs do servidor.", {
       status: 500,
     });

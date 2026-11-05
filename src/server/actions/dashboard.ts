@@ -25,9 +25,12 @@ export async function alternarPrazoOculto(
   if (!alvo) return falha("Prazo não encontrado.");
   const oculto = ocultoSchema.safeParse(ocultoBruto);
   if (!oculto.success) return falhaValidacao(oculto.error);
-  return executar(async () => {
-    await definirPrazoOculto(getDb(), usuarioId, alvo, oculto.data);
-    revalidatePath("/");
-    return sucesso(null);
-  });
+  return executar(
+    async () => {
+      await definirPrazoOculto(getDb(), usuarioId, alvo, oculto.data);
+      revalidatePath("/");
+      return sucesso(null);
+    },
+    { acao: "dashboard.alternarPrazoOculto", usuarioId },
+  );
 }

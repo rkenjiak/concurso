@@ -9,6 +9,7 @@ import { carimboSP } from "@/lib/tz";
 import { exigirUsuarioRota } from "@/server/auth/acesso";
 import { origemPublica } from "@/server/auth/login-google";
 import { getDb } from "@/server/db/client";
+import { log } from "@/server/log";
 import { gerarIcsDoUsuario } from "@/server/queries/calendario-ics";
 import { exportarConcursosCsv, exportarDados } from "@/server/queries/exportacao";
 import { obterUsuario } from "@/server/repositories/usuarios";
@@ -69,6 +70,13 @@ export async function GET(request: NextRequest): Promise<Response> {
   const formato = params.get("formato") ?? "json";
   const agora = new Date();
   const db = getDb();
+  if (formato === "json" || formato === "csv" || formato === "ics") {
+    log.info("dados.exportacao", {
+      usuarioId: usuario.id,
+      formato,
+      concurso: params.get("concurso") ?? undefined,
+    });
+  }
 
   if (formato === "json") {
     const backup = await exportarDados(db, usuario.id, agora);

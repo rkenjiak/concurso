@@ -25,18 +25,21 @@ export async function salvarLink(
   if (linkId && !linkId.success) return falha(INVALIDO);
   const dados = linkSchema.safeParse(entrada);
   if (!dados.success) return falhaValidacao(dados.error);
-  return executar(async () => {
-    const db = getDb();
-    let id: number;
-    if (linkId?.success) {
-      id = linkId.data;
-      await repo.atualizarLink(db, usuarioId, concursoId.data, id, dados.data);
-    } else {
-      id = await repo.criarLink(db, usuarioId, concursoId.data, dados.data);
-    }
-    revalidatePath(`/concursos/${concursoId.data}`);
-    return sucesso({ id });
-  });
+  return executar(
+    async () => {
+      const db = getDb();
+      let id: number;
+      if (linkId?.success) {
+        id = linkId.data;
+        await repo.atualizarLink(db, usuarioId, concursoId.data, id, dados.data);
+      } else {
+        id = await repo.criarLink(db, usuarioId, concursoId.data, dados.data);
+      }
+      revalidatePath(`/concursos/${concursoId.data}`);
+      return sucesso({ id });
+    },
+    { acao: "links.salvarLink", usuarioId },
+  );
 }
 
 export async function excluirLink(
@@ -49,11 +52,14 @@ export async function excluirLink(
   const concursoId = idSchema.safeParse(concursoIdBruto);
   const linkId = idSchema.safeParse(linkIdBruto);
   if (!concursoId.success || !linkId.success) return falha(INVALIDO);
-  return executar(async () => {
-    await repo.excluirLink(getDb(), usuarioId, concursoId.data, linkId.data);
-    revalidatePath(`/concursos/${concursoId.data}`);
-    return sucesso(null);
-  });
+  return executar(
+    async () => {
+      await repo.excluirLink(getDb(), usuarioId, concursoId.data, linkId.data);
+      revalidatePath(`/concursos/${concursoId.data}`);
+      return sucesso(null);
+    },
+    { acao: "links.excluirLink", usuarioId },
+  );
 }
 
 export async function reordenarLinks(
@@ -67,9 +73,12 @@ export async function reordenarLinks(
   if (!concursoId.success) return falha("Concurso não encontrado.");
   const ids = ordemLinksSchema.safeParse(idsBrutos);
   if (!ids.success) return falhaValidacao(ids.error);
-  return executar(async () => {
-    await repo.reordenarLinks(getDb(), usuarioId, concursoId.data, ids.data);
-    revalidatePath(`/concursos/${concursoId.data}`);
-    return sucesso(null);
-  });
+  return executar(
+    async () => {
+      await repo.reordenarLinks(getDb(), usuarioId, concursoId.data, ids.data);
+      revalidatePath(`/concursos/${concursoId.data}`);
+      return sucesso(null);
+    },
+    { acao: "links.reordenarLinks", usuarioId },
+  );
 }

@@ -5,6 +5,7 @@
  */
 import { NextResponse } from "next/server";
 import { getDb } from "../db/client";
+import { log, mascararEmail } from "../log";
 import { entrarComGoogle } from "../repositories/usuarios";
 import { decidirLoginGoogle } from "./autorizacao";
 import { type ConfigAuth, ErroConfigAuth, lerConfigAuth } from "./config";
@@ -123,10 +124,15 @@ export async function concluirLoginGoogle(request: {
     const perfil = await validarIdToken(idToken, config.google, estado.nonce);
     const decisao = await decidirLoginGoogle(getDb(), config, perfil);
     if (decisao !== "ok") {
-      console.warn(`Login Google recusado (${decisao}): ${perfil.email}`);
+      log.warn("auth.login_falhou", {
+        metodo: "google",
+        motivo: decisao,
+        email: mascararEmail(perfil.email),
+      });
       return irParaLogin(origem, decisao);
     }
     const usuario = await entrarComGoogle(getDb(), perfil, config.emailsAdmin.has(perfil.email));
+    log.info("auth.login_ok", { metodo: "google", usuarioId: usuario.id });
     const resposta = NextResponse.redirect(new URL(estado.para, origem));
     apagarCookieOAuth(resposta);
     resposta.cookies.set(
@@ -137,7 +143,7 @@ export async function concluirLoginGoogle(request: {
     return resposta;
   } catch (erro) {
     if (!(erro instanceof ErroLoginGoogle)) throw erro;
-    console.error("Login Google:", erro.message);
+    log.warn("auth.login_falhou", { metodo: "google", motivo: "erro_google", erro: erro.message });
     return irParaLogin(origem, "google");
   }
 }

@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { criarBancoTeste } from "../db/banco-teste";
 import type { Db } from "../db/client";
 import { ID_USUARIO_INICIAL } from "../db/schema";
+import { configurarLog } from "../log";
 import { listarEventos } from "../queries/eventos";
 import { criarServidorMcp, textoDosErros } from "./servidor";
 
@@ -210,6 +211,41 @@ describe("servidor MCP", () => {
       type: "text",
       text: expect.stringContaining('cargo: "Analista"'),
     });
+  });
+});
+
+describe("log das ferramentas (#91)", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    configurarLog({});
+  });
+
+  it("registra nome, usuário, resultado e duração, sem os argumentos", async () => {
+    configurarLog({ nivel: "info", formato: "json" });
+    const saida = vi.spyOn(console, "log").mockImplementation(() => {});
+    await chamar("listar_concursos", { busca: "segredo-do-usuario" });
+    await chamar("obter_concurso", { id: 999 });
+    const linhas = saida.mock.calls.map((c) => JSON.parse(String(c[0])));
+    expect(linhas).toEqual([
+      expect.objectContaining({
+        evento: "mcp.ferramenta",
+        ferramenta: "listar_concursos",
+        usuarioId: ID_USUARIO_INICIAL,
+        ok: true,
+        duracaoMs: expect.any(Number),
+      }),
+      expect.objectContaining({ ferramenta: "obter_concurso", ok: false }),
+    ]);
+    expect(JSON.stringify(linhas)).not.toContain("segredo-do-usuario");
+  });
+
+  it("com saída em stderr (MCP stdio), nada vai para o stdout", async () => {
+    configurarLog({ nivel: "debug", saida: "stderr" });
+    const stdout = vi.spyOn(console, "log").mockImplementation(() => {});
+    const stderr = vi.spyOn(console, "error").mockImplementation(() => {});
+    await chamar("listar_concursos", {});
+    expect(stdout).not.toHaveBeenCalled();
+    expect(stderr).toHaveBeenCalled();
   });
 });
 

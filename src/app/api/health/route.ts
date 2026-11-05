@@ -4,13 +4,14 @@
  */
 import { sql } from "drizzle-orm";
 import { getDb } from "@/server/db/client";
+import { log } from "@/server/log";
 
 export async function GET(): Promise<Response> {
   try {
     await getDb().run(sql`select 1`);
     return Response.json({ status: "ok" }, { headers: { "Cache-Control": "no-store" } });
   } catch (erro) {
-    console.error("Health check falhou:", erro);
+    log.error("health.falhou", { erro });
     return Response.json(
       { status: "erro" },
       { status: 503, headers: { "Cache-Control": "no-store" } },

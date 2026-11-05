@@ -25,18 +25,21 @@ export async function salvarResultadoFase(
   if (resultadoId && !resultadoId.success) return falha(INVALIDO);
   const dados = resultadoFaseSchema.safeParse(entrada);
   if (!dados.success) return falhaValidacao(dados.error);
-  return executar(async () => {
-    const db = getDb();
-    let id: number;
-    if (resultadoId?.success) {
-      id = resultadoId.data;
-      await repo.atualizarResultadoFase(db, usuarioId, concursoId.data, id, dados.data);
-    } else {
-      id = await repo.criarResultadoFase(db, usuarioId, concursoId.data, dados.data);
-    }
-    revalidatePath(`/concursos/${concursoId.data}`);
-    return sucesso({ id });
-  });
+  return executar(
+    async () => {
+      const db = getDb();
+      let id: number;
+      if (resultadoId?.success) {
+        id = resultadoId.data;
+        await repo.atualizarResultadoFase(db, usuarioId, concursoId.data, id, dados.data);
+      } else {
+        id = await repo.criarResultadoFase(db, usuarioId, concursoId.data, dados.data);
+      }
+      revalidatePath(`/concursos/${concursoId.data}`);
+      return sucesso({ id });
+    },
+    { acao: "resultados.salvarResultadoFase", usuarioId },
+  );
 }
 
 export async function excluirResultadoFase(
@@ -49,9 +52,12 @@ export async function excluirResultadoFase(
   const concursoId = idSchema.safeParse(concursoIdBruto);
   const resultadoId = idSchema.safeParse(resultadoIdBruto);
   if (!concursoId.success || !resultadoId.success) return falha(INVALIDO);
-  return executar(async () => {
-    await repo.excluirResultadoFase(getDb(), usuarioId, concursoId.data, resultadoId.data);
-    revalidatePath(`/concursos/${concursoId.data}`);
-    return sucesso(null);
-  });
+  return executar(
+    async () => {
+      await repo.excluirResultadoFase(getDb(), usuarioId, concursoId.data, resultadoId.data);
+      revalidatePath(`/concursos/${concursoId.data}`);
+      return sucesso(null);
+    },
+    { acao: "resultados.excluirResultadoFase", usuarioId },
+  );
 }

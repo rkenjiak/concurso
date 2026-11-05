@@ -6,10 +6,17 @@ import { chaveCliente } from "../auth/acesso";
 import { lerConfigAuth } from "../auth/config";
 import { LimitadorTentativas } from "../auth/limitador";
 import { senhaConfere } from "../auth/senha";
-import { COOKIE_SESSAO, criarTokenSessao, destinoSeguro, opcoesCookieSessao } from "../auth/sessao";
+import {
+  COOKIE_SESSAO,
+  criarTokenSessao,
+  destinoSeguro,
+  lerSessao,
+  opcoesCookieSessao,
+} from "../auth/sessao";
 import { COOKIE_VISAO } from "../auth/visao";
 import { getDb } from "../db/client";
 import { ID_USUARIO_INICIAL } from "../db/schema";
+import { log } from "../log";
 import { obterUsuario, registrarAcesso } from "../repositories/usuarios";
 
 export interface EstadoLogin {
@@ -46,15 +53,27 @@ export async function login(_anterior: EstadoLogin, form: FormData): Promise<Est
     return { erro: "Informe a senha." };
   }
   if (!senhaConfere(senha, config.senha)) {
-    limitador.registrarFalha(chave);
+    log.warn("auth.login_falhou", { metodo: "senha", motivo: "senha_incorreta", ip: chave });
+    const bloqueio = limitador.registrarFalha(chave);
+    if (bloqueio > 0) {
+      log.warn("auth.limite_tentativas", { rota: "login", ip: chave, esperaMs: bloqueio });
+    }
     return { erro: "Senha incorreta." };
   }
 
   limitador.registrarSucesso(chave);
+  // Com senha, o bloqueio só é conferido depois que ela confere.
   if ((await obterUsuario(getDb(), ID_USUARIO_INICIAL))?.bloqueadoEm != null) {
+    log.warn("auth.login_falhou", {
+      metodo: "senha",
+      motivo: "conta_bloqueada",
+      usuarioId: ID_USUARIO_INICIAL,
+      ip: chave,
+    });
     return { erro: "Esta conta foi bloqueada pelo administrador." };
   }
   await registrarAcesso(getDb(), ID_USUARIO_INICIAL);
+  log.info("auth.login_ok", { metodo: "senha", usuarioId: ID_USUARIO_INICIAL });
   (await cookies()).set(
     COOKIE_SESSAO,
     await criarTokenSessao(config.segredo, { usuarioId: ID_USUARIO_INICIAL, metodo: "senha" }),
@@ -63,9 +82,24 @@ export async function login(_anterior: EstadoLogin, form: FormData): Promise<Est
   redirect(destinoSeguro(form.get("para")));
 }
 
+/**
+ * Usuário do cookie de sessão, só para o log do logout: lê o JWT assinado, sem consultar o banco,
+ * e nunca falha (sair não pode depender do log nem do banco).
+ */
+async function usuarioDoCookie(token: string | undefined): Promise<number | undefined> {
+  try {
+    const config = lerConfigAuth();
+    if (!config.habilitada) return undefined;
+    return (await lerSessao(token, config.segredo))?.usuarioId;
+  } catch {
+    return undefined;
+  }
+}
+
 /** Encerra a sessão (e esquece a visão admin/usuário) e volta para o login. */
 export async function logout(): Promise<void> {
   const jar = await cookies();
+  log.info("auth.logout", { usuarioId: await usuarioDoCookie(jar.get(COOKIE_SESSAO)?.value) });
   jar.delete(COOKIE_SESSAO);
   jar.delete(COOKIE_VISAO);
   redirect("/login");

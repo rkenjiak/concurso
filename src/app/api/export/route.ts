@@ -9,6 +9,7 @@ import { carimboSP } from "@/lib/tz";
 import { exigirUsuarioRota } from "@/server/auth/acesso";
 import { origemPublica } from "@/server/auth/login-google";
 import { getDb } from "@/server/db/client";
+import { log } from "@/server/log";
 import { gerarIcsDoUsuario } from "@/server/queries/calendario-ics";
 import { exportarConcursosCsv, exportarDados } from "@/server/queries/exportacao";
 import { obterUsuario } from "@/server/repositories/usuarios";
@@ -65,6 +66,23 @@ const TIPO_ICS = "text/calendar; charset=utf-8";
 export async function GET(request: NextRequest): Promise<Response> {
   const usuario = await exigirUsuarioRota();
   if (usuario instanceof Response) return usuario;
+  const resposta = await exportar(request, usuario.id);
+  if (resposta.ok) {
+    // Só exportações concluídas; o id do concurso entra apenas se for válido (sem valor bruto).
+    const params = request.nextUrl.searchParams;
+    const formato = params.get("formato") ?? "json";
+    const concurso = formato === "ics" ? idSchema.safeParse(params.get("concurso")) : null;
+    log.info("dados.exportacao", {
+      usuarioId: usuario.id,
+      formato,
+      concurso: concurso?.success ? concurso.data : undefined,
+    });
+  }
+  return resposta;
+}
+
+async function exportar(request: NextRequest, usuarioId: number): Promise<Response> {
+  const usuario = { id: usuarioId };
   const params = request.nextUrl.searchParams;
   const formato = params.get("formato") ?? "json";
   const agora = new Date();

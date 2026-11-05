@@ -66,17 +66,27 @@ const TIPO_ICS = "text/calendar; charset=utf-8";
 export async function GET(request: NextRequest): Promise<Response> {
   const usuario = await exigirUsuarioRota();
   if (usuario instanceof Response) return usuario;
+  const resposta = await exportar(request, usuario.id);
+  if (resposta.ok) {
+    // Só exportações concluídas; o id do concurso entra apenas se for válido (sem valor bruto).
+    const params = request.nextUrl.searchParams;
+    const formato = params.get("formato") ?? "json";
+    const concurso = formato === "ics" ? idSchema.safeParse(params.get("concurso")) : null;
+    log.info("dados.exportacao", {
+      usuarioId: usuario.id,
+      formato,
+      concurso: concurso?.success ? concurso.data : undefined,
+    });
+  }
+  return resposta;
+}
+
+async function exportar(request: NextRequest, usuarioId: number): Promise<Response> {
+  const usuario = { id: usuarioId };
   const params = request.nextUrl.searchParams;
   const formato = params.get("formato") ?? "json";
   const agora = new Date();
   const db = getDb();
-  if (formato === "json" || formato === "csv" || formato === "ics") {
-    log.info("dados.exportacao", {
-      usuarioId: usuario.id,
-      formato,
-      concurso: params.get("concurso") ?? undefined,
-    });
-  }
 
   if (formato === "json") {
     const backup = await exportarDados(db, usuario.id, agora);

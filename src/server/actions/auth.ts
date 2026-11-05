@@ -2,11 +2,17 @@
 
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { chaveCliente, usuarioAtual } from "../auth/acesso";
+import { chaveCliente } from "../auth/acesso";
 import { lerConfigAuth } from "../auth/config";
 import { LimitadorTentativas } from "../auth/limitador";
 import { senhaConfere } from "../auth/senha";
-import { COOKIE_SESSAO, criarTokenSessao, destinoSeguro, opcoesCookieSessao } from "../auth/sessao";
+import {
+  COOKIE_SESSAO,
+  criarTokenSessao,
+  destinoSeguro,
+  lerSessao,
+  opcoesCookieSessao,
+} from "../auth/sessao";
 import { COOKIE_VISAO } from "../auth/visao";
 import { getDb } from "../db/client";
 import { ID_USUARIO_INICIAL } from "../db/schema";
@@ -76,10 +82,24 @@ export async function login(_anterior: EstadoLogin, form: FormData): Promise<Est
   redirect(destinoSeguro(form.get("para")));
 }
 
+/**
+ * Usuário do cookie de sessão, só para o log do logout: lê o JWT assinado, sem consultar o banco,
+ * e nunca falha (sair não pode depender do log nem do banco).
+ */
+async function usuarioDoCookie(token: string | undefined): Promise<number | undefined> {
+  try {
+    const config = lerConfigAuth();
+    if (!config.habilitada) return undefined;
+    return (await lerSessao(token, config.segredo))?.usuarioId;
+  } catch {
+    return undefined;
+  }
+}
+
 /** Encerra a sessão (e esquece a visão admin/usuário) e volta para o login. */
 export async function logout(): Promise<void> {
-  log.info("auth.logout", { usuarioId: (await usuarioAtual())?.id });
   const jar = await cookies();
+  log.info("auth.logout", { usuarioId: await usuarioDoCookie(jar.get(COOKIE_SESSAO)?.value) });
   jar.delete(COOKIE_SESSAO);
   jar.delete(COOKIE_VISAO);
   redirect("/login");

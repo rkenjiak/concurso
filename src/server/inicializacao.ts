@@ -28,7 +28,7 @@ export function verificarAmbienteAoIniciar(): void {
     }
   } catch (erro) {
     if (!(erro instanceof ErroConfigAuth)) throw erro;
-    log.error("inicio.config_invalida", { mensagem: `O app não pode iniciar: ${erro.message}` });
+    log.fatal("inicio.config_invalida", { mensagem: `O app não pode iniciar: ${erro.message}` });
     process.exit(1);
   }
 }
@@ -45,7 +45,7 @@ export async function migrarAoIniciar(): Promise<void> {
     await aplicarMigracoes(getDb());
     log.info("inicio.migracoes", { mensagem: "Migrações aplicadas." });
   } catch (erro) {
-    log.error("inicio.migracoes_erro", {
+    log.fatal("inicio.migracoes_erro", {
       mensagem: "O app não pode iniciar: falha ao aplicar as migrações.",
       erro,
     });

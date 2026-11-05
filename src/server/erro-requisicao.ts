@@ -7,7 +7,7 @@
  * esta linha estruturada é acrescentada, com o `digest` para cruzar as duas.
  */
 import { unstable_rethrow } from "next/navigation";
-import { log, semSegredosNaUrl } from "./log";
+import { log } from "./log";
 
 export interface RequisicaoComErro {
   path: string;
@@ -22,10 +22,13 @@ export interface ContextoErroRequisicao {
 }
 
 /**
- * O Next pode chamar o hook mais de uma vez para o mesmo erro (ex.: layout e página que dependem
- * da mesma query memorizada). Registra cada objeto de erro uma vez só.
+ * O Next chama o hook mais de uma vez para o mesmo erro na mesma requisição (ex.: layout e página
+ * que dependem da mesma query memorizada). O mesmo objeto de erro é registrado uma vez a cada
+ * `JANELA_DEDUP_MS`: se ele for relançado em requisições seguintes (ex.: promise rejeitada guardada
+ * em módulo), volta a aparecer no log depois da janela.
  */
-const jaRegistrados = new WeakSet<object>();
+const JANELA_DEDUP_MS = 2_000;
+const registradosEm = new WeakMap<object, number>();
 
 /** Erros de controle do Next (`redirect`, `notFound`, renderização dinâmica…) não são falhas. */
 function ehErroDeControle(erro: unknown): boolean {
@@ -37,15 +40,31 @@ function ehErroDeControle(erro: unknown): boolean {
   }
 }
 
+/**
+ * Caminho sem os valores da query (só os nomes dos parâmetros): valores podem trazer tokens,
+ * e-mails ou outros dados digitados pelo usuário.
+ */
+export function caminhoSemValores(path: string): { caminho: string; parametros?: string[] } {
+  const interrogacao = path.indexOf("?");
+  if (interrogacao < 0) return { caminho: path };
+  const nomes = [...new URLSearchParams(path.slice(interrogacao + 1)).keys()];
+  return {
+    caminho: path.slice(0, interrogacao),
+    parametros: nomes.length > 0 ? [...new Set(nomes)] : undefined,
+  };
+}
+
 export function registrarErroRequisicao(
   erro: unknown,
   requisicao: RequisicaoComErro,
   contexto: ContextoErroRequisicao,
+  agora = Date.now(),
 ): void {
   if (ehErroDeControle(erro)) return;
   if (typeof erro === "object" && erro !== null) {
-    if (jaRegistrados.has(erro)) return;
-    jaRegistrados.add(erro);
+    const anterior = registradosEm.get(erro);
+    if (anterior !== undefined && agora - anterior < JANELA_DEDUP_MS) return;
+    registradosEm.set(erro, agora);
   }
   const digest =
     typeof erro === "object" && erro !== null && "digest" in erro
@@ -53,7 +72,7 @@ export function registrarErroRequisicao(
       : undefined;
   log.error("requisicao.erro", {
     metodo: requisicao.method,
-    caminho: semSegredosNaUrl(requisicao.path),
+    ...caminhoSemValores(requisicao.path),
     rota: contexto.routePath,
     tipo: contexto.routeType,
     origem: contexto.renderSource,

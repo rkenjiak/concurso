@@ -6,9 +6,10 @@
  * - Nível mínimo por `LOG_LEVEL` (padrão: `info` em produção, `debug` em dev, `silent` em teste).
  * - `warn`/`error` vão para stderr e os demais para stdout. O MCP stdio liga a saída só em stderr,
  *   porque lá o stdout é o canal do protocolo.
- * - Defesa em profundidade: campos com nome de segredo (senha, token, cookie…) são omitidos e
- *   parâmetros sensíveis de URL (`token`, `code`, `state`) são removidos de qualquer texto.
- *   Mesmo assim, quem chama não deve passar segredos nem e-mails completos (use `mascararEmail`).
+ * - Defesa em profundidade: campos com nome de segredo (senha, token, cookie…) são omitidos; em
+ *   qualquer texto, valores de parâmetros sensíveis de URL são removidos e e-mails mascarados; os
+ *   `params` das queries do Drizzle saem das mensagens de erro. Mesmo assim, quem chama não deve
+ *   passar segredos nem e-mails completos (use `mascararEmail`).
  */
 
 export const NIVEIS_LOG = ["debug", "info", "warn", "error"] as const;
@@ -59,21 +60,31 @@ function configAtual(): ConfigLog {
 
 // --- Privacidade --------------------------------------------------------------------------------
 
-const CAMPO_SENSIVEL = /senha|password|token|secret|segredo|cookie|authorization/i;
-const PARAM_SENSIVEL = /([?&](?:token|code|state)=)[^&#\s"']*/gi;
+const CAMPO_SENSIVEL = /senha|password|passwd|token|secret|segredo|cookie|authorization/i;
+/** Parâmetros de URL cujo valor nunca vai para o log (o nome fica). */
+const PARAM_SENSIVEL =
+  /([?&](?:[\w-]*(?:token|senha|pass|secret|segredo|key|chave|cookie|auth|sess|e-?mail)[\w-]*|code|state)=)[^&#\s"']*/gi;
+const EMAIL = /([A-Za-z0-9._%+-])[A-Za-z0-9._%+-]*@([A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+)/g;
 const REMOVIDO = "[removido]";
+const CABECALHO = new Set(["ts", "nivel", "evento"]);
 
-/** Remove de um texto (URL, mensagem de erro) os parâmetros de query que carregam segredos. */
+/** Remove de um texto (URL, mensagem de erro) os valores de parâmetros de query sensíveis. */
 export function semSegredosNaUrl(texto: string): string {
   return texto.replace(PARAM_SENSIVEL, `$1${REMOVIDO}`);
 }
 
+/** Texto com parâmetros sensíveis removidos e e-mails mascarados (`r***@dominio`). */
+export function semDadosSensiveis(texto: string): string {
+  return semSegredosNaUrl(texto).replace(EMAIL, "$1***@$2");
+}
+
 /**
- * Mensagem/stack de erro sem os parâmetros de query: o Drizzle anexa `params: …` (que podem trazer
- * e-mails e outros dados do usuário) à mensagem de "Failed query". A SQL em si fica.
+ * Mensagem/stack de erro sem os parâmetros de query: o Drizzle anexa `\nparams: …` ao fim da
+ * mensagem de "Failed query" (valores que podem ter várias linhas, e-mails e dados do usuário).
+ * Remove tudo dali até o fim da mensagem ou até o início da stack. A SQL em si fica.
  */
 function semParametrosDeQuery(texto: string): string {
-  return texto.replace(/(\nparams: )[^\n]*/g, `$1${REMOVIDO}`);
+  return texto.replace(/\nparams: [\s\S]*?(?=\n\s+at |$)/g, `\nparams: ${REMOVIDO}`);
 }
 
 /** `rodrigo@gmail.com` → `r***@gmail.com`. Prefira registrar o `usuarioId` quando houver. */
@@ -89,9 +100,9 @@ const PROFUNDIDADE_MAX = 4;
 function serializarErro(erro: Error, profundidade: number): CamposLog {
   const r: CamposLog = {
     nome: erro.name,
-    mensagem: semSegredosNaUrl(semParametrosDeQuery(erro.message)),
+    mensagem: semDadosSensiveis(semParametrosDeQuery(erro.message)),
   };
-  if (erro.stack) r.stack = semSegredosNaUrl(semParametrosDeQuery(erro.stack));
+  if (erro.stack) r.stack = semDadosSensiveis(semParametrosDeQuery(erro.stack));
   const digest = (erro as { digest?: unknown }).digest;
   if (typeof digest === "string") r.digest = digest;
   if (erro.cause !== undefined) r.causa = limpar(erro.cause, profundidade + 1);
@@ -100,7 +111,7 @@ function serializarErro(erro: Error, profundidade: number): CamposLog {
 
 /** Cópia segura dos campos: erros serializados, segredos omitidos, profundidade limitada. */
 function limpar(valor: unknown, profundidade = 0): unknown {
-  if (typeof valor === "string") return semSegredosNaUrl(valor);
+  if (typeof valor === "string") return semDadosSensiveis(valor);
   if (typeof valor === "bigint") return valor.toString();
   if (valor === null || typeof valor !== "object") {
     return typeof valor === "function" || typeof valor === "symbol" ? String(valor) : valor;
@@ -145,11 +156,18 @@ function linhaTexto(ts: string, nivel: NivelLog, evento: string, campos: CamposL
   return pilhas.length > 0 ? `${linha}\n${pilhas.join("\n")}` : linha;
 }
 
-function registrar(nivel: NivelLog, evento: string, campos: CamposLog = {}): void {
+function registrar(
+  nivel: NivelLog,
+  evento: string,
+  campos: CamposLog = {},
+  ignorarNivel = false,
+): void {
   const config = configAtual();
-  if (PESO[nivel] < PESO[config.nivel]) return;
+  if (!ignorarNivel && PESO[nivel] < PESO[config.nivel]) return;
   const ts = new Date().toISOString();
   const limpos = limpar(campos) as CamposLog;
+  // Campos não sobrescrevem o cabeçalho da linha.
+  for (const chave of CABECALHO) delete limpos[chave];
   const linha =
     config.formato === "json"
       ? linhaJson({ ts, nivel, evento, ...limpos })
@@ -164,4 +182,6 @@ export const log = {
   info: (evento: string, campos?: CamposLog) => registrar("info", evento, campos),
   warn: (evento: string, campos?: CamposLog) => registrar("warn", evento, campos),
   error: (evento: string, campos?: CamposLog) => registrar("error", evento, campos),
+  /** Erro que encerra o processo: sai mesmo com `LOG_LEVEL=silent`. */
+  fatal: (evento: string, campos?: CamposLog) => registrar("error", evento, campos, true),
 };

@@ -59,8 +59,16 @@ export async function exigirUsuarioRota(): Promise<UsuarioSessao | Response> {
   return usuario ?? Response.json(falha(MENSAGEM_SESSAO_EXPIRADA), { status: 401 });
 }
 
+/**
+ * IP do cliente pelos cabeçalhos do proxy (`x-forwarded-for`, `x-real-ip`) ou `"local"`. Fora de um
+ * proxy confiável o cliente pode forjá-lo: serve para limitar tentativas e para o log, não para
+ * autorizar.
+ */
+export function chaveDosHeaders(h: { get(nome: string): string | null }): string {
+  return h.get("x-forwarded-for")?.split(",")[0]?.trim() || h.get("x-real-ip") || "local";
+}
+
 /** Identifica o cliente para o limite de tentativas de login. */
 export async function chaveCliente(): Promise<string> {
-  const h = await headers();
-  return h.get("x-forwarded-for")?.split(",")[0]?.trim() || h.get("x-real-ip") || "local";
+  return chaveDosHeaders(await headers());
 }

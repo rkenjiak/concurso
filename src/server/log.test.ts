@@ -158,12 +158,64 @@ describe("privacidade", () => {
     expect(JSON.stringify(r)).not.toMatch(/sentinela/);
   });
 
-  it("semSegredosNaUrl remove token, code e state", () => {
+  it("remove params do Drizzle com várias linhas, na mensagem e na stack", () => {
+    configurarLog({ nivel: "error", formato: "json" });
+    const { linhas } = capturar();
+    const erro = new Error(
+      'Failed query: insert into "evento" ("obs") values (?)\nparams: linha1\nobs-sentinela,x',
+    );
+    log.error("acao.erro", { erro });
+    const r = JSON.parse(linhas()[0] ?? "");
+    expect(r.erro.mensagem).toBe(
+      'Failed query: insert into "evento" ("obs") values (?)\nparams: [removido]',
+    );
+    expect(r.erro.stack).toMatch(/params: \[removido\]\n\s+at /);
+    expect(JSON.stringify(r)).not.toMatch(/sentinela/);
+  });
+
+  it("mascara e-mails em qualquer texto, inclusive mensagens de erro", () => {
+    configurarLog({ nivel: "info", formato: "json" });
+    const { linhas } = capturar();
+    log.info("x", {
+      motivo: "fulano.sentinela@example.com já existe",
+      erro: new Error("conflito com ciclana-sentinela@ex.com.br"),
+    });
+    const saida = linhas().join("\n");
+    expect(saida).not.toMatch(/sentinela/);
+    expect(saida).toContain("f***@example.com já existe");
+    expect(saida).toContain("c***@ex.com.br");
+  });
+
+  it("campos não sobrescrevem o cabeçalho da linha", () => {
+    configurarLog({ nivel: "info", formato: "json" });
+    const { linhas } = capturar();
+    log.info("real", { evento: "falso", nivel: "error", ts: "x", a: 1 });
+    expect(JSON.parse(linhas()[0] ?? "")).toMatchObject({ evento: "real", nivel: "info", a: 1 });
+  });
+
+  it("log.fatal sai mesmo com LOG_LEVEL=silent", () => {
+    configurarLog({ nivel: "silent" });
+    const { stderr } = capturar();
+    log.error("comum");
+    log.fatal("inicio.config_invalida", { mensagem: "O app não pode iniciar" });
+    expect(stderr).toHaveBeenCalledOnce();
+    expect(String(stderr.mock.calls[0]?.[0])).toContain("inicio.config_invalida");
+  });
+
+  it("semSegredosNaUrl remove valores de parâmetros sensíveis e mantém os demais", () => {
     expect(semSegredosNaUrl(SENTINELAS.url)).toBe("/api/calendario.ics?token=[removido]&x=1");
     expect(semSegredosNaUrl(SENTINELAS.callback)).toBe(
       "/api/auth/google/callback?code=[removido]&state=[removido]",
     );
-    expect(semSegredosNaUrl("/concursos?aba=links")).toBe("/concursos?aba=links");
+    expect(
+      semSegredosNaUrl("/x?password=a&senha=b&email=c&api_key=d&access_token=e&sessionId=f&mes=1"),
+    ).toBe(
+      "/x?password=[removido]&senha=[removido]&email=[removido]&api_key=[removido]" +
+        "&access_token=[removido]&sessionId=[removido]&mes=1",
+    );
+    expect(semSegredosNaUrl("/concursos?aba=links&para=/x&concursos=1,2")).toBe(
+      "/concursos?aba=links&para=/x&concursos=1,2",
+    );
   });
 
   it("mascararEmail mantém só a inicial e o domínio", () => {

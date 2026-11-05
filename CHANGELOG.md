@@ -15,8 +15,9 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
   erros inesperados das Server Actions e do MCP saem como `acao.erro` com a ação e o usuário.
   Novos eventos: logins (sucesso e falha), início de bloqueio por tentativas, tokens MCP/`.ics`
   inválidos, logout, importação, exportação e cada chamada de ferramenta MCP (nome, resultado e
-  duração). Senhas, tokens, cookies e argumentos nunca são registrados; e-mails saem mascarados e
-  `token=` é removido das URLs. No `pnpm mcp` (stdio) todo log vai para o stderr. Catálogo em
+  duração). Senhas, tokens, cookies, valores de query string e argumentos nunca são registrados;
+  e-mails saem mascarados em qualquer texto, e os `params` das queries saem das mensagens de erro.
+  No `pnpm --silent mcp` (stdio) todo log vai para o stderr, com teste do script real. Catálogo em
   `ARQUITETURA.md` §9.4.
 
 ### Alterado

@@ -32,6 +32,12 @@ export const ROTULO_ORDENACAO: Readonly<Record<Ordenacao, string>> = {
 /** Tamanho máximo do texto de busca (o excedente é descartado). */
 export const MAX_BUSCA = 200;
 
+/**
+ * Máximo de palavras distintas da busca usadas na consulta (as demais são ignoradas). Cada uma vira
+ * um `LIKE` no SQL; sem limite, uma busca enorme estoura a profundidade de expressão do SQLite (#96).
+ */
+export const MAX_TERMOS_BUSCA = 20;
+
 /** Nomes dos parâmetros na URL. */
 export const PARAMS = {
   busca: "q",

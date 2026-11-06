@@ -216,4 +216,10 @@ describe("leituras", () => {
       { concursoId: id, tipo: "PROVA_OBJETIVA", data: "2027-01-10", dias: 9 },
     ]);
   });
+
+  it("listar não falha com uma busca de milhares de termos (#96)", async () => {
+    await cadastrar();
+    const busca = Array.from({ length: 2000 }, (_, i) => `termo${i}`).join(" ");
+    await expect(op.listar(db, U, { busca })).resolves.toEqual([]);
+  });
 });

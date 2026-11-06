@@ -10,6 +10,7 @@ import { McpServer, ResourceTemplate } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { ESFERA, STATUS, UF } from "@/domain/enums";
 import { JANELA_PADRAO_DIAS } from "@/domain/prazos";
+import { MAX_BUSCA } from "@/lib/schemas/filtros-concursos";
 import { version } from "../../../package.json";
 import type { ResultadoAcao } from "../actions/resultado";
 import type { Db } from "../db/client";
@@ -19,6 +20,7 @@ import {
   concursoParcialEntrada,
   eventoLoteEntrada,
   eventoNovoEntrada,
+  LIMITES_MCP,
   linkLoteEntrada,
   linkNovoEntrada,
   resultadoEntrada,
@@ -117,8 +119,8 @@ export function criarServidorMcp({ db, usuarioId, aoAlterar }: OpcoesServidorMcp
         "Lista os concursos cadastrados (por próxima data), com busca sem acento em órgão, " +
         "cargo, banca e tags, e filtros opcionais.",
       inputSchema: z.object({
-        busca: z.string().optional().describe("Texto livre (ex.: 'trf analista')."),
-        status: z.array(z.enum(STATUS)).optional().describe("Só estes status."),
+        busca: z.string().max(MAX_BUSCA).optional().describe("Texto livre (ex.: 'trf analista')."),
+        status: z.array(z.enum(STATUS)).max(STATUS.length).optional().describe("Só estes status."),
         esfera: z.enum(ESFERA).optional(),
         uf: z.enum(UF).optional(),
       }),
@@ -172,8 +174,8 @@ export function criarServidorMcp({ db, usuarioId, aoAlterar }: OpcoesServidorMcp
       description:
         "Procura concursos já cadastrados com órgão e cargo parecidos. Use antes de cadastrar.",
       inputSchema: z.object({
-        orgao: z.string().describe("Órgão do edital."),
-        cargo: z.string().describe("Cargo escolhido."),
+        orgao: z.string().max(200).describe("Órgão do edital."),
+        cargo: z.string().max(200).describe("Cargo escolhido."),
       }),
       annotations: LEITURA,
     },
@@ -193,8 +195,16 @@ export function criarServidorMcp({ db, usuarioId, aoAlterar }: OpcoesServidorMcp
         "ignorarDuplicados: true (confirme com o usuário antes).",
       inputSchema: z.object({
         concurso: concursoNovoEntrada,
-        eventos: z.array(eventoNovoEntrada).optional().describe("Cronograma do edital."),
-        links: z.array(linkNovoEntrada).optional().describe("Edital, página da banca etc."),
+        eventos: z
+          .array(eventoNovoEntrada)
+          .max(LIMITES_MCP.eventos)
+          .optional()
+          .describe("Cronograma do edital."),
+        links: z
+          .array(linkNovoEntrada)
+          .max(LIMITES_MCP.links)
+          .optional()
+          .describe("Edital, página da banca etc."),
         simular: z.boolean().optional().describe("Só validar e mostrar, sem gravar."),
         ignorarDuplicados: z
           .boolean()
@@ -233,7 +243,7 @@ export function criarServidorMcp({ db, usuarioId, aoAlterar }: OpcoesServidorMcp
       inputSchema: z.object({
         id: idConcurso,
         para: z.enum(STATUS).describe("Novo status."),
-        observacao: z.string().optional().describe("Observação para o histórico."),
+        observacao: z.string().max(500).optional().describe("Observação para o histórico."),
       }),
       annotations: { ...ESCRITA, idempotentHint: false },
     },
@@ -250,7 +260,7 @@ export function criarServidorMcp({ db, usuarioId, aoAlterar }: OpcoesServidorMcp
         "Não exclui eventos.",
       inputSchema: z.object({
         concursoId: idConcurso,
-        eventos: z.array(eventoLoteEntrada).min(1),
+        eventos: z.array(eventoLoteEntrada).min(1).max(LIMITES_MCP.eventos),
       }),
       annotations: { ...ESCRITA, idempotentHint: false },
     },
@@ -267,7 +277,7 @@ export function criarServidorMcp({ db, usuarioId, aoAlterar }: OpcoesServidorMcp
         "retificações, gabarito, resultado, convocação. Não exclui links.",
       inputSchema: z.object({
         concursoId: idConcurso,
-        links: z.array(linkLoteEntrada).min(1),
+        links: z.array(linkLoteEntrada).min(1).max(LIMITES_MCP.links),
       }),
       annotations: { ...ESCRITA, idempotentHint: false },
     },
@@ -335,7 +345,11 @@ export function criarServidorMcp({ db, usuarioId, aoAlterar }: OpcoesServidorMcp
       title: "Cadastrar a partir do edital",
       description: "Guia para extrair do edital os dados de UM cargo e cadastrá-lo.",
       argsSchema: z.object({
-        cargo: z.string().optional().describe("Cargo escolhido (se vazio, a LLM pergunta)."),
+        cargo: z
+          .string()
+          .max(200)
+          .optional()
+          .describe("Cargo escolhido (se vazio, a LLM pergunta)."),
       }),
     },
     ({ cargo }) => ({
@@ -348,7 +362,7 @@ export function criarServidorMcp({ db, usuarioId, aoAlterar }: OpcoesServidorMcp
     {
       title: "Aplicar retificação",
       description: "Compara uma retificação com o concurso cadastrado e aplica as mudanças.",
-      argsSchema: z.object({ concursoId: z.string().describe("ID do concurso.") }),
+      argsSchema: z.object({ concursoId: z.string().max(20).describe("ID do concurso.") }),
     },
     ({ concursoId }) => ({
       messages: [

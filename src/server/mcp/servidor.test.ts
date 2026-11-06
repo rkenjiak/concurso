@@ -249,6 +249,53 @@ describe("log das ferramentas (#91)", () => {
   });
 });
 
+describe("limites das entradas (#96)", () => {
+  it("anuncia os limites no JSON Schema das ferramentas", async () => {
+    const { tools } = await cliente.listTools();
+    const schema = (nome: string) =>
+      tools.find((t) => t.name === nome)?.inputSchema as {
+        properties: Record<string, { maxLength?: number; maxItems?: number }>;
+      };
+    expect(schema("listar_concursos").properties.busca?.maxLength).toBe(200);
+    expect(schema("listar_concursos").properties.status?.maxItems).toBeGreaterThan(0);
+    expect(schema("cadastrar_concurso").properties.eventos?.maxItems).toBe(100);
+    expect(schema("salvar_links").properties.links?.maxItems).toBe(50);
+    expect(schema("verificar_duplicado").properties.orgao?.maxLength).toBe(200);
+    expect(schema("alterar_status").properties.observacao?.maxLength).toBe(500);
+  });
+
+  it("recusa entradas acima dos limites sem gravar nada", async () => {
+    const recusas = [
+      chamar("listar_concursos", { busca: "x ".repeat(1000) }),
+      chamar("verificar_duplicado", { orgao: "x".repeat(201), cargo: "y" }),
+      chamar("cadastrar_concurso", {
+        ...EDITAL,
+        eventos: Array.from({ length: 101 }, () => EDITAL.eventos[0]),
+      }),
+      chamar("cadastrar_concurso", {
+        ...EDITAL,
+        concurso: { ...EDITAL.concurso, observacoes: "x".repeat(20_001) },
+      }),
+      chamar("salvar_links", {
+        concursoId: 1,
+        links: Array.from({ length: 51 }, () => EDITAL.links[0]),
+      }),
+      chamar("alterar_status", { id: 1, para: "INSCRITO", observacao: "x".repeat(501) }),
+    ];
+    for (const r of await Promise.all(recusas)) expect(r.erro, r.texto).toBe(true);
+    expect(aoAlterar).not.toHaveBeenCalled();
+    expect(await json("listar_concursos", {})).toEqual([]);
+  });
+
+  it("aceita entradas no limite", async () => {
+    const r = await json("cadastrar_concurso", {
+      ...EDITAL,
+      eventos: Array.from({ length: 100 }, () => EDITAL.eventos[0]),
+    });
+    expect(r.id).toEqual(expect.any(Number));
+  });
+});
+
 describe("textoDosErros", () => {
   it("lista campos e erros gerais", () => {
     expect(textoDosErros({ _form: ["Geral."], "eventos[0].data": ["Data inválida."] })).toBe(

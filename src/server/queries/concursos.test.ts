@@ -14,7 +14,7 @@ import type { Db } from "../db/client";
 import { concurso } from "../db/schema";
 import { criarConcurso } from "../repositories/concursos";
 import { criarEvento } from "../repositories/eventos";
-import { listarConcursos } from "./concursos";
+import { listarConcursos, termosDaBusca } from "./concursos";
 
 let db: Db;
 let client: Client;
@@ -116,6 +116,26 @@ describe("listarConcursos — busca", () => {
     expect(await listar({ busca: "auditor_" })).toEqual([ids.pref]);
     expect(await listar({ busca: "%" })).toEqual([ids.pref]);
     expect(await listar({ busca: "!" })).toEqual([]);
+  });
+
+  it("limita a busca a 20 termos distintos, sem erro de SQL com buscas enormes (#96)", async () => {
+    const enorme = Array.from({ length: 5000 }, (_, i) => `t${i}`).join(" ");
+    expect(await listar({ busca: enorme })).toEqual([]);
+    // "auditor" fica depois dos 200 caracteres e é descartado: vale só "fiscal".
+    expect(await listar({ busca: `${"fiscal ".repeat(1000)}auditor` })).toEqual(
+      await listar({ busca: "fiscal" }),
+    );
+    expect(await listar({ busca: `${"fiscal ".repeat(10)}auditor fgv` })).toEqual([ids.sefaz]);
+  });
+});
+
+describe("termosDaBusca", () => {
+  it("normaliza, remove repetidos e limita caracteres e termos", () => {
+    expect(termosDaBusca(null)).toEqual([]);
+    expect(termosDaBusca("  Área  área AREA tj ")).toEqual(["area", "tj"]);
+    expect(termosDaBusca(Array.from({ length: 50 }, (_, i) => `t${i}`).join(" "))).toHaveLength(20);
+    // Só os primeiros 200 caracteres contam: o termo depois deles é descartado.
+    expect(termosDaBusca(`${"a".repeat(199)} fim`)).toEqual(["a".repeat(199)]);
   });
 });
 

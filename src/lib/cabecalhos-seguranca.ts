@@ -54,7 +54,8 @@ export function valorCsp(dev: boolean): string {
 
 /**
  * Recursos do navegador que o app não usa, desligados para a página e para qualquer conteúdo
- * embutido. Só nomes que o Chrome reconhece (nomes desconhecidos geram erro no console).
+ * embutido. Só nomes que o Chromium reconhece em todas as plataformas: nomes desconhecidos geram
+ * erro no console (ex.: `bluetooth` não existe no Chromium para Linux usado no CI).
  */
 export const RECURSOS_DESLIGADOS = [
   "camera",
@@ -64,7 +65,6 @@ export const RECURSOS_DESLIGADOS = [
   "usb",
   "serial",
   "hid",
-  "bluetooth",
   "display-capture",
   "browsing-topics",
 ] as const;

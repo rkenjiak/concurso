@@ -1,6 +1,6 @@
 {
   "name": "concurso",
-  "version": "2.4.0",
+  "version": "2.5.0",
   "private": true,
   "type": "module",
   "description": "App pessoal para cadastrar e acompanhar concursos públicos",

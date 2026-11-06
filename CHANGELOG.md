@@ -7,6 +7,8 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 
 ## [Unreleased]
 
+## [2.5.0] - 2026-11-05
+
 ### Adicionado
 
 - **Logs da aplicação** (#91): logger estruturado próprio (`src/server/log.ts`, sem dependências),

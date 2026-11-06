@@ -52,7 +52,12 @@ export class LimitadorTentativas {
     return r ? Math.max(0, r.bloqueadoAte - agora) : 0;
   }
 
-  registrarFalha(chave: string, agora = Date.now()): void {
+  /**
+   * Conta uma falha e devolve o bloqueio que ela iniciou, em ms (0 = ainda dentro das tentativas
+   * livres). Cada retorno positivo marca a entrada num novo bloqueio (#91: só esse momento é
+   * registrado no log, não cada tentativa recusada durante a espera).
+   */
+  registrarFalha(chave: string, agora = Date.now()): number {
     const { tentativasLivres, bloqueioInicialMs, bloqueioMaximoMs, maxChaves } = this.opcoes;
     const anterior = this.registro(chave, agora);
     const falhas = (anterior?.falhas ?? 0) + 1;
@@ -66,6 +71,7 @@ export class LimitadorTentativas {
       if (maisAntiga === undefined) break;
       this.registros.delete(maisAntiga);
     }
+    return bloqueio;
   }
 
   registrarSucesso(chave: string): void {

@@ -49,11 +49,14 @@ export async function definirPapelAcao(
   if (!usuarioId.success) return falhaValidacao(usuarioId.error);
   const papel = papelSchema.safeParse(papelBruto);
   if (!papel.success) return falhaValidacao(papel.error);
-  const resultado = await executar(async () => {
-    await definirPapel(getDb(), sessao.usuario, usuarioId.data, papel.data, opcoesAdmin());
-    atualizarPainel();
-    return sucesso(null);
-  });
+  const resultado = await executar(
+    async () => {
+      await definirPapel(getDb(), sessao.usuario, usuarioId.data, papel.data, opcoesAdmin());
+      atualizarPainel();
+      return sucesso(null);
+    },
+    { acao: "admin.definirPapelAcao", usuarioId: sessao.usuario.id },
+  );
   if (resultado.ok && usuarioId.data === sessao.usuario.id && papel.data !== "ADMIN") {
     redirect("/");
   }
@@ -71,11 +74,14 @@ export async function definirBloqueioAcao(
   if (!usuarioId.success) return falhaValidacao(usuarioId.error);
   const bloqueado = bloqueadoSchema.safeParse(bloqueadoBruto);
   if (!bloqueado.success) return falhaValidacao(bloqueado.error);
-  return executar(async () => {
-    await definirBloqueio(getDb(), sessao.usuario, usuarioId.data, bloqueado.data, opcoesAdmin());
-    atualizarPainel();
-    return sucesso(null);
-  });
+  return executar(
+    async () => {
+      await definirBloqueio(getDb(), sessao.usuario, usuarioId.data, bloqueado.data, opcoesAdmin());
+      atualizarPainel();
+      return sucesso(null);
+    },
+    { acao: "admin.definirBloqueioAcao", usuarioId: sessao.usuario.id },
+  );
 }
 
 /** Libera um e-mail para entrar com Google. */
@@ -84,11 +90,14 @@ export async function adicionarEmailPermitidoAcao(emailBruto: unknown): Promise<
   if (!sessao.ok) return sessao;
   const email = emailSchema.safeParse(emailBruto);
   if (!email.success) return falhaValidacao(email.error);
-  return executar(async () => {
-    await adicionarEmailPermitido(getDb(), sessao.usuario, email.data);
-    atualizarPainel();
-    return sucesso(null);
-  });
+  return executar(
+    async () => {
+      await adicionarEmailPermitido(getDb(), sessao.usuario, email.data);
+      atualizarPainel();
+      return sucesso(null);
+    },
+    { acao: "admin.adicionarEmailPermitidoAcao", usuarioId: sessao.usuario.id },
+  );
 }
 
 /** Retira um e-mail da lista de acesso do painel. */
@@ -97,9 +106,12 @@ export async function removerEmailPermitidoAcao(emailBruto: unknown): Promise<Re
   if (!sessao.ok) return sessao;
   const email = emailSchema.safeParse(emailBruto);
   if (!email.success) return falhaValidacao(email.error);
-  return executar(async () => {
-    await removerEmailPermitido(getDb(), sessao.usuario, email.data);
-    atualizarPainel();
-    return sucesso(null);
-  });
+  return executar(
+    async () => {
+      await removerEmailPermitido(getDb(), sessao.usuario, email.data);
+      atualizarPainel();
+      return sucesso(null);
+    },
+    { acao: "admin.removerEmailPermitidoAcao", usuarioId: sessao.usuario.id },
+  );
 }

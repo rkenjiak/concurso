@@ -5,7 +5,9 @@
  */
 import { NextResponse } from "next/server";
 import { getDb } from "../db/client";
+import { log, mascararEmail } from "../log";
 import { entrarComGoogle } from "../repositories/usuarios";
+import { chaveDosHeaders } from "./acesso";
 import { decidirLoginGoogle } from "./autorizacao";
 import { type ConfigAuth, ErroConfigAuth, lerConfigAuth } from "./config";
 import {
@@ -104,16 +106,22 @@ export async function iniciarLoginGoogle(request: { nextUrl: URL }): Promise<Nex
 export async function concluirLoginGoogle(request: {
   nextUrl: URL;
   cookies: { get(nome: string): { value: string } | undefined };
+  headers?: { get(nome: string): string | null };
 }): Promise<NextResponse> {
   const origem = origemPublica(request);
   const config = configGoogle();
   if (!config) return NextResponse.redirect(new URL("/login", origem));
   const params = request.nextUrl.searchParams;
-  if (params.get("error")) return irParaLogin(origem, "cancelado");
+  const ip = request.headers ? chaveDosHeaders(request.headers) : undefined;
+  if (params.get("error")) {
+    log.info("auth.login_falhou", { metodo: "google", motivo: "cancelado", ip });
+    return irParaLogin(origem, "cancelado");
+  }
 
   const estado = await lerCookieOAuth(request.cookies.get(COOKIE_OAUTH)?.value, config.segredo);
   const code = params.get("code");
   if (!estado || !code || params.get("state") !== estado.state) {
+    log.warn("auth.login_falhou", { metodo: "google", motivo: "estado_invalido", ip });
     return irParaLogin(origem, "expirado");
   }
 
@@ -123,10 +131,16 @@ export async function concluirLoginGoogle(request: {
     const perfil = await validarIdToken(idToken, config.google, estado.nonce);
     const decisao = await decidirLoginGoogle(getDb(), config, perfil);
     if (decisao !== "ok") {
-      console.warn(`Login Google recusado (${decisao}): ${perfil.email}`);
+      log.warn("auth.login_falhou", {
+        metodo: "google",
+        motivo: decisao,
+        email: mascararEmail(perfil.email),
+        ip,
+      });
       return irParaLogin(origem, decisao);
     }
     const usuario = await entrarComGoogle(getDb(), perfil, config.emailsAdmin.has(perfil.email));
+    log.info("auth.login_ok", { metodo: "google", usuarioId: usuario.id });
     const resposta = NextResponse.redirect(new URL(estado.para, origem));
     apagarCookieOAuth(resposta);
     resposta.cookies.set(
@@ -137,7 +151,12 @@ export async function concluirLoginGoogle(request: {
     return resposta;
   } catch (erro) {
     if (!(erro instanceof ErroLoginGoogle)) throw erro;
-    console.error("Login Google:", erro.message);
+    log.warn("auth.login_falhou", {
+      metodo: "google",
+      motivo: "erro_google",
+      ip,
+      erro: erro.message,
+    });
     return irParaLogin(origem, "google");
   }
 }

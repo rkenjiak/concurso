@@ -10,6 +10,7 @@ import { chaveCliente } from "@/server/auth/acesso";
 import { LimitadorTentativas } from "@/server/auth/limitador";
 import { origemPublica } from "@/server/auth/login-google";
 import { getDb } from "@/server/db/client";
+import { log } from "@/server/log";
 import { gerarIcsDoUsuario } from "@/server/queries/calendario-ics";
 import { usuarioDoTokenIcs } from "@/server/repositories/usuarios";
 
@@ -37,7 +38,11 @@ export async function GET(request: NextRequest): Promise<Response> {
   const db = getDb();
   const usuario = token === "" ? null : await usuarioDoTokenIcs(db, token);
   if (!usuario) {
-    limitador.registrarFalha(chave);
+    log.warn("auth.token_invalido", { rota: "ics", ip: chave, ausente: token === "" });
+    const bloqueio = limitador.registrarFalha(chave);
+    if (bloqueio > 0) {
+      log.warn("auth.limite_tentativas", { rota: "ics", ip: chave, esperaMs: bloqueio });
+    }
     // 404 (e não 401): o calendário não tem como pedir credenciais.
     return texto("Calendário não encontrado. Gere um novo link em Configurações.", 404);
   }

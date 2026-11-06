@@ -332,39 +332,42 @@ export async function cadastrar(
   const eventosOk = eventos.filter((e): e is EventoDados => e !== null);
   const linksOk = links.filter((l): l is LinkDados => l !== null);
 
-  return executar<ResultadoCadastro>(async () => {
-    const duplicados = await verificarDuplicados(db, usuarioId, concurso.data);
-    if (entrada.simular) {
-      return sucesso({
-        simulacao: true as const,
-        concurso: dadosParaSaida(concurso.data),
-        eventos: eventosOk,
-        links: linksOk,
-        possiveisDuplicados: duplicados,
-      });
-    }
-    if (duplicados.length > 0 && !entrada.ignorarDuplicados) {
-      const lista = duplicados.map((d) => `#${d.id} ${d.orgao} — ${d.cargo} (${d.status})`);
-      return falha(
-        `Já existe concurso parecido: ${lista.join("; ")}. Confirme com o usuário e, se for ` +
-          "mesmo outro concurso, repita com ignorarDuplicados: true; senão, atualize o existente.",
+  return executar<ResultadoCadastro>(
+    async () => {
+      const duplicados = await verificarDuplicados(db, usuarioId, concurso.data);
+      if (entrada.simular) {
+        return sucesso({
+          simulacao: true as const,
+          concurso: dadosParaSaida(concurso.data),
+          eventos: eventosOk,
+          links: linksOk,
+          possiveisDuplicados: duplicados,
+        });
+      }
+      if (duplicados.length > 0 && !entrada.ignorarDuplicados) {
+        const lista = duplicados.map((d) => `#${d.id} ${d.orgao} — ${d.cargo} (${d.status})`);
+        return falha(
+          `Já existe concurso parecido: ${lista.join("; ")}. Confirme com o usuário e, se for ` +
+            "mesmo outro concurso, repita com ignorarDuplicados: true; senão, atualize o existente.",
+        );
+      }
+      const id = await repoConcursos.criarConcursoCompleto(
+        db,
+        usuarioId,
+        concurso.data,
+        eventosOk,
+        linksOk,
+        agora,
       );
-    }
-    const id = await repoConcursos.criarConcursoCompleto(
-      db,
-      usuarioId,
-      concurso.data,
-      eventosOk,
-      linksOk,
-      agora,
-    );
-    return sucesso({
-      simulacao: false as const,
-      id,
-      eventos: eventosOk.length,
-      links: linksOk.length,
-    });
-  });
+      return sucesso({
+        simulacao: false as const,
+        id,
+        eventos: eventosOk.length,
+        links: linksOk.length,
+      });
+    },
+    { acao: "mcp.cadastrar", usuarioId },
+  );
 }
 
 /** Atualiza só os campos informados (`null` limpa). Não muda o status. */
@@ -374,14 +377,19 @@ export async function atualizar(
   id: number,
   campos: ConcursoParcialEntrada,
 ): Promise<Resposta<{ id: number }>> {
-  return executar(async () => {
-    const atual = await obterConcurso(db, usuarioId, id);
-    if (!atual) return falha(CONCURSO_NAO_ENCONTRADO);
-    const dados = concursoEdicaoSchema.safeParse(valoresConcurso(valoresDoConcurso(atual), campos));
-    if (!dados.success) return falhaValidacao(dados.error);
-    await repoConcursos.atualizarConcurso(db, usuarioId, id, dados.data);
-    return sucesso({ id });
-  });
+  return executar(
+    async () => {
+      const atual = await obterConcurso(db, usuarioId, id);
+      if (!atual) return falha(CONCURSO_NAO_ENCONTRADO);
+      const dados = concursoEdicaoSchema.safeParse(
+        valoresConcurso(valoresDoConcurso(atual), campos),
+      );
+      if (!dados.success) return falhaValidacao(dados.error);
+      await repoConcursos.atualizarConcurso(db, usuarioId, id, dados.data);
+      return sucesso({ id });
+    },
+    { acao: "mcp.atualizar", usuarioId },
+  );
 }
 
 /** Muda o status validando a transição e registrando o histórico (como na UI). */
@@ -394,28 +402,31 @@ export async function alterarStatus(
 ): Promise<Resposta<{ id: number; status: Status }>> {
   const dados = alterarStatusSchema.safeParse({ ...entrada, observacao: entrada.observacao ?? "" });
   if (!dados.success) return falhaValidacao(dados.error);
-  return executar(async () => {
-    const atual = await obterConcurso(db, usuarioId, id);
-    if (!atual) return falha(CONCURSO_NAO_ENCONTRADO);
-    try {
-      await repoStatus.alterarStatus(
-        db,
-        usuarioId,
-        id,
-        dados.data.para,
-        dados.data.observacao,
-        agora,
-      );
-    } catch (erro) {
-      if (!(erro instanceof ErroDominio)) throw erro;
-      const { opcoes } = await obterOpcoesStatus(db, id, atual.status);
-      return falha(
-        `${erro.message} Status atual: ${atual.status}. Permitidos: ` +
-          `${opcoes.transicoes.join(", ") || "nenhum"}.`,
-      );
-    }
-    return sucesso({ id, status: dados.data.para });
-  });
+  return executar(
+    async () => {
+      const atual = await obterConcurso(db, usuarioId, id);
+      if (!atual) return falha(CONCURSO_NAO_ENCONTRADO);
+      try {
+        await repoStatus.alterarStatus(
+          db,
+          usuarioId,
+          id,
+          dados.data.para,
+          dados.data.observacao,
+          agora,
+        );
+      } catch (erro) {
+        if (!(erro instanceof ErroDominio)) throw erro;
+        const { opcoes } = await obterOpcoesStatus(db, id, atual.status);
+        return falha(
+          `${erro.message} Status atual: ${atual.status}. Permitidos: ` +
+            `${opcoes.transicoes.join(", ") || "nenhum"}.`,
+        );
+      }
+      return sucesso({ id, status: dados.data.para });
+    },
+    { acao: "mcp.alterarStatus", usuarioId },
+  );
 }
 
 const valoresDoEvento = (e: Evento): EventoFormValores => ({
@@ -439,38 +450,41 @@ export async function salvarEventos(
   itens: EventoLoteEntrada[],
   agora: Date = new Date(),
 ): Promise<Resposta<{ ids: number[] }>> {
-  return executar(async () => {
-    if (!(await obterConcurso(db, usuarioId, concursoId))) return falha(CONCURSO_NAO_ENCONTRADO);
-    const existentes = new Map((await listarEventos(db, concursoId)).map((e) => [e.id, e]));
-    const erros = new Erros();
-    const lote: repoEventos.ItemEvento[] = [];
-    for (const [i, item] of itens.entries()) {
-      const caminho = `eventos[${i}]`;
-      if (item.id === undefined) {
-        if (!item.tipo) {
-          erros.campo(`${caminho}.tipo`, "Informe o tipo para criar.");
+  return executar(
+    async () => {
+      if (!(await obterConcurso(db, usuarioId, concursoId))) return falha(CONCURSO_NAO_ENCONTRADO);
+      const existentes = new Map((await listarEventos(db, concursoId)).map((e) => [e.id, e]));
+      const erros = new Erros();
+      const lote: repoEventos.ItemEvento[] = [];
+      for (const [i, item] of itens.entries()) {
+        const caminho = `eventos[${i}]`;
+        if (item.id === undefined) {
+          if (!item.tipo) {
+            erros.campo(`${caminho}.tipo`, "Informe o tipo para criar.");
+            continue;
+          }
+          const novo = { ...item, tipo: item.tipo, data: item.data ?? "" };
+          const dados = validarEventoNovo(novo, caminho, erros);
+          if (dados) lote.push({ id: null, dados });
           continue;
         }
-        const novo = { ...item, tipo: item.tipo, data: item.data ?? "" };
-        const dados = validarEventoNovo(novo, caminho, erros);
-        if (dados) lote.push({ id: null, dados });
-        continue;
+        const atual = existentes.get(item.id);
+        if (!atual) {
+          erros.campo(`${caminho}.id`, "Evento não encontrado neste concurso.");
+          continue;
+        }
+        const r = eventoSchema.safeParse(valoresEvento(valoresDoEvento(atual), item));
+        if (r.success) lote.push({ id: item.id, dados: r.data });
+        else erros.adicionar(falhaValidacao(r.error).erros, caminho);
       }
-      const atual = existentes.get(item.id);
-      if (!atual) {
-        erros.campo(`${caminho}.id`, "Evento não encontrado neste concurso.");
-        continue;
-      }
-      const r = eventoSchema.safeParse(valoresEvento(valoresDoEvento(atual), item));
-      if (r.success) lote.push({ id: item.id, dados: r.data });
-      else erros.adicionar(falhaValidacao(r.error).erros, caminho);
-    }
-    const invalido = erros.falha();
-    if (invalido) return invalido;
-    return sucesso({
-      ids: await repoEventos.salvarEventos(db, usuarioId, concursoId, lote, agora),
-    });
-  });
+      const invalido = erros.falha();
+      if (invalido) return invalido;
+      return sucesso({
+        ids: await repoEventos.salvarEventos(db, usuarioId, concursoId, lote, agora),
+      });
+    },
+    { acao: "mcp.salvarEventos", usuarioId },
+  );
 }
 
 /** Cria (sem `id`) e atualiza (com `id`) links do concurso numa transação. Nunca exclui. */
@@ -480,37 +494,40 @@ export async function salvarLinks(
   concursoId: number,
   itens: LinkLoteEntrada[],
 ): Promise<Resposta<{ ids: number[] }>> {
-  return executar(async () => {
-    if (!(await obterConcurso(db, usuarioId, concursoId))) return falha(CONCURSO_NAO_ENCONTRADO);
-    const existentes = new Map((await listarLinks(db, concursoId)).map((l) => [l.id, l]));
-    const erros = new Erros();
-    const lote: repoLinks.ItemLink[] = [];
-    for (const [i, item] of itens.entries()) {
-      const caminho = `links[${i}]`;
-      if (item.id === undefined) {
-        if (!item.tipo) {
-          erros.campo(`${caminho}.tipo`, "Informe o tipo para criar.");
+  return executar(
+    async () => {
+      if (!(await obterConcurso(db, usuarioId, concursoId))) return falha(CONCURSO_NAO_ENCONTRADO);
+      const existentes = new Map((await listarLinks(db, concursoId)).map((l) => [l.id, l]));
+      const erros = new Erros();
+      const lote: repoLinks.ItemLink[] = [];
+      for (const [i, item] of itens.entries()) {
+        const caminho = `links[${i}]`;
+        if (item.id === undefined) {
+          if (!item.tipo) {
+            erros.campo(`${caminho}.tipo`, "Informe o tipo para criar.");
+            continue;
+          }
+          const novo = { ...item, tipo: item.tipo, url: item.url ?? "" };
+          const dados = validarLinkNovo(novo, caminho, erros);
+          if (dados) lote.push({ id: null, dados });
           continue;
         }
-        const novo = { ...item, tipo: item.tipo, url: item.url ?? "" };
-        const dados = validarLinkNovo(novo, caminho, erros);
-        if (dados) lote.push({ id: null, dados });
-        continue;
+        const atual = existentes.get(item.id);
+        if (!atual) {
+          erros.campo(`${caminho}.id`, "Link não encontrado neste concurso.");
+          continue;
+        }
+        const base = { tipo: atual.tipo, rotulo: atual.rotulo ?? "", url: atual.url };
+        const r = linkSchema.safeParse(valoresLink(base, item));
+        if (r.success) lote.push({ id: item.id, dados: r.data });
+        else erros.adicionar(falhaValidacao(r.error).erros, caminho);
       }
-      const atual = existentes.get(item.id);
-      if (!atual) {
-        erros.campo(`${caminho}.id`, "Link não encontrado neste concurso.");
-        continue;
-      }
-      const base = { tipo: atual.tipo, rotulo: atual.rotulo ?? "", url: atual.url };
-      const r = linkSchema.safeParse(valoresLink(base, item));
-      if (r.success) lote.push({ id: item.id, dados: r.data });
-      else erros.adicionar(falhaValidacao(r.error).erros, caminho);
-    }
-    const invalido = erros.falha();
-    if (invalido) return invalido;
-    return sucesso({ ids: await repoLinks.salvarLinks(db, usuarioId, concursoId, lote) });
-  });
+      const invalido = erros.falha();
+      if (invalido) return invalido;
+      return sucesso({ ids: await repoLinks.salvarLinks(db, usuarioId, concursoId, lote) });
+    },
+    { acao: "mcp.salvarLinks", usuarioId },
+  );
 }
 
 /** Cria (sem `id`, `fase` obrigatória) ou atualiza (com `id`) o resultado de uma fase. */
@@ -520,30 +537,33 @@ export async function registrarResultado(
   concursoId: number,
   entrada: ResultadoEntrada,
 ): Promise<Resposta<{ id: number }>> {
-  return executar(async () => {
-    if (!(await obterConcurso(db, usuarioId, concursoId))) return falha(CONCURSO_NAO_ENCONTRADO);
-    let base = VALORES_INICIAIS_RESULTADO_FASE;
-    if (entrada.id !== undefined) {
-      const atual = (await listarResultadosFase(db, concursoId)).find((r) => r.id === entrada.id);
-      if (!atual) return falha("Resultado não encontrado neste concurso.");
-      base = valoresDoResultadoFase(atual);
-    } else if (!entrada.fase) {
-      return { ok: false, erros: { fase: ["Informe a fase para criar o resultado."] } };
-    }
-    const dados = resultadoFaseSchema.safeParse(valoresResultado(base, entrada));
-    if (!dados.success) return falhaValidacao(dados.error);
-    if (entrada.id !== undefined) {
-      await repoResultados.atualizarResultadoFase(
-        db,
-        usuarioId,
-        concursoId,
-        entrada.id,
-        dados.data,
-      );
-      return sucesso({ id: entrada.id });
-    }
-    return sucesso({
-      id: await repoResultados.criarResultadoFase(db, usuarioId, concursoId, dados.data),
-    });
-  });
+  return executar(
+    async () => {
+      if (!(await obterConcurso(db, usuarioId, concursoId))) return falha(CONCURSO_NAO_ENCONTRADO);
+      let base = VALORES_INICIAIS_RESULTADO_FASE;
+      if (entrada.id !== undefined) {
+        const atual = (await listarResultadosFase(db, concursoId)).find((r) => r.id === entrada.id);
+        if (!atual) return falha("Resultado não encontrado neste concurso.");
+        base = valoresDoResultadoFase(atual);
+      } else if (!entrada.fase) {
+        return { ok: false, erros: { fase: ["Informe a fase para criar o resultado."] } };
+      }
+      const dados = resultadoFaseSchema.safeParse(valoresResultado(base, entrada));
+      if (!dados.success) return falhaValidacao(dados.error);
+      if (entrada.id !== undefined) {
+        await repoResultados.atualizarResultadoFase(
+          db,
+          usuarioId,
+          concursoId,
+          entrada.id,
+          dados.data,
+        );
+        return sucesso({ id: entrada.id });
+      }
+      return sucesso({
+        id: await repoResultados.criarResultadoFase(db, usuarioId, concursoId, dados.data),
+      });
+    },
+    { acao: "mcp.registrarResultado", usuarioId },
+  );
 }

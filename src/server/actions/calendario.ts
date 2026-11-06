@@ -14,22 +14,28 @@ import { executar, falha, type ResultadoAcao, sucesso } from "./resultado";
 export async function gerarTokenIcsAcao(): Promise<ResultadoAcao<{ token: string }>> {
   const sessao = await exigirUsuarioAcao();
   if (!sessao.ok) return sessao;
-  return executar(async () => {
-    const token = await gerarTokenIcs(getDb(), sessao.usuario.id);
-    revalidatePath("/configuracoes");
-    return sucesso({ token });
-  });
+  return executar(
+    async () => {
+      const token = await gerarTokenIcs(getDb(), sessao.usuario.id);
+      revalidatePath("/configuracoes");
+      return sucesso({ token });
+    },
+    { acao: "calendario.gerarTokenIcsAcao", usuarioId: sessao.usuario.id },
+  );
 }
 
 /** Revoga o token do feed: calendários assinados deixam de atualizar. */
 export async function revogarTokenIcsAcao(): Promise<ResultadoAcao> {
   const sessao = await exigirUsuarioAcao();
   if (!sessao.ok) return sessao;
-  return executar(async () => {
-    await revogarTokenIcs(getDb(), sessao.usuario.id);
-    revalidatePath("/configuracoes");
-    return sucesso(null);
-  });
+  return executar(
+    async () => {
+      await revogarTokenIcs(getDb(), sessao.usuario.id);
+      revalidatePath("/configuracoes");
+      return sucesso(null);
+    },
+    { acao: "calendario.revogarTokenIcsAcao", usuarioId: sessao.usuario.id },
+  );
 }
 
 const opcoesSchema = z.object({
@@ -43,9 +49,12 @@ export async function salvarOpcoesIcsAcao(entrada: unknown): Promise<ResultadoAc
   if (!sessao.ok) return sessao;
   const opcoes = opcoesSchema.safeParse(entrada);
   if (!opcoes.success) return falha("Opções inválidas.");
-  return executar(async () => {
-    await definirOpcoesIcs(getDb(), sessao.usuario.id, opcoes.data);
-    revalidatePath("/configuracoes");
-    return sucesso(null);
-  });
+  return executar(
+    async () => {
+      await definirOpcoesIcs(getDb(), sessao.usuario.id, opcoes.data);
+      revalidatePath("/configuracoes");
+      return sucesso(null);
+    },
+    { acao: "calendario.salvarOpcoesIcsAcao", usuarioId: sessao.usuario.id },
+  );
 }

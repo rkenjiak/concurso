@@ -13,6 +13,7 @@ import { JANELA_PADRAO_DIAS } from "@/domain/prazos";
 import { version } from "../../../package.json";
 import type { ResultadoAcao } from "../actions/resultado";
 import type { Db } from "../db/client";
+import { log } from "../log";
 import {
   concursoNovoEntrada,
   concursoParcialEntrada,
@@ -57,11 +58,47 @@ const idConcurso = z.number().int().positive().describe("ID do concurso.");
 const LEITURA = { readOnlyHint: true, destructiveHint: false, openWorldHint: false } as const;
 const ESCRITA = { readOnlyHint: false, destructiveHint: false, openWorldHint: false } as const;
 
+/**
+ * Faz cada chamada de ferramenta gerar uma linha `mcp.ferramenta` no log (#91): nome, usuário,
+ * resultado e duração (sem os argumentos, que podem trazer dados pessoais). Envolve o
+ * `registerTool` da instância para valer em todas as ferramentas registradas abaixo.
+ */
+function registrarChamadasNoLog(servidor: McpServer, usuarioId: number): void {
+  type Handler = (...args: unknown[]) => unknown;
+  const registrar = servidor.registerTool.bind(servidor) as (
+    nome: string,
+    config: unknown,
+    handler: Handler,
+  ) => ReturnType<McpServer["registerTool"]>;
+  const comLog = (nome: string, config: unknown, handler: Handler) =>
+    registrar(nome, config, async (...args: unknown[]) => {
+      const inicio = performance.now();
+      const duracaoMs = () => Math.round(performance.now() - inicio);
+      try {
+        const resultado = await handler(...args);
+        const ok = !(resultado as { isError?: boolean } | undefined)?.isError;
+        log.info("mcp.ferramenta", { usuarioId, ferramenta: nome, ok, duracaoMs: duracaoMs() });
+        return resultado;
+      } catch (erro) {
+        log.error("mcp.ferramenta", {
+          usuarioId,
+          ferramenta: nome,
+          ok: false,
+          duracaoMs: duracaoMs(),
+          erro,
+        });
+        throw erro;
+      }
+    });
+  servidor.registerTool = comLog as McpServer["registerTool"];
+}
+
 export function criarServidorMcp({ db, usuarioId, aoAlterar }: OpcoesServidorMcp): McpServer {
   const servidor = new McpServer(
     { name: "concurso", title: "Concursos", version },
     { instructions: INSTRUCOES },
   );
+  registrarChamadasNoLog(servidor, usuarioId);
 
   /** Converte o resultado padronizado e avisa sobre escritas bem-sucedidas. */
   const escrita = <T>(r: ResultadoAcao<T>, gravou = true): Conteudo => {

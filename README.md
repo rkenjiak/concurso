@@ -57,6 +57,8 @@ Copie `.env.example` para `.env.local` e ajuste. Nada é obrigatório para rodar
 | `ALLOW_NO_AUTH` | `false` | `true` permite rodar em produção sem login (uso local, sem exposição) |
 | `MIGRATE_ON_START` | `false` | `true` aplica as migrações ao iniciar o servidor (já ligado na imagem Docker) |
 | `BACKUP_KEEP` | `10` | Quantos backups o `pnpm db:backup` mantém |
+| `LOG_LEVEL` | `info` (produção), `debug` (dev) | Nível mínimo dos logs: `debug`, `info`, `warn`, `error` ou `silent` |
+| `LOG_FORMAT` | `json` (produção), `texto` (dev) | Formato dos logs: uma linha JSON por evento ou texto legível |
 
 ## Autenticação
 
@@ -270,6 +272,19 @@ Coloque um proxy com HTTPS na frente (Caddy, Traefik, Fly.io…). A imagem tem `
 `ALLOW_NO_AUTH=true`). Para o login com Google no container, troque `APP_PASSWORD` pelas variáveis
 do Google (e `APP_URL`, se o proxy não repassar o host original). Para usar o Turso, passe
 `DATABASE_URL`/`DATABASE_AUTH_TOKEN`.
+
+### Logs
+
+O app escreve uma linha por evento (erros, logins, tentativas bloqueadas, importação,
+exportação, chamadas MCP) no stdout/stderr, sem senhas, tokens nem e-mails completos:
+
+- **Local:** no terminal do `pnpm dev` (texto) ou do `pnpm start` (JSON).
+- **Docker:** `docker logs -f concurso`.
+- **Vercel:** *Project → Logs* (Runtime Logs); filtre pelo campo `evento`, ex.: `auth.login_falhou`.
+
+Erros mostrados ao usuário com um código (`digest`) aparecem no log como `requisicao.erro` com o
+mesmo `digest`. Catálogo de eventos e regras de privacidade em
+[ARQUITETURA.md §9.4](docs/ARQUITETURA.md#94-logs-e-observabilidade-91).
 
 ## Scripts
 

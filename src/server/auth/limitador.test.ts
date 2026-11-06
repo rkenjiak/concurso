@@ -26,6 +26,13 @@ describe("LimitadorTentativas", () => {
     expect(l.esperaMs("ip", 7_000)).toBe(5_000);
   });
 
+  it("registrarFalha devolve o bloqueio iniciado (0 nas tentativas livres)", () => {
+    const l = new LimitadorTentativas(opcoes);
+    for (let i = 0; i < 3; i++) expect(l.registrarFalha("ip", 0)).toBe(0);
+    expect(l.registrarFalha("ip", 0)).toBe(1_000);
+    expect(l.registrarFalha("ip", 1_000)).toBe(2_000);
+  });
+
   it("separa por chave e zera no sucesso", () => {
     const l = new LimitadorTentativas(opcoes);
     for (let i = 0; i < 4; i++) l.registrarFalha("a", 0);

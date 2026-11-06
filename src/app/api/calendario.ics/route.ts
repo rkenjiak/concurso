@@ -2,11 +2,13 @@
  * `GET /api/calendario.ics?token=…` (RF08, #65): feed de calendário assinável (`webcal://`) no
  * Google Calendar, Apple Calendar etc. Calendários não têm o cookie de sessão, então a rota é
  * pública no `proxy.ts` e se autentica pelo token pessoal do feed (gerado em Configurações; o banco
- * guarda só o SHA-256). O feed é do dono do token, com as opções dele; usuário bloqueado (#50) ou
- * token revogado → 404. Falhas seguidas sofrem atraso progressivo, como o login.
+ * guarda só o SHA-256). O feed é do dono do token, com as opções dele; usuário bloqueado (#50), que
+ * perdeu o acesso (mesma regra da sessão, #96) ou token revogado → 404. Falhas seguidas sofrem atraso progressivo, como o login.
  */
 import type { NextRequest } from "next/server";
 import { chaveCliente } from "@/server/auth/acesso";
+import { donoDoTokenAutorizado } from "@/server/auth/autorizacao";
+import { lerConfigAuth } from "@/server/auth/config";
 import { LimitadorTentativas } from "@/server/auth/limitador";
 import { origemPublica } from "@/server/auth/login-google";
 import { getDb } from "@/server/db/client";
@@ -36,9 +38,16 @@ export async function GET(request: NextRequest): Promise<Response> {
   }
   const token = request.nextUrl.searchParams.get("token")?.trim() ?? "";
   const db = getDb();
-  const usuario = token === "" ? null : await usuarioDoTokenIcs(db, token);
+  const dono = token === "" ? null : await usuarioDoTokenIcs(db, token);
+  const autorizado = dono !== null && (await donoDoTokenAutorizado(db, lerConfigAuth(), dono));
+  const usuario = autorizado ? dono : null;
   if (!usuario) {
-    log.warn("auth.token_invalido", { rota: "ics", ip: chave, ausente: token === "" });
+    log.warn("auth.token_invalido", {
+      rota: "ics",
+      ip: chave,
+      ausente: token === "",
+      ...(dono !== null && { usuarioId: dono.id, motivo: "sem_acesso" }),
+    });
     const bloqueio = limitador.registrarFalha(chave);
     if (bloqueio > 0) {
       log.warn("auth.limite_tentativas", { rota: "ics", ip: chave, esperaMs: bloqueio });

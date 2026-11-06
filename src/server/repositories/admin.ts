@@ -231,7 +231,8 @@ export async function definirPapel(
 
 /**
  * Bloqueia ou desbloqueia o usuário. Bloqueado, ele perde o acesso na hora: a sessão é relida do
- * banco a cada requisição e o token do MCP deixa de valer (mas não é apagado).
+ * banco a cada requisição e os tokens pessoais (MCP e feed .ics) são apagados (#96) — ao ser
+ * desbloqueado, ele precisa gerar outros em Configurações.
  */
 export async function definirBloqueio(
   db: Db,
@@ -253,7 +254,8 @@ export async function definirBloqueio(
           : eq(usuario.id, alvo.id);
       const linhas = await tx
         .update(usuario)
-        .set({ bloqueadoEm: agora })
+        // Revoga também os tokens pessoais (MCP e feed .ics, #96): desbloquear não os devolve.
+        .set({ bloqueadoEm: agora, mcpTokenHash: null, icsTokenHash: null })
         .where(condicao)
         .returning({ id: usuario.id });
       if (linhas.length === 0) throw new ErroDominio(MENSAGENS_ADMIN.ultimoAdmin);

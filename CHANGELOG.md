@@ -19,10 +19,29 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
   e-mails saem mascarados em qualquer texto, e os `params` das queries saem das mensagens de erro.
   No `pnpm --silent mcp` (stdio) todo log vai para o stderr, com teste do script real. Catálogo em
   `ARQUITETURA.md` §9.4.
+- **Cabeçalhos de segurança** (#95) em todas as rotas, via `headers()` do `next.config.ts` (Vercel
+  e Docker): `Content-Security-Policy` (só recursos da própria origem, fotos do Google,
+  `frame-ancestors 'none'`, `object-src 'none'`, `form-action 'self'`), `X-Frame-Options: DENY`,
+  `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`,
+  `Permissions-Policy` (câmera, microfone, localização etc. desligados) e
+  `Cross-Origin-Opener-Policy: same-origin`. Imagens externas no Markdown das observações deixam
+  de carregar.
+- **Limites nas entradas do MCP** (#96): tamanho máximo nos textos (os mesmos dos formulários,
+  anunciados no JSON Schema), até 100 eventos e 50 links por chamada. A busca usa no máximo 200
+  caracteres e 20 termos distintos em qualquer ponto de entrada.
 
 ### Alterado
 
 - O login Google recusado não registra mais o e-mail completo (agora `r***@dominio`).
+- Bloquear um usuário apaga os tokens do MCP e do feed `.ics` dele (#96); desbloqueado, ele gera
+  outros em Configurações.
+
+### Corrigido
+
+- **Tokens MCP e `.ics` de quem perdeu o acesso** (#96): continuavam valendo depois que o e-mail
+  saía da lista de acesso (painel ou `ALLOWED_EMAILS`). Agora o token segue a mesma regra da
+  sessão web, conferida a cada requisição: MCP responde 401 e o feed, 404.
+- Uma busca com muitas palavras pelo MCP gerava erro de SQL (`Expression tree is too large`).
 
 ## [2.4.0] - 2026-11-03
 

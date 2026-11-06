@@ -37,3 +37,24 @@ test("exige login, rejeita senha errada, entra e sai", async ({ page, request })
   await page.goto("/configuracoes");
   await expect(page).toHaveURL(/\/login\?para=%2Fconfiguracoes$/);
 });
+
+test("a página de login envia os cabeçalhos de segurança, sem violações de CSP (#95)", async ({
+  page,
+}) => {
+  const erros: string[] = [];
+  page.on("console", (m) => {
+    if (m.type() === "error") erros.push(m.text());
+  });
+  const resposta = await page.goto("/login");
+  const h = resposta?.headers() ?? {};
+  expect(h["content-security-policy"]).toContain("frame-ancestors 'none'");
+  expect(h["x-frame-options"]).toBe("DENY");
+  expect(h["x-content-type-options"]).toBe("nosniff");
+  expect(h["referrer-policy"]).toBe("strict-origin-when-cross-origin");
+  expect(h["permissions-policy"]).toContain("microphone=()");
+  // O login por senha (Server Action) funciona sob a CSP.
+  await page.getByLabel("Senha").fill("errada");
+  await page.getByRole("button", { name: "Entrar" }).click();
+  await expect(page.getByRole("alert").filter({ hasText: "Senha" })).toHaveText("Senha incorreta.");
+  expect(erros).toEqual([]);
+});

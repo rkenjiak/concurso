@@ -2,12 +2,15 @@
  * `/api/mcp` (issues #39, #49): servidor MCP por Streamable HTTP para uso hospedado. Exige
  * `Authorization: Bearer <token>` com o token pessoal do usuário (gerado em Configurações); o
  * servidor só enxerga os dados do dono do token. Independente do login (clientes MCP não têm o
- * cookie de sessão), por isso a rota é pública no `proxy.ts`. Falhas de token seguidas sofrem
- * atraso progressivo, como o login. Localmente, prefira o `pnpm mcp` (stdio).
+ * cookie de sessão), por isso a rota é pública no `proxy.ts`. O token só vale enquanto o dono puder
+ * usar o app (mesma regra da sessão, #96). Falhas de token seguidas sofrem atraso progressivo, como
+ * o login. Localmente, prefira o `pnpm mcp` (stdio).
  */
 import { createMcpHandler, type McpHttpHandler } from "@modelcontextprotocol/server";
 import { revalidatePath } from "next/cache";
 import { chaveCliente } from "@/server/auth/acesso";
+import { donoDoTokenAutorizado } from "@/server/auth/autorizacao";
+import { lerConfigAuth } from "@/server/auth/config";
 import { LimitadorTentativas } from "@/server/auth/limitador";
 import { getDb } from "@/server/db/client";
 import { log } from "@/server/log";
@@ -59,9 +62,17 @@ async function atender(request: Request): Promise<Response> {
     });
   }
   const token = tokenBearer(request.headers.get("authorization"));
-  const usuario = token === null ? null : await usuarioDoTokenMcp(getDb(), token);
+  const db = getDb();
+  const dono = token === null ? null : await usuarioDoTokenMcp(db, token);
+  const autorizado = dono !== null && (await donoDoTokenAutorizado(db, lerConfigAuth(), dono));
+  const usuario = autorizado ? dono : null;
   if (token === null || usuario === null) {
-    log.warn("auth.token_invalido", { rota: "mcp", ip: chave, ausente: token === null });
+    log.warn("auth.token_invalido", {
+      rota: "mcp",
+      ip: chave,
+      ausente: token === null,
+      ...(dono !== null && { usuarioId: dono.id, motivo: "sem_acesso" }),
+    });
     const bloqueio = limitador.registrarFalha(chave);
     if (bloqueio > 0) {
       log.warn("auth.limite_tentativas", { rota: "mcp", ip: chave, esperaMs: bloqueio });

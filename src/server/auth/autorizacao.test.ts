@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { criarBancoTeste, criarUsuarioTeste } from "../db/banco-teste";
 import type { Db } from "../db/client";
 import { emailPermitido, ID_USUARIO_INICIAL, usuario } from "../db/schema";
-import { decidirLoginGoogle, usuarioDaSessao } from "./autorizacao";
+import { decidirLoginGoogle, donoDoTokenAutorizado, usuarioDaSessao } from "./autorizacao";
 import type { ConfigAuth } from "./config";
 
 let db: Db;
@@ -17,7 +17,8 @@ const base = {
   emailsAdmin: new Set(["ana@x.com"]),
   emailsPermitidos: new Set(["bia@x.com"]),
 };
-const GOOGLE: ConfigAuth = { ...base, senha: null, google: { clientId: "c", clientSecret: "s" } };
+const GOOGLE_CFG = { clientId: "c", clientSecret: "s" };
+const GOOGLE: ConfigAuth = { ...base, senha: null, google: GOOGLE_CFG };
 const SENHA: ConfigAuth = { ...base, senha: "senha", google: null };
 
 beforeEach(async () => {
@@ -96,5 +97,63 @@ describe("decidirLoginGoogle", () => {
     expect(await decidirLoginGoogle(db, GOOGLE, { sub: "novo", email: "bia@x.com" })).toBe(
       "bloqueado",
     );
+  });
+});
+
+describe("donoDoTokenAutorizado (#96)", () => {
+  const dono = async (id: number) => {
+    const [u] = await db.select().from(usuario).where(eq(usuario.id, id));
+    if (!u) throw new Error("usuário ausente");
+    return u;
+  };
+  const AMBOS: ConfigAuth = { ...base, senha: "senha", google: GOOGLE_CFG };
+
+  it("segue a allowlist (variáveis e painel), como a sessão Google", async () => {
+    expect(await donoDoTokenAutorizado(db, GOOGLE, await dono(bia))).toBe(true);
+    const carla = await criarUsuarioTeste(db, "carla@x.com");
+    expect(await donoDoTokenAutorizado(db, GOOGLE, await dono(carla))).toBe(false);
+    await db.insert(emailPermitido).values({ email: "carla@x.com" });
+    expect(await donoDoTokenAutorizado(db, GOOGLE, await dono(carla))).toBe(true);
+    await db.delete(emailPermitido);
+    expect(await donoDoTokenAutorizado(db, GOOGLE, await dono(carla))).toBe(false);
+    // Fora das variáveis: Bia perde o acesso se o e-mail sair de ALLOWED_EMAILS.
+    const semBia: ConfigAuth = { ...GOOGLE, emailsPermitidos: new Set() };
+    expect(await donoDoTokenAutorizado(db, semBia, await dono(bia))).toBe(false);
+  });
+
+  it("admin no banco e ADMIN_EMAILS continuam valendo", async () => {
+    expect(await donoDoTokenAutorizado(db, GOOGLE, await dono(ID_USUARIO_INICIAL))).toBe(true);
+    const carla = await criarUsuarioTeste(db, "carla@x.com");
+    await db.update(usuario).set({ papel: "ADMIN" }).where(eq(usuario.id, carla));
+    expect(await donoDoTokenAutorizado(db, GOOGLE, await dono(carla))).toBe(true);
+  });
+
+  it("bloqueado nunca vale, nem sem login", async () => {
+    await bloquear(bia);
+    expect(await donoDoTokenAutorizado(db, GOOGLE, await dono(bia))).toBe(false);
+    await bloquear(ID_USUARIO_INICIAL);
+    expect(
+      await donoDoTokenAutorizado(db, { habilitada: false }, await dono(ID_USUARIO_INICIAL)),
+    ).toBe(false);
+    expect(await donoDoTokenAutorizado(db, SENHA, await dono(ID_USUARIO_INICIAL))).toBe(false);
+  });
+
+  it("só com senha (ou sem login), vale apenas o usuário inicial", async () => {
+    expect(await donoDoTokenAutorizado(db, SENHA, await dono(ID_USUARIO_INICIAL))).toBe(true);
+    expect(await donoDoTokenAutorizado(db, SENHA, await dono(bia))).toBe(false);
+    const semLogin: ConfigAuth = { habilitada: false };
+    expect(await donoDoTokenAutorizado(db, semLogin, await dono(ID_USUARIO_INICIAL))).toBe(true);
+    expect(await donoDoTokenAutorizado(db, semLogin, await dono(bia))).toBe(false);
+  });
+
+  it("com senha e Google, o usuário inicial vale pela senha mesmo fora das listas", async () => {
+    await db
+      .update(usuario)
+      .set({ email: "fora@x.com", papel: "USUARIO" })
+      .where(eq(usuario.id, ID_USUARIO_INICIAL));
+    const inicial = await dono(ID_USUARIO_INICIAL);
+    expect(await donoDoTokenAutorizado(db, GOOGLE, inicial)).toBe(false);
+    expect(await donoDoTokenAutorizado(db, AMBOS, inicial)).toBe(true);
+    expect(await donoDoTokenAutorizado(db, AMBOS, await dono(bia))).toBe(true);
   });
 });

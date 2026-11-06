@@ -78,3 +78,21 @@ export async function usuarioDaSessao(
   if (sessao.metodo === "google" && !(await contaGoogleAutorizada(db, config, u))) return null;
   return u;
 }
+
+/**
+ * `true` se o dono de um token pessoal (MCP ou feed .ics) ainda pode usar o app — a mesma regra da
+ * sessão web ({@link usuarioDaSessao}), conferida a cada requisição (#96). Assim, tirar o e-mail
+ * da allowlist (painel ou `ALLOWED_EMAILS`), desligar o método de login ou bloquear a conta também
+ * invalida os tokens na hora, sem precisar revogá-los. Como o token não guarda o método de login,
+ * vale o que der acesso hoje: o usuário inicial entra pela senha (`APP_PASSWORD` definido) ou,
+ * sem login configurado, sempre; os demais só com a conta Google autorizada.
+ */
+export async function donoDoTokenAutorizado(
+  db: Executor,
+  config: ConfigAuth,
+  u: Pick<Usuario, "id" | "email" | "papel" | "bloqueadoEm">,
+): Promise<boolean> {
+  if (u.bloqueadoEm !== null) return false;
+  if (u.id === ID_USUARIO_INICIAL && (!config.habilitada || config.senha !== null)) return true;
+  return config.habilitada && config.google !== null && contaGoogleAutorizada(db, config, u);
+}

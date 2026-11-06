@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { cabecalhosSeguranca } from "./src/lib/cabecalhos-seguranca";
 
 const nextConfig: NextConfig = {
   // Não anuncia o framework nos headers de resposta.
@@ -10,6 +11,11 @@ const nextConfig: NextConfig = {
   output: process.env.NEXT_OUTPUT === "standalone" ? "standalone" : undefined,
   // `forbidden()` (403) no painel admin (#50).
   experimental: { authInterrupts: true },
+  // CSP, anti-clickjacking, nosniff, Referrer/Permissions-Policy em todas as rotas (#95).
+  async headers() {
+    const dev = process.env.NODE_ENV === "development";
+    return [{ source: "/:path*", headers: cabecalhosSeguranca(dev) }];
+  },
 };
 
 export default nextConfig;

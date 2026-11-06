@@ -436,7 +436,7 @@ visão admin no dashboard vira redirecionamento no cliente. Aceito: as páginas 
 | `GET /api/health` | health check do deploy |
 | `POST/GET/DELETE /api/mcp` | RF10 — servidor MCP (Streamable HTTP); exige `Authorization: Bearer <token pessoal>` |
 | `GET /api/auth/google` e `/api/auth/google/callback` | #49 — login com Google (OIDC, código + PKCE) |
-| `GET /api/calendario.ics?token=…` | RF08 (#65) — feed assinável; pública no `proxy.ts`, autenticada pelo token do feed (`cics_…`, SHA-256 em `usuario.ics_token_hash`); token inválido/revogado ou usuário bloqueado → 404; atraso progressivo como o MCP |
+| `GET /api/calendario.ics?token=…` | RF08 (#65) — feed assinável; pública no `proxy.ts`, autenticada pelo token do feed (`cics_…`, SHA-256 em `usuario.ics_token_hash`); token inválido/revogado, usuário bloqueado ou sem acesso (#96) → 404; atraso progressivo como o MCP |
 
 ### 5.4 Servidor MCP (`src/server/mcp`, RF10)
 
@@ -561,7 +561,10 @@ Decisões (issue #39):
 - Sem biblioteca de auth completa (NextAuth, Better Auth): um provedor só não justifica a
   dependência, e o fluxo OIDC cabe em poucas funções testáveis.
 - **MCP (§5.4):** `/api/mcp` não usa o cookie de sessão; exige `Authorization: Bearer <token>` com o
-  token pessoal do usuário (recusado se o usuário estiver bloqueado).
+  token pessoal do usuário. O token (e o do feed `.ics`) só vale enquanto o dono puder usar o app,
+  pela mesma regra da sessão (`donoDoTokenAutorizado` em `auth/autorizacao.ts`, #96): conta não
+  bloqueada e, para o usuário inicial, `APP_PASSWORD` definido (ou sem login); para os demais,
+  conta Google ainda autorizada. Retirar o e-mail da allowlist recusa os tokens na hora.
 
 **Painel admin (#50):**
 - **Quem entra com Google** (`auth/autorizacao.ts`): quem não está bloqueado e (a) tem o e-mail em
@@ -577,8 +580,9 @@ Decisões (issue #39):
   (`WHERE … AND EXISTS (outro admin ativo)`), sem janela de corrida. Ninguém bloqueia a própria
   conta; quem se rebaixa volta para a visão usuário.
 - **Bloqueio:** `usuario.bloqueado_em`. Barra o login (Google e senha), a sessão existente
-  (relida a cada requisição) e os tokens do MCP e do feed de calendário; os dados e o token ficam guardados e voltam a valer
-  ao desbloquear. Sem login configurado (uso local), o bloqueio não se aplica.
+  (relida a cada requisição) e os tokens do MCP e do feed de calendário, que são apagados ao
+  bloquear (#96; desbloqueado, o usuário gera outros). Os dados ficam guardados e voltam a valer ao
+  desbloquear. Sem login configurado (uso local), o bloqueio não se aplica.
 - **Visão admin ↔ visão usuário:** seletor no menu da conta, só para admins, sem novo login. A
   escolha fica no cookie `concurso_visao` (`auth/visao.ts`) e decide o início (`/` redireciona a
   `/admin` na visão admin). A visão usuário é o app comum, sem nenhum item de admin; a visão admin
@@ -589,6 +593,17 @@ Decisões (issue #39):
 - **Auditoria:** toda alteração do painel grava em `auditoria_admin` na mesma transação.
 - **Privacidade:** o painel mostra só totais e metadados das contas; não há impersonação nem acesso
   aos concursos de outros usuários.
+
+**Cabeçalhos de segurança (#95):** `next.config.ts` aplica a todas as rotas os cabeçalhos de
+`src/lib/cabecalhos-seguranca.ts`: CSP, `X-Frame-Options: DENY`, `nosniff`,
+`Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy` (recursos não usados
+desligados) e `Cross-Origin-Opener-Policy: same-origin`. A CSP é sem nonce (`script-src 'self'
+'unsafe-inline'`): o Next injeta scripts inline e o nonce exigiria renderizar tudo pelo `proxy.ts`,
+que não roda sem login. Ela restringe o resto à própria origem (imagens também de
+`*.googleusercontent.com`, as fotos de perfil), proíbe `<object>`, embutir o app
+(`frame-ancestors 'none'`) e formulários para fora. Não usa `upgrade-insecure-requests`, que
+quebraria o app servido por HTTP na rede local; em dev acrescenta `'unsafe-eval'` (pilhas de erro
+do React). O e2e `seguranca.spec.ts` confere os cabeçalhos e a ausência de violações no console.
 
 ### 7.2 Locale (RNF04)
 - `<html lang="pt-BR">`; toda a UI em pt-BR (sem i18n framework — strings diretas + `labels.ts`).
@@ -738,7 +753,7 @@ O hook só vê o que **escapa** do código: `executar` (Server Actions e MCP), `
 | `auth.login_ok` | info | `metodo` (`senha`/`google`), `usuarioId` |
 | `auth.login_falhou` | warn (info se `cancelado`) | `metodo`, `motivo`, `ip`; Google: `email` mascarado e `erro` quando houver. Motivos com senha: `senha_incorreta`, `conta_bloqueada` (só detectado depois que a senha confere). Com Google: `nao_autorizado` (fora da allowlist), `bloqueado`, `erro_google` (troca do código ou `id_token` inválido), `estado_invalido` (state/cookie expirado ou forjado), `cancelado` |
 | `auth.limite_tentativas` | warn | `rota` (`login`, `mcp`, `ics`), `ip`, `esperaMs`: só quando uma falha **inicia** um bloqueio, não a cada tentativa recusada durante a espera |
-| `auth.token_invalido` | warn | `rota` (`mcp`, `ics`), `ip`, `ausente` |
+| `auth.token_invalido` | warn | `rota` (`mcp`, `ics`), `ip`, `ausente`; token válido de quem perdeu o acesso (#96): também `usuarioId` e `motivo: "sem_acesso"` |
 | `auth.logout` | info | `usuarioId` (lido do cookie assinado, sem consultar o banco; o logout nunca falha por causa do log) |
 | `auth.config_invalida` | error | `erro` (proxy) |
 | `dados.importacao` / `dados.importacao_recusada` / `dados.importacao_erro` | info / info / error | `usuarioId`, contagens do resumo, `motivo` ou `erro` |

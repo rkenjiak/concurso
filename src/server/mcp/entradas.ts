@@ -17,17 +17,34 @@ import {
   UF,
 } from "@/domain/enums";
 import { centavosParaEntrada, notaParaEntrada } from "@/lib/format";
+import { MAX_TAGS, MAX_TAMANHO_TAG } from "@/lib/schemas/comum";
 import type { ConcursoFormValores } from "@/lib/schemas/concurso";
 import type { EventoFormValores } from "@/lib/schemas/evento";
 import type { LinkFormValores } from "@/lib/schemas/link";
 import type { ResultadoFaseFormValores } from "@/lib/schemas/resultado-fase";
 
+/**
+ * Limites das entradas (#96). Os textos usam os mesmos tamanhos máximos dos formulários
+ * (`src/lib/schemas/*`), que ainda validam depois; aqui eles barram entradas enormes antes de
+ * qualquer processamento e aparecem no JSON Schema (`maxLength`/`maxItems`) anunciado à LLM. As
+ * listas de eventos e links têm um teto por chamada, folgado para um cronograma de edital.
+ */
+export const LIMITES_MCP = {
+  /** Eventos por chamada (`cadastrar_concurso`, `salvar_eventos`). */
+  eventos: 100,
+  /** Links por chamada (`cadastrar_concurso`, `salvar_links`). */
+  links: 50,
+  /** Campos curtos sem limite próprio no formulário (data, hora, ícone). */
+  curto: 40,
+} as const;
+
 const id = (descricao: string) => z.number().int().positive().describe(descricao);
-const textoOpc = (descricao: string) => z.string().nullish().describe(descricao);
+const textoOpc = (descricao: string, max: number) =>
+  z.string().max(max).nullish().describe(descricao);
 const inteiroOpc = (descricao: string) => z.number().int().nullish().describe(descricao);
 const numeroOpc = (descricao: string) => z.number().nullish().describe(descricao);
 const dataOpc = (descricao: string) =>
-  z.string().nullish().describe(`${descricao} Formato AAAA-MM-DD.`);
+  z.string().max(LIMITES_MCP.curto).nullish().describe(`${descricao} Formato AAAA-MM-DD.`);
 
 // ---------------------------------------------------------------------------------------------
 // Concurso
@@ -36,17 +53,19 @@ const dataOpc = (descricao: string) =>
 const camposConcurso = {
   orgao: z
     .string()
+    .max(200)
     .describe("Órgão ou instituição, por extenso (ex.: 'Tribunal Regional Federal da 3ª Região')."),
   cargo: z
     .string()
+    .max(200)
     .describe(
       "UM cargo — o escolhido pelo usuário —, com a especialidade/área quando houver " +
         "(ex.: 'Analista Judiciário – Área Judiciária').",
     ),
-  banca: textoOpc("Banca organizadora (ex.: 'FCC', 'Cebraspe')."),
+  banca: textoOpc("Banca organizadora (ex.: 'FCC', 'Cebraspe').", 100),
   esfera: z.enum(ESFERA).nullish().describe("Esfera do órgão."),
   uf: z.enum(UF).nullish().describe("UF (sigla) do órgão ou da lotação."),
-  cidade: textoOpc("Cidade da lotação ou da prova, se única."),
+  cidade: textoOpc("Cidade da lotação ou da prova, se única.", 100),
   escolaridade: z.enum(ESCOLARIDADE).nullish().describe("Escolaridade exigida PARA O CARGO."),
   remuneracao: numeroOpc("Remuneração inicial DO CARGO em reais (ex.: 13994.78)."),
   taxaInscricao: numeroOpc("Taxa de inscrição DO CARGO em reais (ex.: 85)."),
@@ -60,9 +79,11 @@ const camposConcurso = {
   observacoes: textoOpc(
     "Anotações em Markdown: requisitos, atribuições, jornada, lotação, fases/provas e pesos, " +
       "conteúdo programático resumido, critérios de desempate, onde está cada informação no edital.",
+    20_000,
   ),
   tags: z
-    .array(z.string())
+    .array(z.string().max(MAX_TAMANHO_TAG))
+    .max(MAX_TAGS)
     .optional()
     .describe("Tags livres (ex.: 'tribunais', 'nível superior'). Substituem as atuais."),
   cor: z
@@ -72,7 +93,10 @@ const camposConcurso = {
       "Cor de identificação no calendário/painel. Só informe se o usuário pedir; " +
         "null = automática (derivada do ID).",
     ),
-  icone: textoOpc("Ícone de identificação: UM emoji (ex.: '⚖️'). Só informe se o usuário pedir."),
+  icone: textoOpc(
+    "Ícone de identificação: UM emoji (ex.: '⚖️'). Só informe se o usuário pedir.",
+    LIMITES_MCP.curto,
+  ),
   homologacaoData: dataOpc("Data da homologação do resultado final."),
   validadeMeses: inteiroOpc("Prazo de validade do concurso em meses (1 a 24)."),
   validadeProrrogada: z.boolean().optional().describe("Se a validade já foi prorrogada."),
@@ -100,11 +124,14 @@ export type ConcursoParcialEntrada = z.infer<typeof concursoParcialEntrada>;
 
 const camposEvento = {
   tipo: z.enum(TIPO_EVENTO).describe("Tipo do evento."),
-  titulo: textoOpc("Título curto, quando o tipo não basta (ex.: 'Prova discursiva – peça')."),
-  data: z.string().describe("Data AAAA-MM-DD (horário de Brasília). Para períodos, a data final."),
-  hora: textoOpc("Hora HH:mm (horário de Brasília), se houver."),
-  local: textoOpc("Local ou endereço eletrônico."),
-  observacao: textoOpc("Observação (ex.: 'período: 10/03 a 08/04', item do edital)."),
+  titulo: textoOpc("Título curto, quando o tipo não basta (ex.: 'Prova discursiva – peça').", 120),
+  data: z
+    .string()
+    .max(LIMITES_MCP.curto)
+    .describe("Data AAAA-MM-DD (horário de Brasília). Para períodos, a data final."),
+  hora: textoOpc("Hora HH:mm (horário de Brasília), se houver.", LIMITES_MCP.curto),
+  local: textoOpc("Local ou endereço eletrônico.", 200),
+  observacao: textoOpc("Observação (ex.: 'período: 10/03 a 08/04', item do edital).", 1000),
   concluido: z.boolean().optional().describe("Se o evento já aconteceu/foi cumprido."),
 };
 
@@ -117,8 +144,8 @@ export const eventoLoteEntrada = z.object({
 
 export const linkNovoEntrada = z.object({
   tipo: z.enum(TIPO_LINK).describe("Tipo do link."),
-  rotulo: textoOpc("Rótulo (ex.: 'Retificação nº 1')."),
-  url: z.string().describe("URL completa, começando com http:// ou https://."),
+  rotulo: textoOpc("Rótulo (ex.: 'Retificação nº 1').", 100),
+  url: z.string().max(2000).describe("URL completa, começando com http:// ou https://."),
 });
 
 export const linkLoteEntrada = z.object({
@@ -129,15 +156,18 @@ export const linkLoteEntrada = z.object({
 export const resultadoEntrada = z.object({
   id: id("ID do resultado a atualizar (omitir para criar).").optional(),
   fase: z.enum(FASE).optional().describe("Fase. Obrigatória ao criar."),
-  descricao: textoOpc("Descrição da fase (ex.: 'Prova objetiva – conhecimentos específicos')."),
+  descricao: textoOpc(
+    "Descrição da fase (ex.: 'Prova objetiva – conhecimentos específicos').",
+    120,
+  ),
   nota: numeroOpc("Nota obtida."),
   notaMaxima: numeroOpc("Nota máxima possível."),
   notaCorte: numeroOpc("Nota de corte."),
   classificacaoGeral: inteiroOpc("Classificação na ampla concorrência (a partir de 1)."),
   classificacaoCotas: inteiroOpc("Classificação na lista de cotas (a partir de 1)."),
-  listaCotas: textoOpc("Lista de cotas (ex.: 'PcD', 'Negros')."),
+  listaCotas: textoOpc("Lista de cotas (ex.: 'PcD', 'Negros').", 40),
   situacao: z.enum(SITUACAO_FASE).optional().describe("Situação na fase. Padrão: PENDENTE."),
-  observacao: textoOpc("Observação."),
+  observacao: textoOpc("Observação.", 1000),
 });
 
 export type EventoNovoEntrada = z.infer<typeof eventoNovoEntrada>;

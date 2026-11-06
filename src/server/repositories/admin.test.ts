@@ -127,6 +127,16 @@ describe("definirPapel", () => {
 });
 
 describe("definirBloqueio", () => {
+  it("desbloquear não reativa tokens guardados de um bloqueio anterior ao #96", async () => {
+    const token = await gerarTokenMcp(db, bia);
+    const tokenIcs = await gerarTokenIcs(db, bia);
+    // Estado legado: bloqueado por uma versão que não apagava os tokens.
+    await db.update(usuario).set({ bloqueadoEm: AGORA }).where(eq(usuario.id, bia));
+    await definirBloqueio(db, ana, bia, false, SEM_FIXOS, AGORA);
+    expect(await usuarioDoTokenMcp(db, token)).toBeNull();
+    expect(await usuarioDoTokenIcs(db, tokenIcs)).toBeNull();
+  });
+
   it("bloqueia e desbloqueia; o bloqueio revoga os tokens do MCP e do .ics (#96)", async () => {
     const token = await gerarTokenMcp(db, bia);
     const tokenIcs = await gerarTokenIcs(db, bia);

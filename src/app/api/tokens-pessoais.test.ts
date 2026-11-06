@@ -101,6 +101,19 @@ describe("tokens pessoais de quem perdeu o acesso (#96)", () => {
     expect((await chamarMcp(token)).status).toBe(401);
   });
 
+  it("token real de quem perdeu o acesso não conta no limite de tentativas do IP", async () => {
+    const token = await gerarTokenIcs(estado.db, bia);
+    const tokenAna = await gerarTokenIcs(estado.db, ID_USUARIO_INICIAL);
+    await estado.db.delete(emailPermitido);
+    const ipFixo = estado.ip;
+    for (let i = 0; i < 20; i++) {
+      estado.ip = ipFixo;
+      expect((await chamarIcs(token)).status).toBe(404);
+    }
+    estado.ip = ipFixo;
+    expect((await chamarIcs(tokenAna)).status).toBe(200);
+  });
+
   it("admin de ADMIN_EMAILS continua valendo", async () => {
     const token = await gerarTokenIcs(estado.db, ID_USUARIO_INICIAL);
     expect((await chamarIcs(token)).status).toBe(200);

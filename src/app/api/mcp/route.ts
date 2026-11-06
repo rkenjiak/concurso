@@ -73,7 +73,9 @@ async function atender(request: Request): Promise<Response> {
       ausente: token === null,
       ...(dono !== null && { usuarioId: dono.id, motivo: "sem_acesso" }),
     });
-    const bloqueio = limitador.registrarFalha(chave);
+    // Só token inexistente conta como tentativa: o de quem perdeu o acesso é real (não é força
+    // bruta) e um feed antigo consultado sem parar atrasaria outros usuários do mesmo IP.
+    const bloqueio = dono === null ? limitador.registrarFalha(chave) : 0;
     if (bloqueio > 0) {
       log.warn("auth.limite_tentativas", { rota: "mcp", ip: chave, esperaMs: bloqueio });
     }

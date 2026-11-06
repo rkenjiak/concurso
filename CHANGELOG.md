@@ -33,8 +33,10 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 ### Alterado
 
 - O login Google recusado não registra mais o e-mail completo (agora `r***@dominio`).
-- Bloquear um usuário apaga os tokens do MCP e do feed `.ics` dele (#96); desbloqueado, ele gera
-  outros em Configurações.
+- Bloquear ou desbloquear um usuário apaga os tokens do MCP e do feed `.ics` dele (#96);
+  desbloqueado, ele gera outros em Configurações.
+- Sem login configurado, só o usuário inicial pode usar tokens do MCP e do feed (#96). Ao migrar
+  de "sem login" para só Google, os tokens do usuário inicial param até o primeiro admin entrar.
 
 ### Corrigido
 

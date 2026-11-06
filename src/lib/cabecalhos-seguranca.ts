@@ -16,7 +16,8 @@
  *   restringe; por isso `form-action 'self'` basta.
  * - Sem `upgrade-insecure-requests`: quebraria o app servido por HTTP na rede local (Docker). Na
  *   Vercel, o HSTS já força HTTPS.
- * - Em desenvolvimento, o React usa `eval` para reconstruir pilhas de erro: `'unsafe-eval'` só ali.
+ * - Em desenvolvimento, o React usa `eval` para reconstruir pilhas de erro (`'unsafe-eval'`) e o
+ *   HMR usa WebSocket (`ws:`/`wss:` em `connect-src`): só ali.
  */
 
 export interface CabecalhoHttp {
@@ -32,7 +33,8 @@ export function diretivasCsp(dev: boolean): Record<string, string[]> {
     "style-src": ["'self'", "'unsafe-inline'"],
     "img-src": ["'self'", "data:", "blob:", "https://*.googleusercontent.com"],
     "font-src": ["'self'"],
-    "connect-src": ["'self'"],
+    // Em dev, o WebSocket do HMR (nem todo navegador inclui ws:/wss: em 'self').
+    "connect-src": ["'self'", ...(dev ? ["ws:", "wss:"] : [])],
     "manifest-src": ["'self'"],
     "worker-src": ["'self'"],
     "frame-src": ["'none'"],

@@ -32,8 +32,10 @@ describe("cabeçalhos de segurança (#95)", () => {
     expect(csp).not.toContain("upgrade-insecure-requests");
   });
 
-  it("'unsafe-eval' só em desenvolvimento", () => {
+  it("'unsafe-eval' e WebSocket do HMR só em desenvolvimento", () => {
     expect(valorCsp(false)).not.toContain("'unsafe-eval'");
     expect(valorCsp(true)).toMatch(/script-src [^;]*'unsafe-eval'/);
+    expect(valorCsp(false)).toContain("connect-src 'self';");
+    expect(valorCsp(true)).toContain("connect-src 'self' ws: wss:;");
   });
 });

@@ -81,9 +81,10 @@ const camposConcurso = {
       "conteúdo programático resumido, critérios de desempate, onde está cada informação no edital.",
     20_000,
   ),
+  // Com folga: o schema do formulário tira espaços e repetidas antes de aplicar o limite exato.
   tags: z
-    .array(z.string().max(MAX_TAMANHO_TAG))
-    .max(MAX_TAGS)
+    .array(z.string().max(MAX_TAMANHO_TAG * 2))
+    .max(MAX_TAGS * 2)
     .optional()
     .describe("Tags livres (ex.: 'tribunais', 'nível superior'). Substituem as atuais."),
   cor: z

@@ -260,7 +260,11 @@ export async function definirBloqueio(
         .returning({ id: usuario.id });
       if (linhas.length === 0) throw new ErroDominio(MENSAGENS_ADMIN.ultimoAdmin);
     } else {
-      await tx.update(usuario).set({ bloqueadoEm: null }).where(eq(usuario.id, alvo.id));
+      // Limpa os tokens também aqui: quem foi bloqueado antes do #96 ainda os tinha guardados.
+      await tx
+        .update(usuario)
+        .set({ bloqueadoEm: null, mcpTokenHash: null, icsTokenHash: null })
+        .where(eq(usuario.id, alvo.id));
     }
     await auditar(
       tx,

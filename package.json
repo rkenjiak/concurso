@@ -30,7 +30,7 @@
   },
   "dependencies": {
     "@date-fns/tz": "^1.5.0",
-    "@hookform/resolvers": "^6.0.2",
+    "@hookform/resolvers": "^7.0.2",
     "@libsql/client": "^0.18.0",
     "@modelcontextprotocol/server": "^2.4.0",
     "class-variance-authority": "^0.7.1",

@@ -164,6 +164,10 @@ export function PainelEventoProvider({
   useEffect(() => {
     itensRef.current = itens;
   }, [itens]);
+  const abertoRef = useRef(aberto);
+  useEffect(() => {
+    abertoRef.current = aberto;
+  }, [aberto]);
 
   const buscar = useCallback(
     (chave: string): EventoPainel | undefined =>
@@ -242,12 +246,11 @@ export function PainelEventoProvider({
             },
           });
           const pendenciaNova = r.data.pendencia;
-          if (pendenciaNova) {
-            setPendencia({ chave, dados: pendenciaNova });
-            // Pergunta na hora (D5): abre o painel, se a conclusão veio da linha.
-            setAberto((a) =>
-              a?.chave === chave ? a : { chave, ultimo: atualizado, modo: "detalhes" },
-            );
+          if (pendenciaNova) setPendencia({ chave, dados: pendenciaNova });
+          // Pergunta na hora (D5): abre o painel, se a conclusão veio da linha — mas só se nenhum
+          // estiver aberto; se o usuário já abriu outro item, a pergunta espera no painel deste.
+          if (pendenciaNova && !abertoRef.current) {
+            setAberto((a) => a ?? { chave, ultimo: atualizado, modo: "detalhes" });
             ultimaChaveRef.current = chave;
             if (gatilho) gatilhoRef.current = gatilho;
           } else if (gatilho) {

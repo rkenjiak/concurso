@@ -170,3 +170,28 @@ export function proximoVencimentoMs(estado: EstadoAvisos, agora: number): number
   }
   return menor === null ? null : Math.max(0, menor);
 }
+
+/**
+ * Agenda `aoVencer(agora)` para quando o próximo aviso de `estado` vencer e devolve o
+ * cancelamento. Timers podem disparar alguns ms antes do prazo: nesse caso nada venceu ainda e,
+ * como o estado não muda (sem novo render), o aviso ficaria preso — então reagenda o que falta
+ * em vez de chamar `aoVencer` (#100, D4).
+ */
+export function agendarVencimento(
+  estado: EstadoAvisos,
+  aoVencer: (agora: number) => void,
+  relogio: () => number = Date.now,
+): () => void {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const agendar = () => {
+    const ms = proximoVencimentoMs(estado, relogio());
+    if (ms === null) return;
+    timer = setTimeout(() => {
+      const agora = relogio();
+      if (expirar(estado, agora) === estado) agendar();
+      else aoVencer(agora);
+    }, Math.ceil(ms));
+  };
+  agendar();
+  return () => clearTimeout(timer);
+}

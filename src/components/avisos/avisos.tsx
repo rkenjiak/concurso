@@ -9,18 +9,20 @@ import {
   useEffect,
   useMemo,
   useReducer,
+  useRef,
   useState,
 } from "react";
+import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 import {
   type Aviso,
   adicionar,
+  agendarVencimento,
   definirPausa,
   ESTADO_INICIAL,
   type EstadoAvisos,
   expirar,
   type NovoAviso,
-  proximoVencimentoMs,
   remover,
   visiveis,
 } from "@/lib/avisos";
@@ -36,6 +38,20 @@ interface ApiAvisos {
 }
 
 const ContextoAvisos = createContext<ApiAvisos | null>(null);
+
+/** Registra o contêiner de uma {@link RegiaoAvisos}; devolve o cancelamento do registro. */
+type RegistrarRegiao = (el: HTMLElement) => () => void;
+const ContextoRegioes = createContext<RegistrarRegiao | null>(null);
+
+/** Posição da pilha (fixa na viewport) e atributos comuns às regiões de avisos. */
+const PROPS_REGIAO = {
+  // `data-avisos`: o foco "perdido" num aviso que fechou volta ao item (painel de evento).
+  "data-avisos": "",
+  "aria-live": "polite",
+  "aria-relevant": "additions text",
+  className:
+    "pointer-events-none fixed inset-x-0 bottom-[calc(4.25rem+env(safe-area-inset-bottom))] z-[60] flex justify-center pr-[max(1rem,env(safe-area-inset-right))] pl-[max(1rem,env(safe-area-inset-left))] md:inset-x-auto md:right-6 md:bottom-6 md:p-0",
+} as const;
 
 type Acao =
   | { tipo: "adicionar"; aviso: NovoAviso; id: number; agora: number }
@@ -67,16 +83,25 @@ let ultimoId = 0;
  * A pilha fica no canto inferior direito no desktop e, no celular, logo acima da barra de
  * navegação inferior (`NavegacaoInferior`, ~57 px + área segura). É uma região `aria-live` polite;
  * erros usam `role="alert"`. Hover ou foco num aviso pausa a contagem dele; Esc fecha.
+ *
+ * Com um diálogo modal aberto, o Radix esconde o resto da página (`aria-hidden`) e prende o foco
+ * nele: os avisos então são renderizados na {@link RegiaoAvisos} do diálogo mais recente — assim
+ * são anunciados e o "Desfazer" é alcançável pelo Tab.
  */
 export function AvisosProvider({ children }: { children: ReactNode }) {
   const [estado, despachar] = useReducer(reduzir, ESTADO_INICIAL);
+  const [regioes, setRegioes] = useState<readonly HTMLElement[]>([]);
 
-  useEffect(() => {
-    const ms = proximoVencimentoMs(estado, Date.now());
-    if (ms === null) return;
-    const t = window.setTimeout(() => despachar({ tipo: "expirar", agora: Date.now() }), ms);
-    return () => window.clearTimeout(t);
-  }, [estado]);
+  useEffect(
+    () => agendarVencimento(estado, (agora) => despachar({ tipo: "expirar", agora })),
+    [estado],
+  );
+
+  const registrarRegiao = useCallback<RegistrarRegiao>((el) => {
+    setRegioes((r) => [...r, el]);
+    return () => setRegioes((r) => r.filter((x) => x !== el));
+  }, []);
+  const regiaoDialogo = regioes.at(-1);
 
   const avisar = useCallback((aviso: NovoAviso) => {
     ultimoId += 1;
@@ -93,31 +118,44 @@ export function AvisosProvider({ children }: { children: ReactNode }) {
   );
   const api = useMemo(() => ({ avisar, fechar }), [avisar, fechar]);
 
+  const lista = (
+    <ol className="flex w-full max-w-sm flex-col gap-2">
+      {visiveis(estado).map((aviso) => (
+        <ItemAviso
+          key={aviso.id}
+          aviso={aviso}
+          aoFechar={fechar}
+          aoPausar={pausar}
+          avisar={avisar}
+        />
+      ))}
+    </ol>
+  );
+
   return (
     <ContextoAvisos.Provider value={api}>
-      {children}
+      <ContextoRegioes.Provider value={registrarRegiao}>{children}</ContextoRegioes.Provider>
       {/* A região existe desde o início (senão leitores de tela ignoram o 1º aviso). */}
-      {/* `data-avisos`: diálogos abertos não se fecham com cliques aqui (ex.: "Desfazer"). */}
-      <div
-        data-avisos
-        aria-live="polite"
-        aria-relevant="additions text"
-        className="pointer-events-none fixed inset-x-0 bottom-[calc(4.25rem+env(safe-area-inset-bottom))] z-[60] flex justify-center pr-[max(1rem,env(safe-area-inset-right))] pl-[max(1rem,env(safe-area-inset-left))] md:inset-x-auto md:right-6 md:bottom-6 md:p-0"
-      >
-        <ol className="flex w-full max-w-sm flex-col gap-2">
-          {visiveis(estado).map((aviso) => (
-            <ItemAviso
-              key={aviso.id}
-              aviso={aviso}
-              aoFechar={fechar}
-              aoPausar={pausar}
-              avisar={avisar}
-            />
-          ))}
-        </ol>
-      </div>
+      <div {...PROPS_REGIAO}>{regiaoDialogo ? null : lista}</div>
+      {regiaoDialogo ? createPortal(lista, regiaoDialogo) : null}
     </ContextoAvisos.Provider>
   );
+}
+
+/**
+ * Região de avisos dentro de um diálogo modal (renderizada pelo `DialogContent` e pelo
+ * `AlertDialogContent`): fica dentro da árvore acessível e do focus trap do diálogo. Vazia ao
+ * montar, como a região global, para os avisos seguintes serem anunciados. O diálogo não pode ter
+ * `transform` (a posição `fixed` passaria a ser relativa a ele). Fora do provider, não renderiza.
+ */
+export function RegiaoAvisos() {
+  const registrar = useContext(ContextoRegioes);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!registrar || !ref.current) return;
+    return registrar(ref.current);
+  }, [registrar]);
+  return registrar ? <div ref={ref} {...PROPS_REGIAO} /> : null;
 }
 
 /**

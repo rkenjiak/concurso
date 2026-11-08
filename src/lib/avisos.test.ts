@@ -1,6 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   adicionar,
+  agendarVencimento,
   DURACAO_LONGA_MS,
   DURACAO_PADRAO_MS,
   definirPausa,
@@ -139,5 +140,46 @@ describe("remover", () => {
   it("id inexistente devolve o mesmo estado", () => {
     const e = com([{ texto: "1" }]);
     expect(remover(e, 42, 0)).toBe(e);
+  });
+});
+
+describe("agendarVencimento", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("timer adiantado reagenda o que falta em vez de deixar o aviso preso", () => {
+    vi.useFakeTimers();
+    let relogio = 0;
+    const aoVencer = vi.fn();
+    const e = com([{ texto: "a" }]);
+    agendarVencimento(e, aoVencer, () => relogio);
+
+    // O timer dispara, mas o relógio ainda está 5 ms antes do prazo.
+    relogio = DURACAO_PADRAO_MS - 5;
+    vi.advanceTimersByTime(DURACAO_PADRAO_MS);
+    expect(aoVencer).not.toHaveBeenCalled();
+
+    relogio = DURACAO_PADRAO_MS;
+    vi.advanceTimersByTime(5);
+    expect(aoVencer).toHaveBeenCalledExactlyOnceWith(DURACAO_PADRAO_MS);
+    expect(expirar(e, DURACAO_PADRAO_MS).avisos).toHaveLength(0);
+  });
+
+  it("chama no prazo, não agenda sem relógio correndo e pode ser cancelado", () => {
+    vi.useFakeTimers();
+    const aoVencer = vi.fn();
+    agendarVencimento(ESTADO_INICIAL, aoVencer, () => 0);
+    expect(vi.getTimerCount()).toBe(0);
+
+    const cancelar = agendarVencimento(com([{ texto: "a" }]), aoVencer, () => 0);
+    cancelar();
+    vi.advanceTimersByTime(DURACAO_PADRAO_MS * 2);
+    expect(aoVencer).not.toHaveBeenCalled();
+
+    vi.setSystemTime(0);
+    agendarVencimento(com([{ texto: "a" }]), aoVencer);
+    vi.advanceTimersByTime(DURACAO_PADRAO_MS);
+    expect(aoVencer).toHaveBeenCalledExactlyOnceWith(DURACAO_PADRAO_MS);
   });
 });

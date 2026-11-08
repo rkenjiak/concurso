@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { cadastrarConcurso, emDias, unico } from "./utils";
+import { cadastrarConcurso, emDias, regiaoAvisos, unico } from "./utils";
 
 test("dashboard: ocultar um prazo, mostrar ocultos e reexibir (persistente)", async ({ page }) => {
   const id = unico();
@@ -37,7 +37,9 @@ test("dashboard: ocultar um prazo, mostrar ocultos e reexibir (persistente)", as
   await expect(contador).toHaveText("1 oculto");
   // O painel continua aberto (o item saiu da lista) e já oferece reexibir.
   await expect(painel.getByRole("button", { name: "Mostrar no dashboard" })).toBeVisible();
-  await expect(page.locator("[data-avisos]")).toContainText(`“${titulo}” oculto do dashboard.`);
+  // O aviso sai dentro do painel (fora dele ficaria `aria-hidden`).
+  await expect(painel.locator("[data-avisos]")).toContainText(`“${titulo}” oculto do dashboard.`);
+  await expect(regiaoAvisos(page)).toContainText(`“${titulo}” oculto do dashboard.`);
   await page.keyboard.press("Escape");
   await expect(painel).toBeHidden();
 

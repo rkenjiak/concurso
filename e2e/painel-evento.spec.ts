@@ -1,6 +1,6 @@
 import { expect, type Page, test } from "@playwright/test";
 import { mesDaData } from "../src/domain/calendario";
-import { cadastrarConcurso, emDias, unico } from "./utils";
+import { cadastrarConcurso, emDias, regiaoAvisos, unico } from "./utils";
 
 /** Cadastra um evento na aba Eventos do concurso aberto. */
 async function adicionarEvento(
@@ -17,7 +17,7 @@ async function adicionarEvento(
   await expect(dialogo).toBeHidden();
 }
 
-const avisos = (page: Page) => page.locator("[data-avisos]");
+const avisos = regiaoAvisos;
 
 test("dashboard: concluir na linha, Desfazer devolve o prazo e o foco (#100, D5/D6)", async ({
   page,
@@ -93,6 +93,49 @@ test("calendário: concluir, reabrir e editar pelo painel do evento (#100)", asy
   await expect(avisos(page)).toContainText("Evento salvo.");
   await expect(item).toContainText("14:30");
   await expect(item).not.toHaveAttribute("data-esmaecido");
+});
+
+test("teclado: com o painel aberto, o aviso é anunciado nele e o Desfazer é alcançável (#100, D4)", async ({
+  page,
+}) => {
+  const id = unico();
+  const titulo = `Boleto teclado ${id}`;
+  const data = emDias(3);
+  await cadastrarConcurso(page, {
+    orgao: `Teclado ${id}`,
+    cargo: "Analista",
+    status: "Inscrito",
+  });
+  await adicionarEvento(page, { tipo: "Vencimento do boleto", titulo, data });
+
+  await page.goto(`/calendario?mes=${mesDaData(data)}`);
+  await page.locator(`td[data-data="${data}"]`).getByRole("button", { name: titulo }).focus();
+  await page.keyboard.press("Enter");
+  const painel = page.getByRole("dialog", { name: titulo });
+  await expect(painel).toBeVisible();
+  await painel.getByRole("button", { name: "Marcar como concluído" }).focus();
+  await page.keyboard.press("Enter");
+
+  // O aviso fica na região polite dentro do diálogo, fora de qualquer `aria-hidden`.
+  const regiao = painel.locator("[data-avisos]");
+  await expect(regiao).toHaveAttribute("aria-live", "polite");
+  await expect(regiao).toContainText(`“${titulo}” concluído.`);
+  expect(await regiao.evaluate((el) => el.closest("[aria-hidden=true]") === null)).toBe(true);
+
+  // Tab (dentro do focus trap) chega ao "Desfazer".
+  const desfazer = regiao.getByRole("button", { name: "Desfazer" });
+  for (
+    let i = 0;
+    i < 20 && !(await desfazer.evaluate((el) => el === document.activeElement));
+    i++
+  ) {
+    await page.keyboard.press("Tab");
+  }
+  await expect(desfazer).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(painel.getByRole("button", { name: "Marcar como concluído" })).toBeVisible();
+  await expect(regiao).not.toContainText(`“${titulo}” concluído.`);
+  await expect(painel).toBeVisible();
 });
 
 test("concluir o fim das inscrições abre o painel com a pergunta de status (#100, D5)", async ({

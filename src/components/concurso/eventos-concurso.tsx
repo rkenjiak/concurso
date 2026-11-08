@@ -224,7 +224,7 @@ export function EventosConcurso({ concursoId, eventos }: EventosConcursoProps) {
   );
 }
 
-interface FormularioEventoProps {
+export interface FormularioEventoProps {
   concursoId: number;
   evento: EventoItem | null;
   aoConcluir: () => void;
@@ -237,9 +237,14 @@ const CAMPOS = ["tipo", "titulo", "data", "hora", "local", "observacao", "conclu
  * Formulário do modal de evento. Ao criar, "Salvar e adicionar outro" (#100, D9) salva, volta
  * todos os campos ao padrão (inclusive o tipo: cada data do edital costuma ser de um tipo
  * diferente — inscrições, boleto, prova — e manter o anterior induziria a erro) e devolve o foco
- * ao primeiro campo, anunciando o evento salvo.
+ * ao primeiro campo, anunciando o evento salvo. Também usado no painel do evento (#100).
  */
-function FormularioEvento({ concursoId, evento, aoConcluir, aoCancelar }: FormularioEventoProps) {
+export function FormularioEvento({
+  concursoId,
+  evento,
+  aoConcluir,
+  aoCancelar,
+}: FormularioEventoProps) {
   const [erroGeral, setErroGeral] = useState<string | null>(null);
   const [salvo, setSalvo] = useState<string | null>(null);
   const [enviando, iniciar] = useTransition();

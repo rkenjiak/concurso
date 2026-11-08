@@ -44,16 +44,17 @@ test("cadastrar concurso → mudar status → adicionar evento → ver no dashbo
   await page.getByRole("tab", { name: "Histórico" }).click();
   await expect(page.getByText(/^Pendência: .*marcada para/)).toBeVisible();
 
-  // Dashboard: a contagem e o prazo aparecem com o concurso; o prazo leva ao detalhe.
+  // Dashboard: a contagem e o prazo aparecem com o concurso; o nome do concurso, link irmão da
+  // área que abre o painel (#100, D6), leva ao detalhe.
   await page.goto("/");
   await expect(
     page.getByTestId("lista-contagens").getByRole("link", { name: new RegExp(orgao) }),
   ).toBeVisible();
   const prazo = page
     .getByRole("region", { name: /^Próximos \d+ dias$/ })
-    .getByRole("link", { name: new RegExp(titulo) });
-  await expect(prazo).toBeVisible();
-  await expect(prazo).toContainText(orgao);
-  await prazo.click();
+    .getByRole("listitem")
+    .filter({ hasText: titulo });
+  await expect(prazo.locator("[data-painel-chave]")).toBeVisible();
+  await prazo.getByRole("link", { name: new RegExp(orgao) }).click();
   await expect(page.getByRole("heading", { level: 1, name: orgao })).toBeVisible();
 });

@@ -4,11 +4,18 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { AgendaMes, GradeMes, LegendaConcursos } from "@/components/calendario/calendario-mensal";
 import { SeletorMes } from "@/components/calendario/seletor-mes";
+import { PainelEventoProvider } from "@/components/evento/painel-evento";
 import { COR_URGENCIA } from "@/components/evento/urgencia";
 import { CabecalhoPagina } from "@/components/layout/cabecalho-pagina";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { deslocarMes, lerMes, mesDaData, montarGradeMes } from "@/domain/calendario";
+import {
+  deslocarMes,
+  lerMes,
+  mesDaData,
+  montarGradeMes,
+  proximosDoConcurso,
+} from "@/domain/calendario";
 import {
   contarPorMes,
   filtrarPorSelecao,
@@ -21,6 +28,7 @@ import {
   proximaProva,
   proximoMesComEventos,
 } from "@/domain/navegacao-calendario";
+import { paraPainel } from "@/domain/painel-evento";
 import { formatarMes } from "@/lib/format";
 import { hojeSP } from "@/lib/tz";
 import { cn } from "@/lib/utils";
@@ -54,6 +62,8 @@ export default async function CalendarioPage({ searchParams }: PageProps<"/calen
   const seguinte = deslocarMes(mes, 1);
   const href = (m: string) => hrefCalendario(m, selecao);
   const origem = { de: "calendario", mes, selecao } as const;
+  // Painel do evento (#100): próximos do mesmo concurso em qualquer mês, não só no exibido.
+  const itensPainel = itens.map((i) => paraPainel(i, proximosDoConcurso(visiveis, i, hoje)));
   const vazio =
     selecao?.length === 0
       ? "Nenhum concurso selecionado. Use “Mostrar todos” abaixo."
@@ -139,15 +149,17 @@ export default async function CalendarioPage({ searchParams }: PageProps<"/calen
             ) : null}
           </nav>
 
-          <div className="hidden space-y-2 md:block">
-            {vazio && itens.length === 0 ? (
-              <p className="text-muted-foreground text-sm">{vazio}</p>
-            ) : null}
-            <GradeMes grade={grade} itens={itens} titulo={titulo} hoje={hoje} origem={origem} />
-          </div>
-          <div className="md:hidden">
-            <AgendaMes itens={itens} hoje={hoje} vazio={vazio} origem={origem} />
-          </div>
+          <PainelEventoProvider itens={itensPainel} origem={origem}>
+            <div className="hidden space-y-2 md:block">
+              {vazio && itens.length === 0 ? (
+                <p className="text-muted-foreground text-sm">{vazio}</p>
+              ) : null}
+              <GradeMes grade={grade} itens={itens} titulo={titulo} />
+            </div>
+            <div className="md:hidden">
+              <AgendaMes itens={itens} hoje={hoje} vazio={vazio} />
+            </div>
+          </PainelEventoProvider>
 
           <LegendaConcursos
             mes={mes}

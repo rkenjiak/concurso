@@ -1,18 +1,11 @@
 import { AlertTriangle, Clock } from "lucide-react";
-import { DetalhesEvento } from "@/components/calendario/detalhes-evento";
 import { FiltroConcursos } from "@/components/calendario/filtro-concursos";
 import { MarcadorConcurso } from "@/components/concurso/marcador-concurso";
 import { NomeEvento } from "@/components/evento/nome-evento";
+import { BotaoAbrirEvento } from "@/components/evento/painel-evento";
 import { COR_URGENCIA } from "@/components/evento/urgencia";
-import {
-  agruparPorData,
-  DIAS_SEMANA,
-  type DiaGrade,
-  type MesISO,
-  proximosDoConcurso,
-} from "@/domain/calendario";
+import { agruparPorData, DIAS_SEMANA, type DiaGrade, type MesISO } from "@/domain/calendario";
 import { concursoVisivel, type SelecaoConcursos } from "@/domain/navegacao-calendario";
-import type { Origem } from "@/domain/navegacao-concurso";
 import { nomePrazo, ROTULO_SITUACAO } from "@/domain/prazos";
 import { formatarDataLonga } from "@/lib/format";
 import type { DataISO } from "@/lib/tz";
@@ -36,61 +29,49 @@ function rotuloItem(item: ItemDoCalendario): string {
   return partes.join(" · ");
 }
 
-/** Item compacto da grade (desktop); abre os detalhes do evento. */
-function ItemGrade({
-  item,
-  proximos,
-  origem,
-}: {
-  item: ItemDoCalendario;
-  proximos: readonly ItemDoCalendario[];
-  origem: Origem;
-}) {
+/** Item compacto da grade (desktop); abre o painel do evento (#100). */
+function ItemGrade({ item }: { item: ItemDoCalendario }) {
   return (
     <li>
-      <DetalhesEvento item={item} proximos={proximos} origem={origem}>
-        <button
-          type="button"
-          title={rotuloItem(item)}
-          aria-label={rotuloItem(item)}
-          data-criticidade={item.criticidade}
-          data-esmaecido={item.esmaecido || undefined}
-          className={cn(
-            "block w-full cursor-pointer truncate rounded border-l-4 text-left bg-muted/60 px-1.5 py-0.5 text-xs transition-colors hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring",
-            COR_URGENCIA[item.criticidade].bordaEsquerda,
-            COR_URGENCIA[item.criticidade].fundo,
-            item.criticidade === "ALTA" && "font-medium",
-            item.esmaecido && "text-muted-foreground opacity-60",
-          )}
-        >
-          <MarcadorConcurso
-            cor={item.concurso.cor}
-            icone={item.concurso.icone}
-            tamanho="sm"
-            className="mr-1"
-          />
-          {item.hora ? <span className="tabular-nums">{item.hora} </span> : null}
-          <NomeEvento nome={nomePrazo(item)} concluido={item.concluido} /> · {item.concurso.orgao}
-        </button>
-      </DetalhesEvento>
+      <BotaoAbrirEvento
+        chave={item.chave}
+        title={rotuloItem(item)}
+        aria-label={rotuloItem(item)}
+        data-criticidade={item.criticidade}
+        data-esmaecido={item.esmaecido || undefined}
+        className={cn(
+          "block w-full cursor-pointer truncate rounded border-l-4 text-left bg-muted/60 px-1.5 py-0.5 text-xs transition-colors hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring",
+          COR_URGENCIA[item.criticidade].bordaEsquerda,
+          COR_URGENCIA[item.criticidade].fundo,
+          item.criticidade === "ALTA" && "font-medium",
+          item.esmaecido && "text-muted-foreground opacity-60",
+        )}
+      >
+        <MarcadorConcurso
+          cor={item.concurso.cor}
+          icone={item.concurso.icone}
+          tamanho="sm"
+          className="mr-1"
+        />
+        {item.hora ? <span className="tabular-nums">{item.hora} </span> : null}
+        <NomeEvento nome={nomePrazo(item)} concluido={item.concluido} /> · {item.concurso.orgao}
+      </BotaoAbrirEvento>
     </li>
   );
 }
 
-/** Grade mensal (a partir de `md`): semanas de domingo a sábado. */
+/**
+ * Grade mensal (a partir de `md`): semanas de domingo a sábado. Os itens abrem o painel do
+ * evento: precisa de um `PainelEventoProvider` acima.
+ */
 export function GradeMes({
   grade,
   itens,
   titulo,
-  hoje,
-  origem,
 }: {
   grade: DiaGrade[][];
   itens: readonly ItemDoCalendario[];
   titulo: string;
-  hoje: DataISO;
-  /** Mês e seleção atuais, para o "voltar" do concurso (#100). */
-  origem: Origem;
 }) {
   const porData = agruparPorData(itens);
   return (
@@ -114,13 +95,7 @@ export function GradeMes({
         {grade.map((semana) => (
           <tr key={semana[0]?.data}>
             {semana.map((dia) => (
-              <CelulaDia
-                key={dia.data}
-                dia={dia}
-                itens={porData.get(dia.data) ?? []}
-                proximos={(item) => proximosDoConcurso(itens, item, hoje)}
-                origem={origem}
-              />
+              <CelulaDia key={dia.data} dia={dia} itens={porData.get(dia.data) ?? []} />
             ))}
           </tr>
         ))}
@@ -129,17 +104,7 @@ export function GradeMes({
   );
 }
 
-function CelulaDia({
-  dia,
-  itens,
-  proximos,
-  origem,
-}: {
-  dia: DiaGrade;
-  itens: readonly ItemDoCalendario[];
-  proximos: (item: ItemDoCalendario) => ItemDoCalendario[];
-  origem: Origem;
-}) {
+function CelulaDia({ dia, itens }: { dia: DiaGrade; itens: readonly ItemDoCalendario[] }) {
   return (
     <td
       aria-current={dia.hoje ? "date" : undefined}
@@ -162,7 +127,7 @@ function CelulaDia({
       {dia.doMes && itens.length > 0 ? (
         <ul className="space-y-1">
           {itens.map((item) => (
-            <ItemGrade key={item.chave} item={item} proximos={proximos(item)} origem={origem} />
+            <ItemGrade key={item.chave} item={item} />
           ))}
         </ul>
       ) : null}
@@ -170,17 +135,17 @@ function CelulaDia({
   );
 }
 
-/** Agenda do mês (celular): só os dias com itens, em ordem. */
+/**
+ * Agenda do mês (celular): só os dias com itens, em ordem. Os itens abrem o painel do evento:
+ * precisa de um `PainelEventoProvider` acima.
+ */
 export function AgendaMes({
   itens,
   hoje,
-  origem,
   vazio = "Nenhum evento neste mês.",
 }: {
   itens: readonly ItemDoCalendario[];
   hoje: DataISO;
-  /** Mês e seleção atuais, para o "voltar" do concurso (#100). */
-  origem: Origem;
   /** Texto quando não há itens (ex.: todos ocultos pelo filtro de concursos). */
   vazio?: string;
 }) {
@@ -207,40 +172,34 @@ export function AgendaMes({
                 key={item.chave}
                 className={cn("border-l-4", COR_URGENCIA[item.criticidade].bordaEsquerda)}
               >
-                <DetalhesEvento
-                  item={item}
-                  proximos={proximosDoConcurso(itens, item, hoje)}
-                  origem={origem}
+                <BotaoAbrirEvento
+                  chave={item.chave}
+                  className={cn(
+                    "flex w-full cursor-pointer gap-2 p-3 text-left transition-colors hover:bg-accent/50 focus-visible:outline-2 focus-visible:outline-ring",
+                    item.esmaecido && "text-muted-foreground opacity-60",
+                  )}
                 >
-                  <button
-                    type="button"
-                    className={cn(
-                      "flex w-full cursor-pointer gap-2 p-3 text-left transition-colors hover:bg-accent/50 focus-visible:outline-2 focus-visible:outline-ring",
-                      item.esmaecido && "text-muted-foreground opacity-60",
-                    )}
-                  >
-                    <div className="min-w-0 flex-1 space-y-0.5">
-                      <p className="flex items-center gap-1.5 font-medium">
-                        {item.criticidade === "ALTA" ? (
-                          <AlertTriangle className="size-4 shrink-0 text-destructive" aria-hidden />
-                        ) : null}
-                        <NomeEvento nome={nomePrazo(item)} concluido={item.concluido} />
-                      </p>
-                      <p className="flex items-center gap-1.5 text-muted-foreground text-sm">
-                        <MarcadorConcurso cor={item.concurso.cor} icone={item.concurso.icone} />
-                        <span className="min-w-0 truncate">
-                          {item.concurso.orgao} — {item.concurso.cargo}
-                        </span>
-                      </p>
-                    </div>
-                    {item.hora ? (
-                      <span className="inline-flex shrink-0 items-center gap-1 text-muted-foreground text-xs">
-                        <Clock className="size-3" aria-hidden />
-                        {item.hora}
+                  <div className="min-w-0 flex-1 space-y-0.5">
+                    <p className="flex items-center gap-1.5 font-medium">
+                      {item.criticidade === "ALTA" ? (
+                        <AlertTriangle className="size-4 shrink-0 text-destructive" aria-hidden />
+                      ) : null}
+                      <NomeEvento nome={nomePrazo(item)} concluido={item.concluido} />
+                    </p>
+                    <p className="flex items-center gap-1.5 text-muted-foreground text-sm">
+                      <MarcadorConcurso cor={item.concurso.cor} icone={item.concurso.icone} />
+                      <span className="min-w-0 truncate">
+                        {item.concurso.orgao} — {item.concurso.cargo}
                       </span>
-                    ) : null}
-                  </button>
-                </DetalhesEvento>
+                    </p>
+                  </div>
+                  {item.hora ? (
+                    <span className="inline-flex shrink-0 items-center gap-1 text-muted-foreground text-xs">
+                      <Clock className="size-3" aria-hidden />
+                      {item.hora}
+                    </span>
+                  ) : null}
+                </BotaoAbrirEvento>
               </li>
             ))}
           </ul>

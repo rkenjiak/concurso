@@ -38,7 +38,9 @@ test("dashboard → prazo abre a aba Eventos com o evento focado; voltar leva ao
   await page.goto("/");
   await page
     .getByRole("region", { name: /^Próximos \d+ dias$/ })
-    .getByRole("link", { name: new RegExp(titulo) })
+    .getByRole("listitem")
+    .filter({ hasText: titulo })
+    .getByRole("link", { name: new RegExp(orgao) })
     .click();
   await expect(page).toHaveURL(`${detalhe}?aba=eventos&evento=${eventoId}&de=dashboard`);
   await expect(page.getByRole("tab", { name: /^Eventos/ })).toHaveAttribute(

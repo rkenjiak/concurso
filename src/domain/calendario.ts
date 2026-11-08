@@ -242,14 +242,12 @@ export function agruparPorData<T extends { data: DataISO }>(
 
 /**
  * Próximos itens pendentes do mesmo concurso de `item` (de `hoje` em diante, sem o próprio item),
- * na ordem de `itens` (já ordenados), limitados a `limite`. Resumo exibido nos detalhes do evento.
+ * na ordem de `itens` (já ordenados), limitados a `limite`. Resumo exibido no painel do evento
+ * (calendário e prazos do dashboard, #100).
  */
-export function proximosDoConcurso<T extends ItemCalendario>(
-  itens: readonly T[],
-  item: T,
-  hoje: DataISO,
-  limite = 3,
-): T[] {
+export function proximosDoConcurso<
+  T extends { chave: string; data: DataISO; concurso: { id: number }; concluido?: boolean },
+>(itens: readonly T[], item: T, hoje: DataISO, limite = 3): T[] {
   const proximos: T[] = [];
   for (const i of itens) {
     if (proximos.length >= limite) break;

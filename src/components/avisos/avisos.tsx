@@ -97,7 +97,9 @@ export function AvisosProvider({ children }: { children: ReactNode }) {
     <ContextoAvisos.Provider value={api}>
       {children}
       {/* A região existe desde o início (senão leitores de tela ignoram o 1º aviso). */}
+      {/* `data-avisos`: diálogos abertos não se fecham com cliques aqui (ex.: "Desfazer"). */}
       <div
+        data-avisos
         aria-live="polite"
         aria-relevant="additions text"
         className="pointer-events-none fixed inset-x-0 bottom-[calc(4.25rem+env(safe-area-inset-bottom))] z-[60] flex justify-center pr-[max(1rem,env(safe-area-inset-right))] pl-[max(1rem,env(safe-area-inset-left))] md:inset-x-auto md:right-6 md:bottom-6 md:p-0"

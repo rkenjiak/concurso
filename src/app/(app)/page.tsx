@@ -7,6 +7,7 @@ import { BadgeStatus } from "@/components/concurso/badge-status";
 import { ListaContagens } from "@/components/concurso/contagem-prova";
 import { SugestaoStatus } from "@/components/concurso/sugestao-status";
 import { ListaPrazos } from "@/components/dashboard/lista-prazos";
+import { PainelEventoProvider } from "@/components/evento/painel-evento";
 import { CabecalhoPagina } from "@/components/layout/cabecalho-pagina";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,8 +18,9 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { mesDaData } from "@/domain/calendario";
+import { mesDaData, proximosDoConcurso } from "@/domain/calendario";
 import { hrefCalendario } from "@/domain/navegacao-calendario";
+import { paraPainel } from "@/domain/painel-evento";
 import { JANELA_PADRAO_DIAS, semOcultos, totalPrazos } from "@/domain/prazos";
 import { ehAtivo } from "@/domain/status";
 import { formatarData, formatarMes } from "@/lib/format";
@@ -82,6 +84,9 @@ export default async function DashboardPage({ searchParams }: PageProps<"/">) {
   const { porStatus, totalConcursos, ocultos } = dashboard;
   const prazos = mostrarOcultos ? dashboard.prazos : semOcultos(dashboard.prazos);
   const totalExibidos = totalPrazos(prazos);
+  // Dados do painel do evento (#100): os prazos exibidos, com os próximos do mesmo concurso.
+  const listados = [...prazos.vencidos, ...prazos.hoje, ...prazos.proximos];
+  const itensPainel = listados.map((p) => paraPainel(p, proximosDoConcurso(listados, p, hoje)));
   // Primeira prova fora da lista (a 7ª): o "Ver mais" abre o calendário no mês dela (#100, D13).
   const proximaOculta = contagens[MAX_CONTAGENS];
   const mesVerMais = proximaOculta ? mesDaData(proximaOculta.contagem.evento.data) : null;
@@ -183,52 +188,58 @@ export default async function DashboardPage({ searchParams }: PageProps<"/">) {
               </CardAction>
             ) : null}
           </CardHeader>
-          <CardContent className="space-y-6">
-            {totalExibidos === 0 ? (
-              <div className="space-y-2 py-6 text-center">
-                <CalendarCheck className="mx-auto size-8 text-muted-foreground" aria-hidden />
-                {ocultos > 0 ? (
-                  <>
-                    <p className="font-medium">Todos os prazos estão ocultos</p>
-                    <p className="text-muted-foreground text-sm">
-                      Use “Mostrar ocultos” para vê-los e reexibir os que voltarem a interessar.
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <p className="font-medium">
-                      Nenhum prazo nos próximos {JANELA_PADRAO_DIAS} dias
-                    </p>
-                    <p className="text-muted-foreground text-sm">
-                      Adicione eventos na aba “Eventos” de cada concurso para acompanhá-los aqui.
-                    </p>
-                  </>
-                )}
-              </div>
-            ) : (
-              <>
-                {prazos.vencidos.length > 0 ? (
-                  <Grupo
-                    titulo="Vencidos"
-                    descricao="Prazos críticos não marcados como concluídos"
-                    vazio=""
-                    quantidade={prazos.vencidos.length}
-                  >
-                    <ListaPrazos prazos={prazos.vencidos} />
+          <CardContent>
+            <PainelEventoProvider
+              itens={itensPainel}
+              origem={{ de: "dashboard" }}
+              className="space-y-6"
+            >
+              {totalExibidos === 0 ? (
+                <div className="space-y-2 py-6 text-center">
+                  <CalendarCheck className="mx-auto size-8 text-muted-foreground" aria-hidden />
+                  {ocultos > 0 ? (
+                    <>
+                      <p className="font-medium">Todos os prazos estão ocultos</p>
+                      <p className="text-muted-foreground text-sm">
+                        Use “Mostrar ocultos” para vê-los e reexibir os que voltarem a interessar.
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="font-medium">
+                        Nenhum prazo nos próximos {JANELA_PADRAO_DIAS} dias
+                      </p>
+                      <p className="text-muted-foreground text-sm">
+                        Adicione eventos na aba “Eventos” de cada concurso para acompanhá-los aqui.
+                      </p>
+                    </>
+                  )}
+                </div>
+              ) : (
+                <>
+                  {prazos.vencidos.length > 0 ? (
+                    <Grupo
+                      titulo="Vencidos"
+                      descricao="Prazos críticos não marcados como concluídos"
+                      vazio=""
+                      quantidade={prazos.vencidos.length}
+                    >
+                      <ListaPrazos prazos={prazos.vencidos} />
+                    </Grupo>
+                  ) : null}
+                  <Grupo titulo="Hoje" vazio="Nada para hoje." quantidade={prazos.hoje.length}>
+                    <ListaPrazos prazos={prazos.hoje} />
                   </Grupo>
-                ) : null}
-                <Grupo titulo="Hoje" vazio="Nada para hoje." quantidade={prazos.hoje.length}>
-                  <ListaPrazos prazos={prazos.hoje} />
-                </Grupo>
-                <Grupo
-                  titulo={`Próximos ${JANELA_PADRAO_DIAS} dias`}
-                  vazio="Nenhum prazo nos próximos dias."
-                  quantidade={prazos.proximos.length}
-                >
-                  <ListaPrazos prazos={prazos.proximos} />
-                </Grupo>
-              </>
-            )}
+                  <Grupo
+                    titulo={`Próximos ${JANELA_PADRAO_DIAS} dias`}
+                    vazio="Nenhum prazo nos próximos dias."
+                    quantidade={prazos.proximos.length}
+                  >
+                    <ListaPrazos prazos={prazos.proximos} />
+                  </Grupo>
+                </>
+              )}
+            </PainelEventoProvider>
           </CardContent>
         </Card>
 

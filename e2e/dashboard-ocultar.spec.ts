@@ -20,33 +20,50 @@ test("dashboard: ocultar um prazo, mostrar ocultos e reexibir (persistente)", as
   await expect(dialogo).toBeHidden();
 
   await page.goto("/");
-  const item = page.getByRole("listitem").filter({ hasText: titulo });
+  const item = page.getByRole("main").getByRole("listitem").filter({ hasText: titulo });
   await expect(item).toBeVisible();
   const contador = page.getByTestId("contador-ocultos");
   await expect(contador).toHaveCount(0);
 
-  // Ocultar: some da lista e o contador aparece.
-  await item.getByRole("button", { name: `Ocultar "${titulo}" do dashboard` }).click();
+  // Ocultar fica no painel do evento (#100, D6), com a dica de que não conclui o prazo.
+  await item.locator("[data-painel-chave]").click();
+  const painel = page.getByRole("dialog", { name: titulo });
+  const ocultar = painel.getByRole("button", { name: "Ocultar do dashboard" });
+  await expect(ocultar).toHaveAccessibleDescription(
+    "Ocultar só remove do dashboard; o prazo continua pendente.",
+  );
+  await ocultar.click();
   await expect(item).toHaveCount(0);
   await expect(contador).toHaveText("1 oculto");
+  // O painel continua aberto (o item saiu da lista) e já oferece reexibir.
+  await expect(painel.getByRole("button", { name: "Mostrar no dashboard" })).toBeVisible();
+  await expect(page.locator("[data-avisos]")).toContainText(`“${titulo}” oculto do dashboard.`);
+  await page.keyboard.press("Escape");
+  await expect(painel).toBeHidden();
 
   // Persiste entre carregamentos (gravado no banco).
   await page.reload();
-  await expect(page.getByRole("listitem").filter({ hasText: titulo })).toHaveCount(0);
+  await expect(
+    page.getByRole("main").getByRole("listitem").filter({ hasText: titulo }),
+  ).toHaveCount(0);
   await expect(contador).toHaveText("1 oculto");
 
-  // "Mostrar ocultos" exibe o prazo esmaecido, com a ação de reexibir.
+  // "Mostrar ocultos" exibe o prazo esmaecido; o painel oferece reexibir.
   await page.getByRole("link", { name: "Mostrar ocultos" }).click();
   await expect(page).toHaveURL(/\?ocultos=1$/);
   await expect(item).toBeVisible();
   await expect(item).toHaveAttribute("data-oculto", "true");
   await expect(item).toContainText("Oculto");
 
-  await item.getByRole("button", { name: `Mostrar "${titulo}" no dashboard` }).click();
+  await item.locator("[data-painel-chave]").click();
+  await painel.getByRole("button", { name: "Mostrar no dashboard" }).click();
   await expect(contador).toHaveCount(0);
+  await page.keyboard.press("Escape");
   await page.goto("/");
-  await expect(page.getByRole("listitem").filter({ hasText: titulo })).toBeVisible();
-  await expect(page.getByRole("listitem").filter({ hasText: titulo })).not.toHaveAttribute(
-    "data-oculto",
-  );
+  await expect(
+    page.getByRole("main").getByRole("listitem").filter({ hasText: titulo }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("main").getByRole("listitem").filter({ hasText: titulo }),
+  ).not.toHaveAttribute("data-oculto");
 });

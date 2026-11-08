@@ -115,3 +115,34 @@ export async function listarPendenciasStatus(
     return pendencia ? [{ ...c, cor: corDoConcurso(c), pendencia }] : [];
   });
 }
+
+/**
+ * Pendência de status ligada a um evento recém-concluído (#100, D5): a pendência exibida para o
+ * concurso, só se for desse evento (senão `null`). Restrita ao concurso do usuário.
+ */
+export async function obterPendenciaDoEvento(
+  db: Db | Executor,
+  usuarioId: number,
+  concursoId: number,
+  eventoId: number,
+  hoje: DataISO,
+): Promise<PendenciaStatus | null> {
+  const [c] = await db
+    .select({ status: concurso.status })
+    .from(concurso)
+    .where(and(eq(concurso.id, concursoId), eq(concurso.usuarioId, usuarioId)));
+  if (!c) return null;
+  const eventos = await db
+    .select({
+      id: evento.id,
+      tipo: evento.tipo,
+      titulo: evento.titulo,
+      data: evento.data,
+      hora: evento.hora,
+      concluido: evento.concluido,
+    })
+    .from(evento)
+    .where(and(eq(evento.concursoId, concursoId), inArray(evento.tipo, TIPOS_PENDENCIA)));
+  const pendencia = await obterPendenciaConcurso(db, concursoId, c.status, eventos, hoje);
+  return pendencia?.eventoId === eventoId ? pendencia : null;
+}

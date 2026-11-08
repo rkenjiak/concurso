@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { AvisosProvider } from "@/components/avisos/avisos";
 import { BotaoAtualizar } from "@/components/layout/botao-atualizar";
 import { Marca } from "@/components/layout/marca";
 import { type ContaMenu, MenuConta } from "@/components/layout/menu-conta";
@@ -22,7 +23,10 @@ interface CascaProps {
   children: ReactNode;
 }
 
-/** Estrutura das páginas: navegação lateral (desktop) e inferior (celular) e menu da conta. */
+/**
+ * Estrutura das páginas: navegação lateral (desktop) e inferior (celular), menu da conta e a pilha
+ * de avisos (#100, D4).
+ */
 export function Casca({
   visao,
   conta,
@@ -36,7 +40,7 @@ export function Casca({
   const secao = visao === "admin" ? "admin" : "app";
   const menu = { conta, ehAdmin, visao, podeSair };
   return (
-    <>
+    <AvisosProvider>
       <div className="flex min-h-dvh">
         <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col gap-6 border-r bg-sidebar p-4 text-sidebar-foreground md:flex">
           <div className="flex items-center gap-2">
@@ -78,6 +82,6 @@ export function Casca({
         </div>
       </div>
       <NavegacaoInferior secao={secao} />
-    </>
+    </AvisosProvider>
   );
 }

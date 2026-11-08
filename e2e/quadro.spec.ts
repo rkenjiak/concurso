@@ -1,6 +1,15 @@
 import { expect, type Page, test } from "@playwright/test";
 import { cadastrarConcurso, unico } from "./utils";
 
+/** Aviso global (#100, D4) com o texto dado. */
+const aviso = (page: Page, texto: string) =>
+  page
+    .getByRole("listitem")
+    .filter({ hasText: texto })
+    .filter({
+      has: page.getByRole("button", { name: "Fechar aviso" }),
+    });
+
 const coluna = (page: Page, nome: string) =>
   page.getByRole("region", { name: new RegExp(`^${nome}\\s*\\d+$`) });
 
@@ -24,14 +33,22 @@ test("quadro: mover pelo menu, desfazer e arrastar com transição inválida", a
 
   // Teclado/celular: "Mover para" usa as transições permitidas.
   await cartao.getByRole("combobox", { name: /Mover/ }).selectOption({ label: "Inscrito" });
-  await expect(page.getByText("movido para “Inscrito”")).toBeVisible();
+  // O aviso global anuncia a mudança (região polite) e oferece Desfazer.
+  await expect(aviso(page, "movido para “Inscrito”")).toBeVisible();
+  await expect(
+    page.locator("[aria-live=polite]").getByText("movido para “Inscrito”"),
+  ).toBeVisible();
+  // A dica de uso continua no quadro.
+  await expect(page.getByText("Arraste os cartões entre as colunas")).toBeVisible();
   await expect(coluna(page, "Inscrito").getByRole("listitem", { name: /Quadro E2E/ })).toHaveCount(
     1,
   );
 
   // Desfazer volta ao status anterior.
-  await page.getByRole("button", { name: "Desfazer" }).click();
-  await expect(page.getByText("de volta a “Previsto”")).toBeVisible();
+  await aviso(page, "movido para “Inscrito”").getByRole("button", { name: "Desfazer" }).click();
+  await expect(aviso(page, "de volta a “Previsto”")).toBeVisible();
+  // O aviso de "movido" foi substituído (mesmo concurso), não empilhado.
+  await expect(aviso(page, "movido para “Inscrito”")).toHaveCount(0);
   await expect(coluna(page, "Previsto").getByRole("listitem", { name: /Quadro E2E/ })).toHaveCount(
     1,
   );
@@ -44,7 +61,11 @@ test("quadro: mover pelo menu, desfazer e arrastar com transição inválida", a
 
   // Arrastar para trás é rejeitado com a mensagem do domínio.
   await cartao.dragTo(coluna(page, "Previsto"));
-  await expect(page.getByText("Não é possível mudar o status")).toBeVisible();
+  // Erro: role="alert"; fecha pelo botão com nome acessível.
+  const erro = page.getByRole("alert").filter({ hasText: "Não é possível mudar o status" });
+  await expect(erro).toBeVisible();
+  await erro.getByRole("button", { name: "Fechar aviso" }).click();
+  await expect(erro).toHaveCount(0);
   await expect(
     coluna(page, "Edital publicado").getByRole("listitem", { name: /Quadro E2E/ }),
   ).toHaveCount(1);

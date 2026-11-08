@@ -1,9 +1,10 @@
 "use client";
 
-import { CalendarDays, ChevronLeft, ChevronRight, GripVertical, Undo2 } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, GripVertical } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type DragEvent, useOptimistic, useState, useTransition } from "react";
+import { useAvisos } from "@/components/avisos/avisos";
 import { Button } from "@/components/ui/button";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import type { CorConcurso } from "@/domain/cores";
@@ -32,22 +33,18 @@ export interface CartaoQuadro {
   transicoes: Status[];
 }
 
-type Aviso =
-  | { tipo: "ok"; texto: string; concursoId: number }
-  | { tipo: "erro"; texto: string }
-  | { tipo: "info"; texto: string };
-
 const TIPO_ARRASTE = "application/x-concurso-id";
 
 /**
  * Quadro por status (kanban). Mover um cartão — arrastando no desktop ou pelo menu "Mover para"
  * (teclado/celular) — chama a mesma Server Action da troca de status do detalhe: a transição é
- * validada no servidor, o histórico é gravado e a última mudança pode ser desfeita.
+ * validada no servidor, o histórico é gravado e a última mudança pode ser desfeita pelo aviso
+ * global (#100, D4).
  */
 export function QuadroConcursos({ cartoes }: { cartoes: CartaoQuadro[] }) {
   const router = useRouter();
   const [pendente, iniciar] = useTransition();
-  const [aviso, setAviso] = useState<Aviso | null>(null);
+  const { avisar } = useAvisos();
   const [arrastando, setArrastando] = useState<CartaoQuadro | null>(null);
   const [agrupadasAbertas, setAgrupadasAbertas] = useState(false);
   const [otimistas, moverOtimista] = useOptimistic(
@@ -59,37 +56,48 @@ export function QuadroConcursos({ cartoes }: { cartoes: CartaoQuadro[] }) {
 
   function mover(cartao: CartaoQuadro, para: Status) {
     if (cartao.status === para) return;
-    setAviso(null);
     iniciar(async () => {
       moverOtimista({ id: cartao.id, para });
       const r = await alterarStatus(cartao.id, { para });
       if (r.ok) {
-        setAviso({
-          tipo: "ok",
+        avisar({
           texto: `“${cartao.orgao}” movido para “${ROTULO_STATUS[para]}”.`,
-          concursoId: cartao.id,
+          chave: `status-${cartao.id}`,
+          acao: { rotulo: "Desfazer", executar: () => desfazer(cartao.id) },
         });
       } else {
-        setAviso({ tipo: "erro", texto: r.erros._form?.[0] ?? "Não foi possível mover." });
+        avisar({
+          texto: r.erros._form?.[0] ?? "Não foi possível mover.",
+          tipo: "erro",
+          chave: `status-${cartao.id}`,
+        });
         // Falhou: nada foi revalidado; busca o estado atual (outra aba pode ter mudado o status).
         router.refresh();
       }
     });
   }
 
+  /** Desfaz a última mudança; a promessa termina com a ação (o aviso mostra a pendência). */
   function desfazer(concursoId: number) {
-    setAviso(null);
-    iniciar(async () => {
-      const r = await desfazerUltimoStatus(concursoId);
-      setAviso(
-        r.ok
-          ? {
-              tipo: "info",
-              texto: `Mudança desfeita: de volta a “${ROTULO_STATUS[r.data.status]}”.`,
-            }
-          : { tipo: "erro", texto: r.erros._form?.[0] ?? "Não foi possível desfazer." },
-      );
-      if (!r.ok) router.refresh();
+    return new Promise<void>((resolver) => {
+      iniciar(async () => {
+        const r = await desfazerUltimoStatus(concursoId);
+        avisar(
+          r.ok
+            ? {
+                texto: `Mudança desfeita: de volta a “${ROTULO_STATUS[r.data.status]}”.`,
+                tipo: "info",
+                chave: `status-${concursoId}`,
+              }
+            : {
+                texto: r.erros._form?.[0] ?? "Não foi possível desfazer.",
+                tipo: "erro",
+                chave: `status-${concursoId}`,
+              },
+        );
+        if (!r.ok) router.refresh();
+        resolver();
+      });
     });
   }
 
@@ -112,34 +120,9 @@ export function QuadroConcursos({ cartoes }: { cartoes: CartaoQuadro[] }) {
 
   return (
     <div className="space-y-3">
-      <div aria-live="polite" className="min-h-8">
-        {aviso ? (
-          <div
-            role={aviso.tipo === "erro" ? "alert" : "status"}
-            className={cn(
-              "flex flex-wrap items-center gap-2 rounded-lg border px-3 py-1.5 text-sm",
-              aviso.tipo === "erro" && "border-destructive/40 text-destructive",
-            )}
-          >
-            <span>{aviso.texto}</span>
-            {aviso.tipo === "ok" ? (
-              <Button
-                variant="ghost"
-                size="sm"
-                disabled={pendente}
-                onClick={() => desfazer(aviso.concursoId)}
-              >
-                <Undo2 aria-hidden />
-                Desfazer
-              </Button>
-            ) : null}
-          </div>
-        ) : (
-          <p className="py-1.5 text-muted-foreground text-xs">
-            Arraste os cartões entre as colunas ou use “Mover para” em cada cartão.
-          </p>
-        )}
-      </div>
+      <p className="py-1.5 text-muted-foreground text-xs">
+        Arraste os cartões entre as colunas ou use “Mover para” em cada cartão.
+      </p>
 
       <div
         className="-mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-4 md:mx-0 md:px-0"

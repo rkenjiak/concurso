@@ -70,11 +70,14 @@ export function MudarStatus({ concursoId, atual, transicoes, desfazerPara }: Mud
     }
   }
 
-  /** Desfaz a última mudança; a promessa termina com a ação (o aviso mostra a pendência). */
-  function desfazer() {
+  /**
+   * Desfaz a mudança `registroId` — só se ainda for a última (o servidor confere); a promessa
+   * termina com a ação (o aviso mostra a pendência).
+   */
+  function desfazer(registroId: number) {
     return new Promise<void>((resolver) => {
       iniciar(async () => {
-        const r = await desfazerUltimoStatus(concursoId);
+        const r = await desfazerUltimoStatus(concursoId, { registroId });
         avisar(
           r.ok
             ? {
@@ -101,7 +104,7 @@ export function MudarStatus({ concursoId, atual, transicoes, desfazerPara }: Mud
         avisar({
           texto: `Status → “${ROTULO_STATUS[para]}”.`,
           chave,
-          acao: { rotulo: "Desfazer", executar: desfazer },
+          acao: { rotulo: "Desfazer", executar: () => desfazer(r.data.registroId) },
         });
       } else {
         setErro(r.erros._form?.[0] ?? r.erros.para?.[0] ?? r.erros.observacao?.[0] ?? "Erro.");
@@ -185,7 +188,8 @@ export function MudarStatus({ concursoId, atual, transicoes, desfazerPara }: Mud
               rotuloConfirmar="Desfazer"
               variante="ghost"
               tamanho="lg"
-              acao={() => desfazerUltimoStatus(concursoId)}
+              // O usuário vê "Atual: …": se mudou desde então, o servidor recusa.
+              acao={() => desfazerUltimoStatus(concursoId, { status: atual })}
               aoConcluir={() => {
                 mudarAberto(false);
                 avisar({

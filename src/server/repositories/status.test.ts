@@ -2,15 +2,19 @@ import type { Client } from "@libsql/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { Status } from "@/domain/enums";
 import { ErroDominio } from "@/domain/erros";
+import { MSG_STATUS_MUDOU } from "@/domain/status";
 import { concursoSchema, VALORES_INICIAIS_CONCURSO } from "@/lib/schemas/concurso";
+import { eventoSchema, VALORES_INICIAIS_EVENTO } from "@/lib/schemas/evento";
 import { alterarStatusSchema } from "@/lib/schemas/status";
 import { ID_USUARIO_INICIAL as U } from "@/server/db/schema";
 import { criarBancoTeste } from "../db/banco-teste";
 import type { Db } from "../db/client";
 import { obterConcurso } from "../queries/concursos";
+import { listarEventos } from "../queries/eventos";
 import { listarHistorico, obterOpcoesStatus, opcoesStatusPorConcurso } from "../queries/historico";
 import { criarConcurso } from "./concursos";
-import { alterarStatus, desfazerUltimoStatus } from "./status";
+import { criarEvento, definirConcluido } from "./eventos";
+import { alterarStatus, desfazerResposta, desfazerUltimoStatus } from "./status";
 
 let db: Db;
 let client: Client;
@@ -103,6 +107,90 @@ describe("desfazerUltimoStatus", () => {
 
   it("rejeita concurso inexistente", async () => {
     await expect(desfazerUltimoStatus(db, U, 999)).rejects.toThrow("Concurso não encontrado.");
+  });
+
+  it("desfaz a mudança esperada pelo id do registro (#100)", async () => {
+    const id = await novo();
+    const registroId = await alterarStatus(db, U, id, "INSCRITO", null, t(2));
+    expect((await listarHistorico(db, id)).at(-1)?.id).toBe(registroId);
+    expect(await desfazerUltimoStatus(db, U, id, { registroId })).toBe("PREVISTO");
+  });
+
+  it("recusa sem mudar nada quando houve outra mudança depois (#100)", async () => {
+    const id = await novo();
+    const registroId = await alterarStatus(db, U, id, "INSCRITO", null, t(2));
+    await alterarStatus(db, U, id, "PROVA_AGENDADA", null, t(3));
+    await expect(desfazerUltimoStatus(db, U, id, { registroId })).rejects.toThrow(MSG_STATUS_MUDOU);
+    await expect(desfazerUltimoStatus(db, U, id, { status: "INSCRITO" })).rejects.toThrow(
+      MSG_STATUS_MUDOU,
+    );
+    expect((await obterConcurso(db, U, id))?.status).toBe("PROVA_AGENDADA");
+    expect(await listarHistorico(db, id)).toHaveLength(3);
+  });
+
+  it("recusa o segundo Desfazer da mesma mudança (#100)", async () => {
+    const id = await novo();
+    await alterarStatus(db, U, id, "EDITAL_PUBLICADO", null, t(2));
+    const registroId = await alterarStatus(db, U, id, "INSCRITO", null, t(3));
+    expect(await desfazerUltimoStatus(db, U, id, { registroId })).toBe("EDITAL_PUBLICADO");
+    await expect(desfazerUltimoStatus(db, U, id, { registroId })).rejects.toThrow(MSG_STATUS_MUDOU);
+    expect((await obterConcurso(db, U, id))?.status).toBe("EDITAL_PUBLICADO");
+  });
+});
+
+describe("desfazerResposta", () => {
+  async function boletoPago() {
+    const id = await novo("INSCRITO");
+    const eventoId = await criarEvento(
+      db,
+      U,
+      id,
+      eventoSchema.parse({
+        ...VALORES_INICIAIS_EVENTO,
+        data: "2026-01-05",
+        tipo: "VENCIMENTO_BOLETO",
+      }),
+    );
+    await definirConcluido(db, U, id, eventoId, true, t(2));
+    const registroStatus = await alterarStatus(db, U, id, "PROVA_AGENDADA", null, t(2));
+    return { id, eventoId, registroStatus };
+  }
+  const concluido = async (id: number) => (await listarEventos(db, id))[0]?.concluido;
+
+  it("volta o status e reabre o evento juntos", async () => {
+    const { id, eventoId, registroStatus } = await boletoPago();
+    expect(await desfazerResposta(db, U, id, { registroStatus, eventoConcluido: eventoId })).toBe(
+      "INSCRITO",
+    );
+    expect((await obterConcurso(db, U, id))?.status).toBe("INSCRITO");
+    expect(await concluido(id)).toBe(false);
+  });
+
+  it("sem mudança de status, só reabre o evento e devolve o status atual", async () => {
+    const { id, eventoId } = await boletoPago();
+    expect(
+      await desfazerResposta(db, U, id, { registroStatus: null, eventoConcluido: eventoId }),
+    ).toBe("PROVA_AGENDADA");
+    expect(await concluido(id)).toBe(false);
+  });
+
+  it("se reabrir o evento falhar, o status não é revertido", async () => {
+    const { id, registroStatus } = await boletoPago();
+    await expect(
+      desfazerResposta(db, U, id, { registroStatus, eventoConcluido: 999 }),
+    ).rejects.toThrow(ErroDominio);
+    expect((await obterConcurso(db, U, id))?.status).toBe("PROVA_AGENDADA");
+    expect(await listarHistorico(db, id)).toHaveLength(2);
+  });
+
+  it("se o status mudou depois, recusa e não reabre o evento", async () => {
+    const { id, eventoId, registroStatus } = await boletoPago();
+    await alterarStatus(db, U, id, "PROVA_REALIZADA", null, t(3));
+    await expect(
+      desfazerResposta(db, U, id, { registroStatus, eventoConcluido: eventoId }),
+    ).rejects.toThrow(MSG_STATUS_MUDOU);
+    expect((await obterConcurso(db, U, id))?.status).toBe("PROVA_REALIZADA");
+    expect(await concluido(id)).toBe(true);
   });
 });
 

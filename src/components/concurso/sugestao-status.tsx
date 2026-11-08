@@ -84,9 +84,10 @@ export function SugestaoStatus({
       // A pergunta volta (no painel, a pendência é estado local; na página, vem do servidor).
       setEscondida(false);
       avisar({
-        texto: aplicada.mudouStatus
-          ? `Resposta desfeita: de volta a “${ROTULO_STATUS[r.data.status]}”.`
-          : "Resposta desfeita.",
+        texto:
+          aplicada.registroStatus !== null
+            ? `Resposta desfeita: de volta a “${ROTULO_STATUS[r.data.status]}”.`
+            : "Resposta desfeita.",
         tipo: "info",
         chave: chaveAviso,
       });
@@ -112,7 +113,7 @@ export function SugestaoStatus({
             : `${pergunta} ${resposta.rotulo}.`,
           chave: chaveAviso,
           acao:
-            aplicada.mudouStatus || aplicada.eventoConcluido !== null
+            aplicada.registroStatus !== null || aplicada.eventoConcluido !== null
               ? { rotulo: "Desfazer", executar: () => desfazer(aplicada) }
               : undefined,
         }),

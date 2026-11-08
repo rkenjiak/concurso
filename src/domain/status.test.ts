@@ -6,6 +6,7 @@ import {
   ehAtivo,
   ehTerminal,
   exigirTransicao,
+  MSG_STATUS_MUDOU,
   podeDesfazer,
   podeTransicionar,
   posicaoNaTrilha,
@@ -269,5 +270,17 @@ describe("desfazer", () => {
   it("statusAoDesfazer lança quando não há o que desfazer", () => {
     expect(() => statusAoDesfazer({ de: null, para: "PREVISTO" })).toThrow(ErroDominio);
     expect(() => statusAoDesfazer(undefined)).toThrow("Não há mudança de status para desfazer.");
+  });
+
+  it("statusAoDesfazer confere a mudança esperada (#100)", () => {
+    const ultimo = { id: 7, de: "INSCRITO", para: "CANCELADO" } as const;
+    expect(statusAoDesfazer(ultimo, { registroId: 7 })).toBe("INSCRITO");
+    expect(statusAoDesfazer(ultimo, { status: "CANCELADO" })).toBe("INSCRITO");
+    expect(() => statusAoDesfazer(ultimo, { registroId: 6 })).toThrow(MSG_STATUS_MUDOU);
+    expect(() => statusAoDesfazer(ultimo, { status: "INSCRITO" })).toThrow(MSG_STATUS_MUDOU);
+    // A mudança esperada já foi desfeita e só resta o registro de criação.
+    expect(() =>
+      statusAoDesfazer({ id: 1, de: null, para: "PREVISTO" }, { registroId: 7 }),
+    ).toThrow(MSG_STATUS_MUDOU);
   });
 });

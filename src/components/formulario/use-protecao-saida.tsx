@@ -5,6 +5,12 @@ import { type ReactNode, useCallback, useEffect, useRef, useState } from "react"
 import { DialogoConfirmar } from "@/components/concurso/botao-confirmar";
 import { destinoInterceptavel } from "@/lib/protecao-saida";
 
+/**
+ * Depois de "Descartar e sair", quanto tempo a proteção fica desligada à espera de a saída
+ * desmontar o formulário (fechar o modal, navegar). Se ele continua montado e sujo, volta a valer.
+ */
+const LIBERACAO_MS = 2000;
+
 export interface ProtecaoSaida {
   /**
    * Sai do formulário (Cancelar, fechar o modal…): com alterações não salvas, pede confirmação
@@ -27,7 +33,9 @@ export interface ProtecaoSaida {
  */
 export function useProtecaoSaida(ativa: boolean): ProtecaoSaida {
   const router = useRouter();
-  const [pedido, setPedido] = useState<(() => void) | null>(null);
+  /** Confirmação aberta; a saída pedida fica em ref (lida só ao confirmar). */
+  const [confirmando, setConfirmando] = useState(false);
+  const pedido = useRef<(() => void) | null>(null);
   /** Pedido aberto (para não trocá-lo por outro) e onde estava o foco ao abrir. */
   const pedidoAberto = useRef(false);
   const focoAntes = useRef<HTMLElement | null>(null);
@@ -40,11 +48,22 @@ export function useProtecaoSaida(ativa: boolean): ProtecaoSaida {
     descartou.current = false;
     focoAntes.current =
       document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    setPedido(() => prosseguir);
+    pedido.current = prosseguir;
+    setConfirmando(true);
   }, []);
-  /** Confirmada a saída, nada mais é bloqueado enquanto o formulário desmonta/navega. */
+  /**
+   * Confirmada a saída, nada mais é bloqueado enquanto o formulário desmonta/navega. Volta a
+   * proteger quando o formulário deixa de estar sujo ou se, passado {@link LIBERACAO_MS}, ele
+   * continua montado (a saída não aconteceu: navegação para a mesma página, falha…).
+   */
   const [liberada, setLiberada] = useState(false);
   const protegendo = ativa && !liberada;
+  const timerLiberacao = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  useEffect(() => {
+    if (!ativa) setLiberada(false);
+  }, [ativa]);
+  useEffect(() => () => clearTimeout(timerLiberacao.current), []);
 
   useEffect(() => {
     if (!protegendo) return;
@@ -94,10 +113,10 @@ export function useProtecaoSaida(ativa: boolean): ProtecaoSaida {
 
   const dialogo = (
     <DialogoConfirmar
-      aberto={pedido !== null}
+      aberto={confirmando}
       aoMudarAberto={(aberto) => {
         if (aberto) return;
-        setPedido(null);
+        setConfirmando(false);
         // Só depois do evento atual: o Esc que fecha a confirmação também chega ao modal de baixo
         // (o Radix nem sempre o ignora), e não pode reabri-la.
         setTimeout(() => {
@@ -113,7 +132,11 @@ export function useProtecaoSaida(ativa: boolean): ProtecaoSaida {
       aoFechado={() => {
         const saida = saidaConfirmada.current;
         saidaConfirmada.current = null;
-        saida?.();
+        pedido.current = null;
+        if (!saida) return;
+        saida();
+        clearTimeout(timerLiberacao.current);
+        timerLiberacao.current = setTimeout(() => setLiberada(false), LIBERACAO_MS);
       }}
       titulo="Descartar alterações?"
       descricao="Há alterações que não foram salvas. Se sair agora, elas serão perdidas."
@@ -122,7 +145,7 @@ export function useProtecaoSaida(ativa: boolean): ProtecaoSaida {
       destrutivo
       aoConcluir={() => {
         descartou.current = true;
-        saidaConfirmada.current = pedido;
+        saidaConfirmada.current = pedido.current;
         setLiberada(true);
       }}
     />

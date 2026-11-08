@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import type { Status } from "@/domain/enums";
+import { STATUS, type Status } from "@/domain/enums";
 import {
   DIAS_LEMBRAR_DEPOIS,
   lerChavePendencia,
@@ -27,7 +27,11 @@ function revalidar(id: number) {
   revalidatePath("/");
 }
 
-export async function alterarStatus(idBruto: unknown, entrada: unknown): Promise<ResultadoAcao> {
+/** Altera o status; devolve o id do registro do histórico para o "Desfazer" do aviso (#100). */
+export async function alterarStatus(
+  idBruto: unknown,
+  entrada: unknown,
+): Promise<ResultadoAcao<{ registroId: number }>> {
   const sessao = await exigirUsuarioAcao();
   if (!sessao.ok) return sessao;
   const usuarioId = sessao.usuario.id;
@@ -37,25 +41,43 @@ export async function alterarStatus(idBruto: unknown, entrada: unknown): Promise
   if (!dados.success) return falhaValidacao(dados.error);
   return executar(
     async () => {
-      await repo.alterarStatus(getDb(), usuarioId, id.data, dados.data.para, dados.data.observacao);
+      const registroId = await repo.alterarStatus(
+        getDb(),
+        usuarioId,
+        id.data,
+        dados.data.para,
+        dados.data.observacao,
+      );
       revalidar(id.data);
-      return sucesso(null);
+      return sucesso({ registroId });
     },
     { acao: "status.alterarStatus", usuarioId },
   );
 }
 
+const desfazerEsperadoSchema = z
+  .object({ registroId: idSchema.optional(), status: z.enum(STATUS).optional() })
+  .refine((e) => e.registroId !== undefined || e.status !== undefined);
+
+/**
+ * Desfaz a última mudança de status, só se ela ainda for a `esperada` (#100): o registro criado
+ * pela mudança (aviso "Desfazer") ou o status atual que o usuário vê (diálogo "Mudar status").
+ * Se o status mudou desde então (outra aba, "Desfazer" duplo), recusa sem mudar nada.
+ */
 export async function desfazerUltimoStatus(
   idBruto: unknown,
+  esperadoBruto: unknown,
 ): Promise<ResultadoAcao<{ status: Status }>> {
   const sessao = await exigirUsuarioAcao();
   if (!sessao.ok) return sessao;
   const usuarioId = sessao.usuario.id;
   const id = idSchema.safeParse(idBruto);
   if (!id.success) return falha("Concurso não encontrado.");
+  const esperado = desfazerEsperadoSchema.safeParse(esperadoBruto);
+  if (!esperado.success) return falha("Mudança inválida.");
   return executar(
     async () => {
-      const status = await repo.desfazerUltimoStatus(getDb(), usuarioId, id.data);
+      const status = await repo.desfazerUltimoStatus(getDb(), usuarioId, id.data, esperado.data);
       revalidar(id.data);
       return sucesso({ status });
     },
@@ -66,8 +88,8 @@ export async function desfazerUltimoStatus(
 /** O que a resposta a uma pendência mudou — o necessário para desfazê-la (#100). */
 export interface RespostaAplicada {
   status: Status;
-  /** A resposta registrou uma mudança de status (último item do histórico). */
-  mudouStatus: boolean;
+  /** Registro do histórico criado pela resposta; `null` = a resposta não mudou o status. */
+  registroStatus: number | null;
   /** Evento que a resposta concluiu (ex.: boleto pago); `null` = nenhum. */
   eventoConcluido: number | null;
 }
@@ -106,25 +128,24 @@ export async function responderPendenciaStatus(
       }
       const { para, concluirEvento } = resposta;
       // Status e conclusão do evento (ex.: boleto pago) juntos: se um falhar, nada muda.
-      await db.transaction(async (tx) => {
+      const registroStatus = await db.transaction(async (tx) => {
         if (concluirEvento) {
           await definirConcluido(tx, usuarioId, id.data, pendencia.eventoId, true);
         }
-        if (para) {
-          await repo.alterarStatus(
-            tx,
-            usuarioId,
-            id.data,
-            para,
-            observacaoResposta(pendencia, resposta),
-          );
-        }
+        if (!para) return null;
+        return repo.alterarStatus(
+          tx,
+          usuarioId,
+          id.data,
+          para,
+          observacaoResposta(pendencia, resposta),
+        );
       });
       revalidar(id.data);
       if (concluirEvento) revalidatePath("/", "layout");
       return sucesso({
         status: resposta.para ?? concurso.status,
-        mudouStatus: para !== null,
+        registroStatus,
         eventoConcluido: concluirEvento ? pendencia.eventoId : null,
       });
     },
@@ -133,13 +154,14 @@ export async function responderPendenciaStatus(
 }
 
 const desfazerRespostaSchema = z.object({
-  mudouStatus: z.boolean(),
+  registroStatus: idSchema.nullable(),
   eventoConcluido: idSchema.nullable(),
 });
 
 /**
- * Desfaz a resposta a uma pendência ("Desfazer" do aviso, #100): volta o último status, se a
- * resposta o mudou, e reabre o evento que ela concluiu. A pergunta volta a valer.
+ * Desfaz a resposta a uma pendência ("Desfazer" do aviso, #100): numa transação, volta o status
+ * (se a resposta o mudou e a última mudança ainda for a dela) e reabre o evento que ela concluiu.
+ * A pergunta volta a valer.
  */
 export async function desfazerRespostaPendencia(
   idBruto: unknown,
@@ -152,18 +174,10 @@ export async function desfazerRespostaPendencia(
   if (!id.success) return falha("Concurso não encontrado.");
   const dados = desfazerRespostaSchema.safeParse(entrada);
   if (!dados.success) return falha("Resposta inválida.");
-  const { mudouStatus, eventoConcluido } = dados.data;
   return executar(
     async () => {
-      const db = getDb();
-      const status = mudouStatus
-        ? await repo.desfazerUltimoStatus(db, usuarioId, id.data)
-        : (await obterConcurso(db, usuarioId, id.data))?.status;
-      if (!status) return falha("Concurso não encontrado.");
-      if (eventoConcluido !== null) {
-        await definirConcluido(db, usuarioId, id.data, eventoConcluido, false);
-        revalidatePath("/", "layout");
-      }
+      const status = await repo.desfazerResposta(getDb(), usuarioId, id.data, dados.data);
+      if (dados.data.eventoConcluido !== null) revalidatePath("/", "layout");
       revalidar(id.data);
       return sucesso({ status });
     },

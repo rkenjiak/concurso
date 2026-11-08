@@ -63,7 +63,7 @@ export function QuadroConcursos({ cartoes }: { cartoes: CartaoQuadro[] }) {
         avisar({
           texto: `“${cartao.orgao}” movido para “${ROTULO_STATUS[para]}”.`,
           chave: `status-${cartao.id}`,
-          acao: { rotulo: "Desfazer", executar: () => desfazer(cartao.id) },
+          acao: { rotulo: "Desfazer", executar: () => desfazer(cartao.id, r.data.registroId) },
         });
       } else {
         avisar({
@@ -77,11 +77,14 @@ export function QuadroConcursos({ cartoes }: { cartoes: CartaoQuadro[] }) {
     });
   }
 
-  /** Desfaz a última mudança; a promessa termina com a ação (o aviso mostra a pendência). */
-  function desfazer(concursoId: number) {
+  /**
+   * Desfaz a mudança `registroId` — só se ainda for a última (o servidor confere); a promessa
+   * termina com a ação (o aviso mostra a pendência).
+   */
+  function desfazer(concursoId: number, registroId: number) {
     return new Promise<void>((resolver) => {
       iniciar(async () => {
-        const r = await desfazerUltimoStatus(concursoId);
+        const r = await desfazerUltimoStatus(concursoId, { registroId });
         avisar(
           r.ok
             ? {

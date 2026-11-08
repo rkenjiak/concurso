@@ -76,3 +76,36 @@ test("quadro: mover pelo menu, desfazer e arrastar com transição inválida", a
   await page.getByRole("tab", { name: "Histórico" }).click();
   await expect(page.getByText("Edital publicado").first()).toBeVisible();
 });
+
+test("quadro: Desfazer recusa quando o status mudou em outra aba (#100)", async ({
+  page,
+  context,
+}) => {
+  const id = unico();
+  const orgao = `Quadro Guarda ${id}`;
+  const detalhe = await cadastrarConcurso(page, { orgao, cargo: "Analista", tags: [`g${id}`] });
+
+  await page.goto(`/concursos?q=${id}&visao=quadro`);
+  const cartao = page.getByRole("listitem", { name: new RegExp(orgao) });
+  await cartao.getByRole("combobox", { name: /Mover/ }).selectOption({ label: "Inscrito" });
+  await expect(aviso(page, "movido para “Inscrito”")).toBeVisible();
+
+  // Outra aba muda o status de novo.
+  const outra = await context.newPage();
+  await outra.goto(detalhe);
+  await outra.getByRole("button", { name: "Mudar status" }).click();
+  const dialogo = outra.getByRole("dialog", { name: "Mudar status" });
+  await dialogo.getByLabel("Novo status").selectOption({ label: "Prova agendada" });
+  await dialogo.getByRole("button", { name: "Alterar status" }).click();
+  await expect(dialogo).toBeHidden();
+  await outra.close();
+
+  // O Desfazer do aviso não desfaz a mudança da outra aba.
+  await aviso(page, "movido para “Inscrito”").getByRole("button", { name: "Desfazer" }).click();
+  await expect(
+    page.getByRole("alert").filter({ hasText: "O status mudou desde então; nada foi desfeito." }),
+  ).toBeVisible();
+  await expect(
+    coluna(page, "Prova agendada").getByRole("listitem", { name: new RegExp(orgao) }),
+  ).toHaveCount(1);
+});

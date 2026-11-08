@@ -17,7 +17,8 @@ const reduzirMovimento = () =>
  */
 export function useDestaqueAlvo<T extends HTMLElement>(chave: string | number | null) {
   const ref = useRef<T>(null);
-  const [forte, setForte] = useState(false);
+  // Começa forte quando já há alvo: evita um quadro só com o contorno sutil antes do efeito.
+  const [forte, setForte] = useState(chave !== null);
 
   useEffect(() => {
     if (chave === null) return;

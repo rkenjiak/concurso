@@ -7,6 +7,8 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 
 ## [Unreleased]
 
+## [2.6.0] - 2026-11-08
+
 ### Adicionado
 
 - **Painel do evento** (#100) no dashboard e no calendário: clicar num prazo abre os detalhes

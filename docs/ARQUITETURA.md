@@ -810,7 +810,8 @@ Cada item = uma branch `feature/*` a partir de `develop`; cada milestone fecha c
 | **Desempenho** → `v2.3.0` | `feature/performance-mutacoes` (#73) | Mutações com uma viagem só ao servidor e esqueletos de carregamento |
 | **Uso diário** → `v2.4.0` | `feature/atualizar-dados` (#77) · `feature/sino-unico` (#78) · `feature/tema-layout` (#81, #82) · `feature/eventos-dashboard` (#84, #85) · `feature/calendario-navegacao` (#83) | Botão Atualizar, contagem regressiva das provas, pendências de status e navegação rápida no calendário |
 | **Observabilidade** → `v2.5.0` | `feature/logs` (#91) | Logger estruturado, `onRequestError` e eventos de segurança e operação |
-| **M7 — Anexos** → `v2.6.0` | `feature/anexos` | RF02 desejável |
+| **UX dos eventos** → `v2.6.0` | `feature/ux-fluxo-eventos` (#100) | Painel do evento, concluir no dashboard, link direto para o evento, voltar à origem e avisos com Desfazer |
+| **M7 — Anexos** → `v2.7.0` | `feature/anexos` | RF02 desejável |
 
 ---
 

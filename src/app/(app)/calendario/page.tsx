@@ -53,6 +53,7 @@ export default async function CalendarioPage({ searchParams }: PageProps<"/calen
   const anterior = deslocarMes(mes, -1);
   const seguinte = deslocarMes(mes, 1);
   const href = (m: string) => hrefCalendario(m, selecao);
+  const origem = { de: "calendario", mes, selecao } as const;
   const vazio =
     selecao?.length === 0
       ? "Nenhum concurso selecionado. Use “Mostrar todos” abaixo."
@@ -142,10 +143,10 @@ export default async function CalendarioPage({ searchParams }: PageProps<"/calen
             {vazio && itens.length === 0 ? (
               <p className="text-muted-foreground text-sm">{vazio}</p>
             ) : null}
-            <GradeMes grade={grade} itens={itens} titulo={titulo} hoje={hoje} />
+            <GradeMes grade={grade} itens={itens} titulo={titulo} hoje={hoje} origem={origem} />
           </div>
           <div className="md:hidden">
-            <AgendaMes itens={itens} hoje={hoje} vazio={vazio} />
+            <AgendaMes itens={itens} hoje={hoje} vazio={vazio} origem={origem} />
           </div>
 
           <LegendaConcursos

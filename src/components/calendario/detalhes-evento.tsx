@@ -17,6 +17,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { hrefPrazo, type Origem } from "@/domain/navegacao-concurso";
 import { nomePrazo } from "@/domain/prazos";
 import { formatarData, formatarDataLonga } from "@/lib/format";
 import type { ItemDoCalendario } from "@/server/queries/calendario";
@@ -24,14 +25,18 @@ import type { ItemDoCalendario } from "@/server/queries/calendario";
 /**
  * Detalhes de um item do calendário em diálogo (Radix: Esc/clique fora fecham, foco preso e
  * devolvido ao gatilho). `children` é o gatilho — um único `<button>` —, que recebe os atributos
- * de abertura; navegar ao concurso fica a cargo do link "Ver no concurso".
+ * de abertura; navegar ao concurso fica a cargo do link "Ver no concurso", que abre o evento na aba
+ * Eventos (ou o card Validade, se derivado) e guarda a origem para o "voltar" (#100).
  */
 export function DetalhesEvento({
   item,
   proximos,
+  origem,
   children,
 }: {
   item: ItemDoCalendario;
+  /** Mês e seleção atuais do calendário. */
+  origem: Origem;
   /** Próximos eventos pendentes do mesmo concurso (resumo). */
   proximos: readonly ItemDoCalendario[];
   children: ReactElement;
@@ -109,7 +114,7 @@ export function DetalhesEvento({
 
         <DialogFooter>
           <Button asChild>
-            <Link href={`/concursos/${item.concurso.id}`}>
+            <Link href={hrefPrazo(item.concurso.id, item.evento, origem)}>
               Ver no concurso
               <span className="sr-only">: {nome}</span>
               <ArrowRight aria-hidden />

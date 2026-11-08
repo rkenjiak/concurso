@@ -4,6 +4,7 @@ import { MarcadorConcurso } from "@/components/concurso/marcador-concurso";
 import { BadgeSituacao } from "@/components/evento/badge-situacao";
 import { COR_URGENCIA } from "@/components/evento/urgencia";
 import { Badge } from "@/components/ui/badge";
+import { hrefPrazo } from "@/domain/navegacao-concurso";
 import { descreverDias, nomePrazo, type Prazo, situacaoPrazo } from "@/domain/prazos";
 import { formatarData } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -36,7 +37,7 @@ export function ListaPrazos({ prazos }: { prazos: readonly PrazoDashboard[] }) {
             className={cn("flex items-start border-l-4", COR_URGENCIA[p.criticidade].bordaEsquerda)}
           >
             <Link
-              href={`/concursos/${p.concurso.id}`}
+              href={hrefPrazo(p.concurso.id, p.evento, { de: "dashboard" })}
               className={cn(
                 "flex min-w-0 flex-1 gap-3 p-3 transition-colors hover:bg-accent/50 focus-visible:outline-2 focus-visible:outline-ring",
                 p.oculto && "opacity-60",

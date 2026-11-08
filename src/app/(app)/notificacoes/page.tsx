@@ -47,6 +47,7 @@ export default async function NotificacoesPage() {
             <ListaNotificacoes
               itens={notificacoes.map((n) => ({
                 chave: n.chave,
+                eventoId: n.evento?.id ?? null,
                 mensagem: n.mensagem,
                 data: n.data,
                 hora: n.hora,

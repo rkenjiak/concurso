@@ -4,6 +4,7 @@ import { MarcadorConcurso } from "@/components/concurso/marcador-concurso";
 import { COR_URGENCIA } from "@/components/evento/urgencia";
 import { type Contagem, type DestaqueContagem, urgenciaContagem } from "@/domain/contagem";
 import type { CorConcurso } from "@/domain/cores";
+import { hrefEvento } from "@/domain/navegacao-concurso";
 import { nomePrazo } from "@/domain/prazos";
 import { formatarData } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -62,14 +63,17 @@ export interface ItemContagem {
   contagem: Contagem;
 }
 
-/** Lista das próximas provas no dashboard (#84), da mais próxima para a mais distante. */
+/**
+ * Lista das próximas provas no dashboard (#84), da mais próxima para a mais distante. Cada item
+ * leva à prova na aba Eventos do concurso (#100).
+ */
 export function ListaContagens({ itens }: { itens: readonly ItemContagem[] }) {
   return (
     <ul className="space-y-2" data-testid="lista-contagens">
       {itens.map((c) => (
         <li key={c.concursoId}>
           <Link
-            href={`/concursos/${c.concursoId}`}
+            href={hrefEvento(c.concursoId, c.contagem.evento.id, { de: "dashboard" })}
             data-destaque={c.contagem.destaque}
             className={cn(
               "flex items-center gap-3 rounded-lg border p-3 transition-colors hover:bg-accent/50 focus-visible:outline-2 focus-visible:outline-ring",

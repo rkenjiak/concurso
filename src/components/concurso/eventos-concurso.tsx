@@ -2,8 +2,10 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CalendarDays, Clock, MapPin, Pencil, Plus, Trash2 } from "lucide-react";
-import { useState, useTransition } from "react";
+import { useSearchParams } from "next/navigation";
+import { useEffect, useState, useTransition } from "react";
 import { Controller, useForm } from "react-hook-form";
+import { classesDestaque, useDestaqueAlvo } from "@/components/evento/destaque";
 import { NomeEvento } from "@/components/evento/nome-evento";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -22,7 +24,9 @@ import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
 import { Textarea } from "@/components/ui/textarea";
 import { TIPO_EVENTO, type TipoEvento } from "@/domain/enums";
 import { opcoes, ROTULO_TIPO_EVENTO } from "@/domain/labels";
+import { lerIdEvento } from "@/domain/navegacao-concurso";
 import { nomePrazo } from "@/domain/prazos";
+import { PARAM_EVENTO, urlSemParametro } from "@/lib/aba-concurso";
 import { formatarData } from "@/lib/format";
 import {
   type EventoFormValores,
@@ -51,11 +55,25 @@ interface EventosConcursoProps {
   eventos: readonly EventoItem[];
 }
 
-/** Lista e gerencia as datas e eventos do concurso (RF04). */
+/**
+ * Lista e gerencia as datas e eventos do concurso (RF04). `?evento=<id>` (#100, D2) destaca o
+ * evento: rola até ele, dá foco e marca `aria-current` enquanto o parâmetro existir. Id que não é
+ * de um evento deste concurso (inválido, de outro concurso ou excluído) é removido da URL.
+ */
 export function EventosConcurso({ concursoId, eventos }: EventosConcursoProps) {
   const [editando, setEditando] = useState<EventoItem | "novo" | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [alternando, iniciarAlternar] = useTransition();
+  const paramEvento = useSearchParams().get(PARAM_EVENTO);
+  const idPedido = lerIdEvento(paramEvento);
+  const alvoId = idPedido !== null && eventos.some((e) => e.id === idPedido) ? idPedido : null;
+  const { ref: refAlvo, forte } = useDestaqueAlvo<HTMLLIElement>(alvoId);
+
+  useEffect(() => {
+    if (paramEvento !== null && alvoId === null) {
+      window.history.replaceState(null, "", urlSemParametro(window.location.href, PARAM_EVENTO));
+    }
+  }, [paramEvento, alvoId]);
 
   function alternar(e: EventoItem, concluido: boolean) {
     setErro(null);
@@ -76,8 +94,20 @@ export function EventosConcurso({ concursoId, eventos }: EventosConcursoProps) {
           {eventos.map((e) => {
             const nome = nomePrazo(e);
             const checkId = `evento-${e.id}-concluido`;
+            const alvo = e.id === alvoId;
             return (
-              <li key={e.id} className="flex items-start gap-3 p-3">
+              <li
+                key={e.id}
+                id={`evento-${e.id}`}
+                ref={alvo ? refAlvo : undefined}
+                tabIndex={alvo ? -1 : undefined}
+                aria-current={alvo ? "true" : undefined}
+                data-destaque={alvo ? (forte ? "forte" : "sutil") : undefined}
+                className={cn(
+                  "flex items-start gap-3 p-3 first:rounded-t-lg last:rounded-b-lg",
+                  classesDestaque(alvo, forte),
+                )}
+              >
                 <Checkbox
                   id={checkId}
                   className="mt-1"

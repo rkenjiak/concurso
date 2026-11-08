@@ -12,6 +12,7 @@ import {
   proximosDoConcurso,
 } from "@/domain/calendario";
 import { concursoVisivel, type SelecaoConcursos } from "@/domain/navegacao-calendario";
+import type { Origem } from "@/domain/navegacao-concurso";
 import { nomePrazo, ROTULO_SITUACAO } from "@/domain/prazos";
 import { formatarDataLonga } from "@/lib/format";
 import type { DataISO } from "@/lib/tz";
@@ -39,13 +40,15 @@ function rotuloItem(item: ItemDoCalendario): string {
 function ItemGrade({
   item,
   proximos,
+  origem,
 }: {
   item: ItemDoCalendario;
   proximos: readonly ItemDoCalendario[];
+  origem: Origem;
 }) {
   return (
     <li>
-      <DetalhesEvento item={item} proximos={proximos}>
+      <DetalhesEvento item={item} proximos={proximos} origem={origem}>
         <button
           type="button"
           title={rotuloItem(item)}
@@ -80,11 +83,14 @@ export function GradeMes({
   itens,
   titulo,
   hoje,
+  origem,
 }: {
   grade: DiaGrade[][];
   itens: readonly ItemDoCalendario[];
   titulo: string;
   hoje: DataISO;
+  /** Mês e seleção atuais, para o "voltar" do concurso (#100). */
+  origem: Origem;
 }) {
   const porData = agruparPorData(itens);
   return (
@@ -113,6 +119,7 @@ export function GradeMes({
                 dia={dia}
                 itens={porData.get(dia.data) ?? []}
                 proximos={(item) => proximosDoConcurso(itens, item, hoje)}
+                origem={origem}
               />
             ))}
           </tr>
@@ -126,10 +133,12 @@ function CelulaDia({
   dia,
   itens,
   proximos,
+  origem,
 }: {
   dia: DiaGrade;
   itens: readonly ItemDoCalendario[];
   proximos: (item: ItemDoCalendario) => ItemDoCalendario[];
+  origem: Origem;
 }) {
   return (
     <td
@@ -153,7 +162,7 @@ function CelulaDia({
       {dia.doMes && itens.length > 0 ? (
         <ul className="space-y-1">
           {itens.map((item) => (
-            <ItemGrade key={item.chave} item={item} proximos={proximos(item)} />
+            <ItemGrade key={item.chave} item={item} proximos={proximos(item)} origem={origem} />
           ))}
         </ul>
       ) : null}
@@ -165,10 +174,13 @@ function CelulaDia({
 export function AgendaMes({
   itens,
   hoje,
+  origem,
   vazio = "Nenhum evento neste mês.",
 }: {
   itens: readonly ItemDoCalendario[];
   hoje: DataISO;
+  /** Mês e seleção atuais, para o "voltar" do concurso (#100). */
+  origem: Origem;
   /** Texto quando não há itens (ex.: todos ocultos pelo filtro de concursos). */
   vazio?: string;
 }) {
@@ -195,7 +207,11 @@ export function AgendaMes({
                 key={item.chave}
                 className={cn("border-l-4", COR_URGENCIA[item.criticidade].bordaEsquerda)}
               >
-                <DetalhesEvento item={item} proximos={proximosDoConcurso(itens, item, hoje)}>
+                <DetalhesEvento
+                  item={item}
+                  proximos={proximosDoConcurso(itens, item, hoje)}
+                  origem={origem}
+                >
                   <button
                     type="button"
                     className={cn(

@@ -9,6 +9,7 @@ import { BotaoExcluirConcurso } from "@/components/concurso/botao-excluir-concur
 import { BotaoSilenciarConcurso } from "@/components/concurso/botao-silenciar-concurso";
 import { ContagemProva } from "@/components/concurso/contagem-prova";
 import { EventosConcurso } from "@/components/concurso/eventos-concurso";
+import { FocoValidade } from "@/components/concurso/foco-validade";
 import { LinksConcurso } from "@/components/concurso/links-concurso";
 import { ListaTags } from "@/components/concurso/lista-tags";
 import { MarcadorConcurso } from "@/components/concurso/marcador-concurso";
@@ -23,6 +24,7 @@ import { TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { contagemRegressiva } from "@/domain/contagem";
 import { corDoConcurso } from "@/domain/cores";
 import { ROTULO_ESCOLARIDADE, ROTULO_ESFERA } from "@/domain/labels";
+import { lerOrigem, linkVoltar } from "@/domain/navegacao-concurso";
 import { formatarBRL, formatarDataInstante } from "@/lib/format";
 import { idSchema } from "@/lib/schemas/comum";
 import { hojeSP } from "@/lib/tz";
@@ -63,7 +65,7 @@ function Item({ rotulo, children }: { rotulo: string; children: React.ReactNode 
 
 const numero = (n: number | null) => (n == null ? "—" : n.toLocaleString("pt-BR"));
 
-export default async function ConcursoPage({ params }: PageProps<"/concursos/[id]">) {
+export default async function ConcursoPage({ params, searchParams }: PageProps<"/concursos/[id]">) {
   const c = await carregar(params);
   const [{ historico, opcoes }, links, eventos, resultados] = await Promise.all([
     obterOpcoesStatus(getDb(), c.id, c.status),
@@ -73,6 +75,8 @@ export default async function ConcursoPage({ params }: PageProps<"/concursos/[id
   ]);
   const pendentes = eventos.filter((e) => !e.concluido).length;
   const hoje = hojeSP();
+  // Volta à tela de origem (#100, D1): `de`/`mes`/`concursos` por allowlist, nunca uma URL livre.
+  const voltar = linkVoltar(lerOrigem(await searchParams, hoje));
   const pendencia = await obterPendenciaConcurso(getDb(), c.id, c.status, eventos, hoje);
   const contagem = contagemRegressiva(c.status, eventos, hoje);
   const local = [c.cidade, c.uf].filter(Boolean).join(" / ");
@@ -80,11 +84,12 @@ export default async function ConcursoPage({ params }: PageProps<"/concursos/[id
   return (
     <div className="space-y-6">
       <Link
-        href="/concursos"
+        href={voltar.href}
         className="inline-flex items-center gap-1 text-muted-foreground text-sm hover:text-foreground"
       >
         <ArrowLeft className="size-4" aria-hidden />
-        Concursos
+        <span className="sr-only">Voltar para </span>
+        {voltar.rotulo}
       </Link>
 
       <header className="flex flex-wrap items-start justify-between gap-3">
@@ -183,14 +188,17 @@ export default async function ConcursoPage({ params }: PageProps<"/concursos/[id
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Validade do concurso</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ValidadeConcurso dados={c} hoje={hoje} />
-            </CardContent>
-          </Card>
+          {/* Alvo de `?foco=validade` (#100): destino do fim da validade derivado. */}
+          <FocoValidade>
+            <Card>
+              <CardHeader>
+                <CardTitle>Validade do concurso</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ValidadeConcurso dados={c} hoje={hoje} />
+              </CardContent>
+            </Card>
+          </FocoValidade>
 
           <Card>
             <CardHeader>

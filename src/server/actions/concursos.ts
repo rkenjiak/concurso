@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { urlComAba } from "@/lib/aba-concurso";
 import { idSchema } from "@/lib/schemas/comum";
 import { concursoEdicaoSchema, concursoSchema } from "@/lib/schemas/concurso";
 import { exigirUsuarioAcao } from "../auth/acesso";
@@ -15,7 +16,8 @@ const NAO_ENCONTRADO = "Concurso não encontrado.";
  * Criar, editar e excluir terminam em outra página: o `redirect` na action faz a resposta já trazer
  * a página de destino (uma viagem só, #73), em vez de re-renderizar a atual e o cliente navegar
  * depois. Fica fora de `executar`, cujo `catch` engoliria o erro de controle do `redirect`. Em
- * caso de sucesso a action não retorna; só as falhas chegam ao cliente.
+ * caso de sucesso a action não retorna; só as falhas chegam ao cliente. O concurso recém-criado abre
+ * na aba Eventos, onde o estado vazio orienta a cadastrar as datas (#100, D9).
  */
 
 export async function criarConcurso(entrada: unknown): Promise<ResultadoAcao> {
@@ -33,7 +35,7 @@ export async function criarConcurso(entrada: unknown): Promise<ResultadoAcao> {
     },
     { acao: "concursos.criarConcurso", usuarioId },
   );
-  if (r.ok) redirect(`/concursos/${r.data.id}`);
+  if (r.ok) redirect(urlComAba(`/concursos/${r.data.id}`, "eventos"));
   return r;
 }
 

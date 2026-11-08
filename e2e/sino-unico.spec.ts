@@ -9,7 +9,7 @@ async function criarAvisoNaoLido(page: Page) {
   const dialogo = page.getByRole("dialog", { name: "Novo evento" });
   await dialogo.getByLabel("Tipo").selectOption({ label: "Fim das inscrições" });
   await dialogo.getByLabel("Data").fill(emDias(1));
-  await dialogo.getByRole("button", { name: "Salvar" }).click();
+  await dialogo.getByRole("button", { name: "Salvar", exact: true }).click();
   await expect(dialogo).toBeHidden();
 }
 

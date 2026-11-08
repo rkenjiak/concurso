@@ -19,7 +19,7 @@ test("calendário mensal: hoje, destaque crítico, detalhes em popup, navegaçã
   await dialogo.getByLabel("Título").fill(titulo);
   await dialogo.getByLabel("Data").fill(data);
   await dialogo.getByLabel("Hora").fill("09:00");
-  await dialogo.getByRole("button", { name: "Salvar" }).click();
+  await dialogo.getByRole("button", { name: "Salvar", exact: true }).click();
   await expect(dialogo).toBeHidden();
 
   // Pela navegação: mês atual com hoje destacado.

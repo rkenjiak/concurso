@@ -428,7 +428,14 @@ export function FormularioConcurso({
       ) : null}
 
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-        <Button type="button" variant="outline" onClick={() => router.back()} disabled={enviando}>
+        {/* Rota fixa, não `router.back()` (#100): quem chegou por link direto ou recarregou
+            não sai do app nem cai numa tela inesperada. */}
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => router.push(editando ? `/concursos/${concursoId}` : "/concursos")}
+          disabled={enviando}
+        >
           Cancelar
         </Button>
         <Button type="submit" disabled={enviando}>

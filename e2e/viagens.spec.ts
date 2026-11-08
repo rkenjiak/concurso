@@ -44,7 +44,7 @@ test("mutações fazem uma viagem só e o sino atualiza sem recarregar (#73)", a
   await dialogo.getByLabel("Tipo").selectOption({ label: "Fim das inscrições" });
   await dialogo.getByLabel("Data").fill(emDias(1));
   const criar = await contarViagens(page, async () => {
-    await dialogo.getByRole("button", { name: "Salvar" }).click();
+    await dialogo.getByRole("button", { name: "Salvar", exact: true }).click();
     await expect(dialogo).toBeHidden();
   });
   expect(criar).toEqual({ posts: 1, refreshes: 0 });

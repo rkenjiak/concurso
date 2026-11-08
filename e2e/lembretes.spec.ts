@@ -22,7 +22,7 @@ test("lembretes: notificação no app, feed .ics assinável e revogado (#65)", a
   const dialogo = page.getByRole("dialog", { name: "Novo evento" });
   await dialogo.getByLabel("Tipo").selectOption({ label: "Fim das inscrições" });
   await dialogo.getByLabel("Data").fill(emDias(1));
-  await dialogo.getByRole("button", { name: "Salvar" }).click();
+  await dialogo.getByRole("button", { name: "Salvar", exact: true }).click();
   await expect(dialogo).toBeHidden();
 
   // Regra padrão (7, 1 e 0 dias): aviso "amanhã" no sino.

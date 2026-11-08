@@ -24,7 +24,7 @@ test("cadastrar concurso → mudar status → adicionar evento → ver no dashbo
   await dialogo.getByLabel("Título").fill(titulo);
   await dialogo.getByLabel("Data").fill(emDias(5));
   await dialogo.getByLabel("Hora").fill("13:00");
-  await dialogo.getByRole("button", { name: "Salvar" }).click();
+  await dialogo.getByRole("button", { name: "Salvar", exact: true }).click();
   await expect(dialogo).toBeHidden();
   await expect(page.getByText(titulo, { exact: true })).toBeVisible();
 

@@ -27,7 +27,10 @@ export async function escolherCor(page: Page, nome: string | RegExp): Promise<vo
   await expect(radio).toBeChecked();
 }
 
-/** Cadastra um concurso pela interface e espera a página de detalhe. Retorna a URL. */
+/**
+ * Cadastra um concurso pela interface e espera o detalhe, que abre na aba Eventos (#100, D9).
+ * Retorna a URL do detalhe sem parâmetros (aba Visão geral).
+ */
 export async function cadastrarConcurso(page: Page, dados: NovoConcurso): Promise<string> {
   await page.goto("/concursos/novo");
   await page.getByLabel("Nome / órgão").fill(dados.orgao);
@@ -43,7 +46,8 @@ export async function cadastrarConcurso(page: Page, dados: NovoConcurso): Promis
   if (dados.cor) await escolherCor(page, dados.cor);
   if (dados.icone) await page.getByLabel("Ícone (opcional)").fill(dados.icone);
   await page.getByRole("button", { name: "Cadastrar concurso" }).click();
-  await expect(page).toHaveURL(/\/concursos\/\d+$/);
+  await expect(page).toHaveURL(/\/concursos\/\d+\?aba=eventos$/);
   await expect(page.getByRole("heading", { level: 1, name: dados.orgao })).toBeVisible();
-  return page.url();
+  const url = new URL(page.url());
+  return `${url.origin}${url.pathname}`;
 }

@@ -36,7 +36,7 @@ test("cor e ícone do concurso: formulário, calendário, legenda, detalhes e co
   await dialogo.getByLabel("Tipo").selectOption({ label: "Prova objetiva" });
   await dialogo.getByLabel("Título").fill(titulo);
   await dialogo.getByLabel("Data").fill(data);
-  await dialogo.getByRole("button", { name: "Salvar" }).click();
+  await dialogo.getByRole("button", { name: "Salvar", exact: true }).click();
   await expect(dialogo).toBeHidden();
 
   // Calendário: o item mostra a cor/ícone do concurso e mantém a criticidade.

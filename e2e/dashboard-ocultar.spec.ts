@@ -16,7 +16,7 @@ test("dashboard: ocultar um prazo, mostrar ocultos e reexibir (persistente)", as
   await dialogo.getByLabel("Tipo").selectOption({ label: "Vencimento do boleto" });
   await dialogo.getByLabel("Título").fill(titulo);
   await dialogo.getByLabel("Data").fill(emDias(4));
-  await dialogo.getByRole("button", { name: "Salvar" }).click();
+  await dialogo.getByRole("button", { name: "Salvar", exact: true }).click();
   await expect(dialogo).toBeHidden();
 
   await page.goto("/");

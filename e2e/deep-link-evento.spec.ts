@@ -14,7 +14,7 @@ async function adicionarEvento(
   await dialogo.getByLabel("Tipo").selectOption({ label: tipo });
   await dialogo.getByLabel("Título").fill(titulo);
   await dialogo.getByLabel("Data").fill(data);
-  await dialogo.getByRole("button", { name: "Salvar" }).click();
+  await dialogo.getByRole("button", { name: "Salvar", exact: true }).click();
   await expect(dialogo).toBeHidden();
   const li = page.locator('li[id^="evento-"]').filter({ hasText: titulo });
   await expect(li).toBeVisible();

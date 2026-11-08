@@ -2,7 +2,7 @@
 
 import { ArrowRightLeft, Undo2 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useAvisos } from "@/components/avisos/avisos";
 import { Button } from "@/components/ui/button";
 import {
@@ -47,7 +47,17 @@ export function MudarStatus({ concursoId, atual, transicoes, desfazerPara }: Mud
   const [pendente, iniciar] = useTransition();
   const chave = `status-${concursoId}`;
 
-  if (transicoes.length === 0 && !desfazerPara) return null;
+  const semAcoes = transicoes.length === 0 && !desfazerPara;
+
+  // Sem controle para abrir, `?mudar=status` (link da edição) não pode ficar preso na URL.
+  useEffect(() => {
+    if (!semAcoes) return;
+    if (new URL(window.location.href).searchParams.has(PARAM_MUDAR)) {
+      window.history.replaceState(null, "", urlSemParametro(window.location.href, PARAM_MUDAR));
+    }
+  }, [semAcoes]);
+
+  if (semAcoes) return null;
 
   function mudarAberto(v: boolean) {
     setAberto(v);

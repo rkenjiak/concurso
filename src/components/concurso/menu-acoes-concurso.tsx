@@ -31,6 +31,7 @@ interface MenuAcoesConcursoProps {
 export function MenuAcoesConcurso({ concursoId, nome, silenciado }: MenuAcoesConcursoProps) {
   const { avisar } = useAvisos();
   const gatilhoRef = useRef<HTMLButtonElement>(null);
+  const abrindoExclusao = useRef(false);
   const [excluindo, setExcluindo] = useState(false);
   const [silenciadoOtimista, setSilenciadoOtimista] = useOptimistic(silenciado);
   const [, iniciar] = useTransition();
@@ -76,7 +77,17 @@ export function MenuAcoesConcurso({ concursoId, nome, silenciado }: MenuAcoesCon
             <Ellipsis aria-hidden />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
+        <DropdownMenuContent
+          align="end"
+          // Abrindo a confirmação de exclusão, o menu não devolve o foco ao gatilho: isso
+          // disputaria o foco com o diálogo que está abrindo.
+          onCloseAutoFocus={(e) => {
+            if (abrindoExclusao.current) {
+              e.preventDefault();
+              abrindoExclusao.current = false;
+            }
+          }}
+        >
           <DropdownMenuItem asChild>
             <a
               href={`/api/export?formato=ics&concurso=${concursoId}`}
@@ -95,7 +106,13 @@ export function MenuAcoesConcurso({ concursoId, nome, silenciado }: MenuAcoesCon
             Silenciar notificações
           </DropdownMenuCheckboxItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem variante="destrutivo" onSelect={() => setExcluindo(true)}>
+          <DropdownMenuItem
+            variante="destrutivo"
+            onSelect={() => {
+              abrindoExclusao.current = true;
+              setExcluindo(true);
+            }}
+          >
             <Trash2 aria-hidden />
             Excluir…
           </DropdownMenuItem>

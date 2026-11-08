@@ -90,7 +90,7 @@ test("calendário: concluir, reabrir e editar pelo painel do evento (#100)", asy
   await edicao.getByLabel("Hora").fill("14:30");
   await edicao.getByRole("button", { name: "Salvar", exact: true }).click();
   await expect(edicao).toBeHidden();
-  await expect(avisos(page)).toContainText("Evento salvo.");
+  await expect(avisos(page)).toContainText(`“${titulo}” salvo.`);
   await expect(item).toContainText("14:30");
   await expect(item).not.toHaveAttribute("data-esmaecido");
 });

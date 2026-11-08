@@ -319,8 +319,8 @@ export function PainelEventoProvider({
                 ref={formularioRef}
                 concursoId={item.concurso.id}
                 evento={item.evento}
-                aoConcluir={() => {
-                  avisar({ texto: "Evento salvo.", chave: `salvar-${item.chave}` });
+                aoConcluir={(nome) => {
+                  avisar({ texto: `“${nome}” salvo.`, chave: `salvar-${item.chave}` });
                   setAberto(null);
                 }}
                 aoCancelar={() => setAberto((a) => (a ? { ...a, modo: "detalhes" } : a))}

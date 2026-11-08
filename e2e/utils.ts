@@ -1,13 +1,13 @@
 import { expect, type Page } from "@playwright/test";
 import { hojeSP, somarDias } from "../src/lib/tz";
 
-/** Sufixo único por teste, para não depender da ordem nem de dados de outros testes. */
 /**
  * Região de avisos que está mostrando os avisos: a global ou, com um diálogo aberto, a de dentro
  * dele (a outra fica vazia) (#100, D4).
  */
 export const regiaoAvisos = (page: Page) => page.locator("[data-avisos]").filter({ visible: true });
 
+/** Sufixo único por teste, para não depender da ordem nem de dados de outros testes. */
 export const unico = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 
 /** Data `YYYY-MM-DD` daqui a `dias` dias (horário de Brasília). */

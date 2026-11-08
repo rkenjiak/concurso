@@ -36,7 +36,6 @@ function BotaoConcluir({ prazo, nome }: { prazo: PrazoDashboard; nome: string })
       size="icon"
       className="size-11 text-muted-foreground hover:text-primary md:size-9"
       aria-label={`Marcar “${nome}” como concluído`}
-      aria-pressed={concluido}
       disabled={concluido || painel.gravando(prazo.chave)}
       onClick={(e) => painel.alternarConcluido(prazo.chave, true, e.currentTarget)}
     >

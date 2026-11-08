@@ -15,8 +15,8 @@
 import { type DataISO, ehDataISO, instanteSP, somarDias } from "../lib/tz";
 import type { TipoEvento } from "./enums";
 import { ROTULO_TIPO_EVENTO } from "./labels";
-import { type ConcursoNotificavel, nomeDoPrazo, type RegrasNotificacao } from "./notificacoes";
-import { concursoAcompanhado, type EventoPrazo, ehTipoCritico } from "./prazos";
+import type { ConcursoNotificavel, RegrasNotificacao } from "./notificacoes";
+import { concursoAcompanhado, type EventoPrazo, ehTipoCritico, nomePrazo } from "./prazos";
 
 /** Duração atribuída a eventos com hora (o app não guarda o horário de término). */
 export const DURACAO_EVENTO_MIN = 60;
@@ -262,7 +262,7 @@ export function eventosDoCalendario<E extends EventoCalendario, C extends Concur
     if (e.tipo === "VALIDADE") comValidadeExplicita.add(e.concursoId);
     const c = incluidos.get(e.concursoId);
     if (!c || !ehDataISO(e.data) || (e.concluido && !opcoes.incluirConcluidos)) continue;
-    const nome = nomeDoPrazo({ derivado: false, titulo: e.titulo, tipo: e.tipo });
+    const nome = nomePrazo(e);
     saida.push({
       uid: `evento-${e.id}@${host}`,
       data: e.data,
@@ -284,7 +284,7 @@ export function eventosDoCalendario<E extends EventoCalendario, C extends Concur
   for (const c of incluidos.values()) {
     const fim = c.validadeFim;
     if (!fim || !ehDataISO(fim) || comValidadeExplicita.has(c.id)) continue;
-    const nome = nomeDoPrazo({ derivado: true, titulo: null, tipo: "VALIDADE" });
+    const nome = nomePrazo({ derivado: true, titulo: null, tipo: "VALIDADE" });
     saida.push({
       uid: `validade-${c.id}@${host}`,
       data: fim,

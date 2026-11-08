@@ -13,9 +13,12 @@ import {
   ehTipoCritico,
   JANELA_PADRAO_DIAS,
   lerChavePrazo,
+  nomePrazo,
   proximaData,
   proximosPrazos,
+  ROTULO_SITUACAO,
   semOcultos,
+  situacaoPrazo,
   TIPOS_CRITICOS,
   totalPrazos,
 } from "./prazos";
@@ -478,5 +481,56 @@ describe("descreverDias", () => {
     [-5, "há 5 dias"],
   ])("%i → %s", (dias, texto) => {
     expect(descreverDias(dias)).toBe(texto);
+  });
+});
+
+describe("nomePrazo (#100)", () => {
+  it("título, rótulo do tipo ou fim da validade (derivado)", () => {
+    expect(nomePrazo({ tipo: "PROVA_OBJETIVA", titulo: null })).toBe("Prova objetiva");
+    expect(nomePrazo({ tipo: "PROVA_OBJETIVA", titulo: "Prova TJ" })).toBe("Prova TJ");
+    expect(nomePrazo({ tipo: "PROVA_OBJETIVA", titulo: "Prova TJ", derivado: false })).toBe(
+      "Prova TJ",
+    );
+    expect(nomePrazo({ tipo: "VALIDADE", titulo: null, derivado: true })).toBe(
+      "Fim da validade do concurso",
+    );
+  });
+});
+
+describe("situacaoPrazo (#100, D11)", () => {
+  const boleto = "VENCIMENTO_BOLETO" as const;
+
+  it("concluído tem precedência sobre tudo, inclusive concurso encerrado", () => {
+    expect(situacaoPrazo({ tipo: boleto, dias: -5, concluido: true })).toBe("CONCLUIDO");
+    expect(situacaoPrazo({ tipo: "OUTRO", dias: 10, concluido: true })).toBe("CONCLUIDO");
+    expect(situacaoPrazo({ tipo: boleto, dias: 1, concluido: true, status: "DESISTIU" })).toBe(
+      "CONCLUIDO",
+    );
+  });
+
+  it("vencido só para prazo crítico, pendente e de concurso acompanhado", () => {
+    expect(situacaoPrazo({ tipo: boleto, dias: -1 })).toBe("VENCIDO");
+    expect(situacaoPrazo({ tipo: boleto, dias: -1, status: "INSCRITO" })).toBe("VENCIDO");
+    expect(situacaoPrazo({ tipo: boleto, dias: -1, status: "DESISTIU" })).toBeNull();
+    expect(situacaoPrazo({ tipo: "OUTRO", dias: -1 })).toBeNull();
+    expect(situacaoPrazo({ tipo: "VALIDADE", dias: -1 })).toBeNull();
+  });
+
+  it("urgente, esta semana e prazo crítico pelas faixas de criticidade", () => {
+    expect(situacaoPrazo({ tipo: boleto, dias: 0 })).toBe("URGENTE");
+    expect(situacaoPrazo({ tipo: boleto, dias: DIAS_CRITICIDADE_ALTA })).toBe("URGENTE");
+    expect(situacaoPrazo({ tipo: boleto, dias: DIAS_CRITICIDADE_ALTA + 1 })).toBe("ESTA_SEMANA");
+    expect(situacaoPrazo({ tipo: boleto, dias: DIAS_CRITICIDADE_MEDIA })).toBe("ESTA_SEMANA");
+    expect(situacaoPrazo({ tipo: boleto, dias: DIAS_CRITICIDADE_MEDIA + 1 })).toBe("CRITICO");
+  });
+
+  it("tipos não críticos e concursos não acompanhados ficam sem badge", () => {
+    expect(situacaoPrazo({ tipo: "GABARITO_PRELIMINAR", dias: 1 })).toBeNull();
+    expect(situacaoPrazo({ tipo: boleto, dias: 1, status: "REPROVADO" })).toBeNull();
+  });
+
+  it("todas as situações têm rótulo", () => {
+    expect(ROTULO_SITUACAO.VENCIDO).toBe("Vencido");
+    expect(ROTULO_SITUACAO.ESTA_SEMANA).toBe("Esta semana");
   });
 });

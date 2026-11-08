@@ -4,6 +4,7 @@ import { cn } from "cn";
 import { XIcon } from "lucide-react";
 import { Dialog as DialogPrimitive } from "radix-ui";
 import type * as React from "react";
+import { RegiaoAvisos } from "@/components/avisos/avisos";
 import { Button } from "@/components/ui/button";
 
 function Dialog({ ...props }: React.ComponentProps<typeof DialogPrimitive.Root>) {
@@ -38,21 +39,40 @@ function DialogOverlay({
   );
 }
 
+/**
+ * Posição do conteúdo: `centro` (padrão) ou `gaveta` — painel de baixo (largura total, cantos
+ * superiores arredondados, área segura) abaixo de `md` e diálogo centralizado a partir de `md`
+ * (#100, D3). Sem alça de arrastar: fecha pelo X, Esc ou clique fora.
+ *
+ * Centraliza com `inset-0 m-auto h-fit`, não com `translate`: um `transform` no conteúdo faria a
+ * {@link RegiaoAvisos} (`fixed`) se posicionar relativa ao diálogo em vez da viewport.
+ */
+const POSICAO_CONTEUDO = {
+  centro:
+    "inset-0 m-auto h-fit w-full max-w-[calc(100%-2rem)] rounded-xl p-4 duration-100 sm:max-w-sm data-open:zoom-in-95 data-closed:zoom-out-95",
+  gaveta:
+    "inset-x-0 bottom-0 max-h-[85dvh] w-full overflow-y-auto rounded-t-xl pt-4 pr-[max(1rem,env(safe-area-inset-right))] pb-[max(1rem,env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] duration-200 max-md:motion-safe:data-open:slide-in-from-bottom max-md:motion-safe:data-closed:slide-out-to-bottom md:inset-0 md:m-auto md:h-fit md:max-h-[90dvh] md:max-w-lg md:rounded-xl md:p-4 md:duration-100 md:data-open:zoom-in-95 md:data-closed:zoom-out-95",
+} as const;
+
 function DialogContent({
   className,
   children,
   showCloseButton = true,
+  variante = "centro",
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean;
+  variante?: keyof typeof POSICAO_CONTEUDO;
 }) {
   return (
     <DialogPortal>
       <DialogOverlay />
       <DialogPrimitive.Content
         data-slot="dialog-content"
+        data-variante={variante}
         className={cn(
-          "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl bg-popover p-4 text-sm text-popover-foreground ring-1 ring-foreground/10 duration-100 outline-none sm:max-w-sm data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
+          "fixed z-50 grid gap-4 bg-popover text-sm text-popover-foreground ring-1 ring-foreground/10 outline-none data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0",
+          POSICAO_CONTEUDO[variante],
           className,
         )}
         {...props}
@@ -60,12 +80,21 @@ function DialogContent({
         {children}
         {showCloseButton && (
           <DialogPrimitive.Close data-slot="dialog-close" asChild>
-            <Button variant="ghost" className="absolute top-2 right-2" size="icon-sm">
+            <Button
+              variant="ghost"
+              className={cn(
+                "absolute top-2 right-2",
+                variante === "gaveta" && "max-md:size-11 max-md:pointer-coarse:size-11",
+              )}
+              size="icon-sm"
+            >
               <XIcon />
               <span className="sr-only">Fechar</span>
             </Button>
           </DialogPrimitive.Close>
         )}
+        {/* Avisos dentro do diálogo: fora dele ficariam `aria-hidden` e fora do focus trap. */}
+        <RegiaoAvisos />
       </DialogPrimitive.Content>
     </DialogPortal>
   );

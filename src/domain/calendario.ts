@@ -13,6 +13,8 @@ import {
   type EventoPrazo,
   ehTipoCritico,
   type Prazo,
+  type SituacaoPrazo,
+  situacaoPrazo,
 } from "./prazos";
 
 /** Mês de calendário no formato `AAAA-MM`. */
@@ -137,6 +139,8 @@ export type ItemCalendario<
   concluido: boolean;
   /** Esmaecido: evento concluído ou de concurso encerrado (não exige mais ação). */
   esmaecido: boolean;
+  /** Situação pela regra única do badge ({@link situacaoPrazo}, #100). */
+  situacao: SituacaoPrazo | null;
 };
 
 /**
@@ -182,6 +186,12 @@ export function itensCalendario<E extends EventoPrazo, C extends ConcursoPrazo>(
       derivado: false,
       concluido: e.concluido,
       esmaecido,
+      situacao: situacaoPrazo({
+        tipo: e.tipo,
+        dias,
+        concluido: e.concluido,
+        status: concurso.status,
+      }),
     });
   }
 
@@ -210,6 +220,7 @@ export function itensCalendario<E extends EventoPrazo, C extends ConcursoPrazo>(
       derivado: true,
       concluido: false,
       esmaecido: false,
+      situacao: situacaoPrazo({ tipo: "VALIDADE", dias, status: concurso.status }),
     });
   }
 
@@ -231,14 +242,12 @@ export function agruparPorData<T extends { data: DataISO }>(
 
 /**
  * Próximos itens pendentes do mesmo concurso de `item` (de `hoje` em diante, sem o próprio item),
- * na ordem de `itens` (já ordenados), limitados a `limite`. Resumo exibido nos detalhes do evento.
+ * na ordem de `itens` (já ordenados), limitados a `limite`. Resumo exibido no painel do evento
+ * (calendário e prazos do dashboard, #100).
  */
-export function proximosDoConcurso<T extends ItemCalendario>(
-  itens: readonly T[],
-  item: T,
-  hoje: DataISO,
-  limite = 3,
-): T[] {
+export function proximosDoConcurso<
+  T extends { chave: string; data: DataISO; concurso: { id: number }; concluido?: boolean },
+>(itens: readonly T[], item: T, hoje: DataISO, limite = 3): T[] {
   const proximos: T[] = [];
   for (const i of itens) {
     if (proximos.length >= limite) break;

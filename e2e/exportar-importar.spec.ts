@@ -25,12 +25,10 @@ test("exportar backup, excluir dados e restaurar pela importação", async ({ pa
   ]);
   expect(csv.suggestedFilename()).toMatch(/^concursos-\d{8}-\d{4}\.csv$/);
 
-  // Excluir o concurso.
+  // Excluir o concurso (menu "Mais ações", #100 D8).
   await page.goto(detalhe);
-  await page
-    .getByRole("button", { name: /Excluir/ })
-    .first()
-    .click();
+  await page.getByRole("button", { name: "Mais ações" }).click();
+  await page.getByRole("menuitem", { name: /^Excluir/ }).click();
   await page.getByRole("alertdialog").getByRole("button", { name: "Excluir" }).click();
   await expect(page).toHaveURL(/\/concursos$/);
   await expect(page.getByRole("link", { name: new RegExp(orgao) })).toHaveCount(0);
@@ -58,7 +56,13 @@ test("exportar backup, excluir dados e restaurar pela importação", async ({ pa
   await substituir.click();
   await expect(page.getByRole("status")).toContainText("Backup importado");
 
-  await page.goto(detalhe);
+  // A importação renumera os ids (a partir de 1): o detalhe é aberto pela lista, não pela URL
+  // antiga, que muda se outro teste excluiu um concurso antes.
+  await page.goto("/concursos");
+  await page
+    .getByRole("link", { name: new RegExp(orgao) })
+    .first()
+    .click();
   await expect(page.getByRole("heading", { level: 1, name: orgao })).toBeVisible();
   await expect(page.getByText("backup", { exact: true })).toBeVisible();
 });

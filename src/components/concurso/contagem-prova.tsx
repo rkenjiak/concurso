@@ -1,18 +1,19 @@
 import { CalendarClock } from "lucide-react";
 import Link from "next/link";
 import { MarcadorConcurso } from "@/components/concurso/marcador-concurso";
-import type { Contagem, DestaqueContagem } from "@/domain/contagem";
+import { COR_URGENCIA } from "@/components/evento/urgencia";
+import { type Contagem, type DestaqueContagem, urgenciaContagem } from "@/domain/contagem";
 import type { CorConcurso } from "@/domain/cores";
-import { nomeEvento } from "@/domain/eventos-chave";
+import { hrefEvento } from "@/domain/navegacao-concurso";
+import { nomePrazo } from "@/domain/prazos";
 import { formatarData } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
-const ESTILO_DESTAQUE: Readonly<Record<DestaqueContagem, string>> = {
-  HOJE: "border-destructive bg-destructive/10 text-destructive",
-  AMANHA: "border-destructive/60 bg-destructive/5 text-destructive",
-  PROXIMA: "border-aviso bg-aviso/10 text-aviso-foreground",
-  NORMAL: "border-border text-foreground",
-};
+/** Cores do destaque a partir do mapa único de urgência (#100). */
+function estiloDestaque(destaque: DestaqueContagem): string {
+  const cor = COR_URGENCIA[urgenciaContagem(destaque)];
+  return cn(cor.borda, cor.fundo);
+}
 
 /** Número grande + legenda ("12 dias", "hoje", "amanhã"). */
 function Numero({ contagem }: { contagem: Contagem }) {
@@ -38,14 +39,14 @@ export function ContagemProva({ contagem, className }: { contagem: Contagem; cla
       data-destaque={contagem.destaque}
       className={cn(
         "inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm",
-        ESTILO_DESTAQUE[contagem.destaque],
+        estiloDestaque(contagem.destaque),
         className,
       )}
     >
       <CalendarClock className="size-4 shrink-0" aria-hidden />
       <span className="sr-only">{contagem.rotulo}</span>
       <span aria-hidden>
-        {nomeEvento(contagem.evento)}: {contagem.texto} ·{" "}
+        {nomePrazo(contagem.evento)}: {contagem.texto} ·{" "}
         <span className="tabular-nums">{formatarData(contagem.evento.data)}</span>
         {contagem.evento.hora ? ` às ${contagem.evento.hora}` : null}
       </span>
@@ -62,18 +63,21 @@ export interface ItemContagem {
   contagem: Contagem;
 }
 
-/** Lista das próximas provas no dashboard (#84), da mais próxima para a mais distante. */
+/**
+ * Lista das próximas provas no dashboard (#84), da mais próxima para a mais distante. Cada item
+ * leva à prova na aba Eventos do concurso (#100).
+ */
 export function ListaContagens({ itens }: { itens: readonly ItemContagem[] }) {
   return (
     <ul className="space-y-2" data-testid="lista-contagens">
       {itens.map((c) => (
         <li key={c.concursoId}>
           <Link
-            href={`/concursos/${c.concursoId}`}
+            href={hrefEvento(c.concursoId, c.contagem.evento.id, { de: "dashboard" })}
             data-destaque={c.contagem.destaque}
             className={cn(
               "flex items-center gap-3 rounded-lg border p-3 transition-colors hover:bg-accent/50 focus-visible:outline-2 focus-visible:outline-ring",
-              c.contagem.destaque !== "NORMAL" && ESTILO_DESTAQUE[c.contagem.destaque],
+              c.contagem.destaque !== "NORMAL" && estiloDestaque(c.contagem.destaque),
             )}
           >
             {/* Nome acessível = texto visível + complemento (WCAG 2.5.3, comando de voz). */}
@@ -89,7 +93,7 @@ export function ListaContagens({ itens }: { itens: readonly ItemContagem[] }) {
                 {c.cargo}. {c.contagem.rotulo}.
               </span>
               <p className="truncate text-muted-foreground text-xs">
-                {nomeEvento(c.contagem.evento)} · {formatarData(c.contagem.evento.data)}
+                {nomePrazo(c.contagem.evento)} · {formatarData(c.contagem.evento.data)}
                 {c.contagem.evento.hora ? ` às ${c.contagem.evento.hora}` : null}
               </p>
             </div>

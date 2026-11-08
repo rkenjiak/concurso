@@ -4,6 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowDown, ArrowUp, ExternalLink, Pencil, Plus, Trash2 } from "lucide-react";
 import { useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
+import { useAvisos } from "@/components/avisos/avisos";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -37,6 +38,7 @@ interface LinksConcursoProps {
 
 /** Lista e gerencia os links do concurso (RF02). Links externos abrem em nova aba com segurança. */
 export function LinksConcurso({ concursoId, links }: LinksConcursoProps) {
+  const { avisar } = useAvisos();
   const [editando, setEditando] = useState<LinkItem | "novo" | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [movendo, iniciarMover] = useTransition();
@@ -118,6 +120,9 @@ export function LinksConcurso({ concursoId, links }: LinksConcursoProps) {
                   tamanho="icon"
                   rotuloAcessivel={`Excluir link ${l.rotulo ?? ROTULO_TIPO_LINK[l.tipo]}`}
                   acao={() => excluirLink(concursoId, l.id)}
+                  aoConcluir={() =>
+                    avisar({ texto: `Link “${l.rotulo ?? ROTULO_TIPO_LINK[l.tipo]}” excluído.` })
+                  }
                 >
                   <Trash2 aria-hidden />
                 </BotaoConfirmar>
@@ -143,7 +148,10 @@ export function LinksConcurso({ concursoId, links }: LinksConcursoProps) {
               key={editando === "novo" ? "novo" : editando.id}
               concursoId={concursoId}
               link={editando === "novo" ? null : editando}
-              aoConcluir={() => setEditando(null)}
+              aoConcluir={() => {
+                avisar({ texto: editando === "novo" ? "Link adicionado." : "Link salvo." });
+                setEditando(null);
+              }}
             />
           ) : null}
         </DialogContent>

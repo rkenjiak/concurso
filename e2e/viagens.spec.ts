@@ -44,7 +44,7 @@ test("mutações fazem uma viagem só e o sino atualiza sem recarregar (#73)", a
   await dialogo.getByLabel("Tipo").selectOption({ label: "Fim das inscrições" });
   await dialogo.getByLabel("Data").fill(emDias(1));
   const criar = await contarViagens(page, async () => {
-    await dialogo.getByRole("button", { name: "Salvar" }).click();
+    await dialogo.getByRole("button", { name: "Salvar", exact: true }).click();
     await expect(dialogo).toBeHidden();
   });
   expect(criar).toEqual({ posts: 1, refreshes: 0 });
@@ -81,7 +81,8 @@ test("editar e excluir concurso redirecionam na própria resposta da action (#73
   expect(editar).toEqual({ posts: 1, refreshes: 0 });
 
   const excluir = await contarViagens(page, async () => {
-    await page.getByRole("button", { name: "Excluir", exact: true }).click();
+    await page.getByRole("button", { name: "Mais ações" }).click();
+    await page.getByRole("menuitem", { name: /^Excluir/ }).click();
     await page.getByRole("alertdialog").getByRole("button", { name: "Excluir" }).click();
     await expect(page).toHaveURL(/\/concursos$/);
   });

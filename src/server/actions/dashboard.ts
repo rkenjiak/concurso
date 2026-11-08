@@ -29,6 +29,8 @@ export async function alternarPrazoOculto(
     async () => {
       await definirPrazoOculto(getDb(), usuarioId, alvo, oculto.data);
       revalidatePath("/");
+      // O painel do evento no calendário também mostra o estado (#100).
+      revalidatePath("/calendario");
       return sucesso(null);
     },
     { acao: "dashboard.alternarPrazoOculto", usuarioId },

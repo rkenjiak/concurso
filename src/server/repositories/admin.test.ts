@@ -18,7 +18,14 @@ import {
   removerEmailPermitido,
 } from "./admin";
 import { criarConcurso } from "./concursos";
-import { emailNaAllowlist, gerarTokenMcp, obterUsuario, usuarioDoTokenMcp } from "./usuarios";
+import {
+  emailNaAllowlist,
+  gerarTokenIcs,
+  gerarTokenMcp,
+  obterUsuario,
+  usuarioDoTokenIcs,
+  usuarioDoTokenMcp,
+} from "./usuarios";
 
 let db: Db;
 let client: Client;
@@ -120,14 +127,28 @@ describe("definirPapel", () => {
 });
 
 describe("definirBloqueio", () => {
-  it("bloqueia e desbloqueia; bloqueado perde o token do MCP enquanto durar", async () => {
+  it("desbloquear não reativa tokens guardados de um bloqueio anterior ao #96", async () => {
     const token = await gerarTokenMcp(db, bia);
+    const tokenIcs = await gerarTokenIcs(db, bia);
+    // Estado legado: bloqueado por uma versão que não apagava os tokens.
+    await db.update(usuario).set({ bloqueadoEm: AGORA }).where(eq(usuario.id, bia));
+    await definirBloqueio(db, ana, bia, false, SEM_FIXOS, AGORA);
+    expect(await usuarioDoTokenMcp(db, token)).toBeNull();
+    expect(await usuarioDoTokenIcs(db, tokenIcs)).toBeNull();
+  });
+
+  it("bloqueia e desbloqueia; o bloqueio revoga os tokens do MCP e do .ics (#96)", async () => {
+    const token = await gerarTokenMcp(db, bia);
+    const tokenIcs = await gerarTokenIcs(db, bia);
     await definirBloqueio(db, ana, bia, true, SEM_FIXOS, AGORA);
     expect(await bloqueado(bia)).toEqual(AGORA);
     expect(await usuarioDoTokenMcp(db, token)).toBeNull();
+    expect(await usuarioDoTokenIcs(db, tokenIcs)).toBeNull();
     await definirBloqueio(db, ana, bia, false, SEM_FIXOS, AGORA);
     expect(await bloqueado(bia)).toBeNull();
-    expect((await usuarioDoTokenMcp(db, token))?.id).toBe(bia);
+    expect(await usuarioDoTokenMcp(db, token)).toBeNull();
+    expect(await usuarioDoTokenIcs(db, tokenIcs)).toBeNull();
+    expect((await usuarioDoTokenMcp(db, await gerarTokenMcp(db, bia)))?.id).toBe(bia);
     expect((await listarAuditoria(db)).map((r) => r.acao)).toEqual([
       "DESBLOQUEAR_USUARIO",
       "BLOQUEAR_USUARIO",

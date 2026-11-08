@@ -353,10 +353,10 @@ seguinte, seletor e atalhos), então o filtro se mantém ao trocar de mês.
 
 | Rota | Tela | Fase |
 |---|---|---|
-| `/` | **Dashboard**: próximos prazos (vencidos/hoje/30 dias), contagem por status, atalhos; ocultar/reexibir prazos, `?ocultos=1` mostra os ocultos | MVP |
+| `/` | **Dashboard**: pendências de status no topo, próximos prazos (vencidos/hoje/30 dias) com concluir na linha e painel do evento (#100), próximas provas, contagem por status; ocultar/reexibir prazos pelo painel, `?ocultos=1` mostra os ocultos | MVP |
 | `/concursos` | **Lista** com busca, filtros e ordenação em `searchParams` (URL compartilhável) | MVP |
-| `/concursos/novo` | **Formulário** de cadastro | MVP |
-| `/concursos/[id]` | **Detalhe** em abas: Visão geral · Eventos · Links · Resultados · Histórico; a aba aberta fica em `?aba=` (#77): abas controladas pelo `useSearchParams`, troca gravada com `history.replaceState`, sem ir ao servidor | MVP |
+| `/concursos/novo` | **Formulário** de cadastro; ao salvar abre o detalhe na aba Eventos (#100) | MVP |
+| `/concursos/[id]` | **Detalhe** em abas: Visão geral · Eventos · Links · Resultados · Histórico; a aba aberta fica em `?aba=` (#77): abas controladas pelo `useSearchParams`, troca gravada com `history.replaceState`, sem ir ao servidor. `?evento=<id>` destaca um evento e `?foco=validade` o card Validade; `de`/`mes`/`concursos` definem o link de volta (allowlist); `?mudar=status` abre "Mudar status". Cabeçalho: Editar, Mudar status e menu Mais ações (.ics, Silenciar, Excluir) (#100) | MVP |
 | `/concursos/[id]/editar` | Formulário de edição | MVP |
 | `/configuracoes` | Regras de notificação, calendário (.ics), exportar/importar dados, token do MCP, acesso | MVP |
 | `/notificacoes` | **Central de notificações** (#65): marcar como lida, marcar todas, dispensar | v2.2 |
@@ -366,7 +366,7 @@ seguinte, seletor e atalhos), então o filtro se mantém ao trocar de mês.
 | `/admin/acesso` | Allowlist do login Google: e-mails das variáveis (só leitura) e liberados no painel (adicionar/retirar) | v1.4 |
 | `/admin/auditoria` | Log das ações administrativas (últimas 200) | v1.4 |
 | `/concursos?visao=quadro` | Quadro por status (kanban; arrastar ou “Mover para” = transição validada) | v1.1 |
-| `/calendario?mes=AAAA-MM&concursos=1,3` | Visão mensal de eventos (agenda em lista no celular); clique abre os detalhes do evento; cor/ícone por concurso com legenda (#46); seletor de mês e ano com eventos por mês, atalhos "Próximos eventos" e "Próxima prova", e filtro de concursos pela legenda (#83, §4.6) | v1.1 |
+| `/calendario?mes=AAAA-MM&concursos=1,3` | Visão mensal de eventos (agenda em lista no celular); clique abre o painel do evento (concluir, ocultar, editar, ver no concurso; gaveta no celular, #100); cor/ícone por concurso com legenda (#46); seletor de mês e ano com eventos por mês, atalhos "Próximos eventos" e "Próxima prova", e filtro de concursos pela legenda (#83, §4.6) | v1.1 |
 
 Layout responsivo (alvo: 360 px sem rolagem horizontal, #48): navegação lateral no desktop, barra
 inferior no celular; menu da conta (avatar) com Sair e, só para admins, o seletor de
@@ -436,7 +436,7 @@ visão admin no dashboard vira redirecionamento no cliente. Aceito: as páginas 
 | `GET /api/health` | health check do deploy |
 | `POST/GET/DELETE /api/mcp` | RF10 — servidor MCP (Streamable HTTP); exige `Authorization: Bearer <token pessoal>` |
 | `GET /api/auth/google` e `/api/auth/google/callback` | #49 — login com Google (OIDC, código + PKCE) |
-| `GET /api/calendario.ics?token=…` | RF08 (#65) — feed assinável; pública no `proxy.ts`, autenticada pelo token do feed (`cics_…`, SHA-256 em `usuario.ics_token_hash`); token inválido/revogado ou usuário bloqueado → 404; atraso progressivo como o MCP |
+| `GET /api/calendario.ics?token=…` | RF08 (#65) — feed assinável; pública no `proxy.ts`, autenticada pelo token do feed (`cics_…`, SHA-256 em `usuario.ics_token_hash`); token inválido/revogado, usuário bloqueado ou sem acesso (#96) → 404; atraso progressivo como o MCP |
 
 ### 5.4 Servidor MCP (`src/server/mcp`, RF10)
 
@@ -498,8 +498,11 @@ Decisões (issue #39):
 │   ├── components/
 │   │   ├── ui/                     # shadcn/ui
 │   │   ├── concurso/               # formulários, cards, quadro, badges, sugestão de status
-│   │   ├── calendario/             # visão mensal, detalhes do evento, seletor de mês, filtro (#83)
-│   │   ├── dashboard/              # lista de prazos, ocultar/reexibir
+│   │   ├── calendario/             # visão mensal, seletor de mês, filtro (#83)
+│   │   ├── evento/                 # painel do evento, badge de situação, destaque do deep-link (#100)
+│   │   ├── avisos/                 # avisos (toast) com Desfazer e aviso vindo da URL (#100)
+│   │   ├── formulario/             # proteção de alterações não salvas, foco no erro (#100)
+│   │   ├── dashboard/              # lista de prazos (concluir na linha), ocultar/reexibir
 │   │   ├── configuracoes/          # regras de notificação, calendário .ics, export/import, token MCP
 │   │   ├── admin/                  # painel admin (#50)
 │   │   ├── auth/                   # login (Google/senha) e sair
@@ -561,7 +564,10 @@ Decisões (issue #39):
 - Sem biblioteca de auth completa (NextAuth, Better Auth): um provedor só não justifica a
   dependência, e o fluxo OIDC cabe em poucas funções testáveis.
 - **MCP (§5.4):** `/api/mcp` não usa o cookie de sessão; exige `Authorization: Bearer <token>` com o
-  token pessoal do usuário (recusado se o usuário estiver bloqueado).
+  token pessoal do usuário. O token (e o do feed `.ics`) só vale enquanto o dono puder usar o app,
+  pela mesma regra da sessão (`donoDoTokenAutorizado` em `auth/autorizacao.ts`, #96): conta não
+  bloqueada e, para o usuário inicial, `APP_PASSWORD` definido (ou sem login); para os demais,
+  conta Google ainda autorizada. Retirar o e-mail da allowlist recusa os tokens na hora.
 
 **Painel admin (#50):**
 - **Quem entra com Google** (`auth/autorizacao.ts`): quem não está bloqueado e (a) tem o e-mail em
@@ -577,8 +583,9 @@ Decisões (issue #39):
   (`WHERE … AND EXISTS (outro admin ativo)`), sem janela de corrida. Ninguém bloqueia a própria
   conta; quem se rebaixa volta para a visão usuário.
 - **Bloqueio:** `usuario.bloqueado_em`. Barra o login (Google e senha), a sessão existente
-  (relida a cada requisição) e os tokens do MCP e do feed de calendário; os dados e o token ficam guardados e voltam a valer
-  ao desbloquear. Sem login configurado (uso local), o bloqueio não se aplica.
+  (relida a cada requisição) e os tokens do MCP e do feed de calendário, que são apagados ao
+  bloquear (#96; desbloqueado, o usuário gera outros). Os dados ficam guardados e voltam a valer ao
+  desbloquear. Sem login configurado (uso local), o bloqueio não se aplica.
 - **Visão admin ↔ visão usuário:** seletor no menu da conta, só para admins, sem novo login. A
   escolha fica no cookie `concurso_visao` (`auth/visao.ts`) e decide o início (`/` redireciona a
   `/admin` na visão admin). A visão usuário é o app comum, sem nenhum item de admin; a visão admin
@@ -589,6 +596,17 @@ Decisões (issue #39):
 - **Auditoria:** toda alteração do painel grava em `auditoria_admin` na mesma transação.
 - **Privacidade:** o painel mostra só totais e metadados das contas; não há impersonação nem acesso
   aos concursos de outros usuários.
+
+**Cabeçalhos de segurança (#95):** `next.config.ts` aplica a todas as rotas os cabeçalhos de
+`src/lib/cabecalhos-seguranca.ts`: CSP, `X-Frame-Options: DENY`, `nosniff`,
+`Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy` (recursos não usados
+desligados) e `Cross-Origin-Opener-Policy: same-origin`. A CSP é sem nonce (`script-src 'self'
+'unsafe-inline'`): o Next injeta scripts inline e o nonce exigiria renderizar tudo pelo `proxy.ts`,
+que não roda sem login. Ela restringe o resto à própria origem (imagens também de
+`*.googleusercontent.com`, as fotos de perfil), proíbe `<object>`, embutir o app
+(`frame-ancestors 'none'`) e formulários para fora. Não usa `upgrade-insecure-requests`, que
+quebraria o app servido por HTTP na rede local; em dev acrescenta `'unsafe-eval'` (pilhas de erro
+do React). O e2e `seguranca.spec.ts` confere os cabeçalhos e a ausência de violações no console.
 
 ### 7.2 Locale (RNF04)
 - `<html lang="pt-BR">`; toda a UI em pt-BR (sem i18n framework — strings diretas + `labels.ts`).
@@ -644,7 +662,7 @@ Decisões (issue #39):
 |---|---|---|---|
 | Unitário | Vitest | `domain/*` (transições, prazos, validade, criticidade), `lib/format`, parsers BRL, schemas Zod | meta: cobertura ≥ 90% em `domain/` (medida no CI, sem limite configurado) |
 | Integração | Vitest + libSQL `:memory:` + migrações | repositories/queries (transação de status, tags, filtros, export→import ida e volta); servidor MCP com cliente em memória (`InMemoryTransport`) | casos principais |
-| E2E | Playwright (Chromium) | smoke: criar concurso → evento → aparece no dashboard → mudar status → exportar/importar; login, MCP, PWA e lembretes com auth ativa; painel admin com o usuário inicial (sem auth); busca, quadro, calendário (navegação rápida e filtro de concursos no desktop e em 360 px, #83), cor/ícone, ocultar prazos, tema, lembretes (sino, regras, feed .ics), sino único por tela e tema pelo menu no celular, tema e Configurações sem duplicação (#82), PWA, aba do detalhe na URL e botão Atualizar com limite de 60 s (#77) e layout em 360 px; `/api/mcp` com token → concurso visível no app. Dois servidores (com e sem auth) com bancos temporários em `e2e/.tmp` | poucos fluxos |
+| E2E | Playwright (Chromium) | smoke: criar concurso → evento → aparece no dashboard → mudar status → exportar/importar; login, MCP, PWA e lembretes com auth ativa; painel admin com o usuário inicial (sem auth); busca, quadro, calendário (navegação rápida e filtro de concursos no desktop e em 360 px, #83), cor/ícone, ocultar prazos, tema, lembretes (sino, regras, feed .ics), sino único por tela e tema pelo menu no celular, tema e Configurações sem duplicação (#82), PWA, aba do detalhe na URL e botão Atualizar com limite de 60 s (#77), deep-link e volta à origem, painel do evento com concluir/Desfazer, cabeçalho do concurso, avisos e alterações não salvas (#100) e layout em 360 px; `/api/mcp` com token → concurso visível no app. Dois servidores (com e sem auth) com bancos temporários em `e2e/.tmp` | poucos fluxos |
 
 Datas sempre fixadas (`vi.setSystemTime` / `hoje` injetado).
 
@@ -738,7 +756,7 @@ O hook só vê o que **escapa** do código: `executar` (Server Actions e MCP), `
 | `auth.login_ok` | info | `metodo` (`senha`/`google`), `usuarioId` |
 | `auth.login_falhou` | warn (info se `cancelado`) | `metodo`, `motivo`, `ip`; Google: `email` mascarado e `erro` quando houver. Motivos com senha: `senha_incorreta`, `conta_bloqueada` (só detectado depois que a senha confere). Com Google: `nao_autorizado` (fora da allowlist), `bloqueado`, `erro_google` (troca do código ou `id_token` inválido), `estado_invalido` (state/cookie expirado ou forjado), `cancelado` |
 | `auth.limite_tentativas` | warn | `rota` (`login`, `mcp`, `ics`), `ip`, `esperaMs`: só quando uma falha **inicia** um bloqueio, não a cada tentativa recusada durante a espera |
-| `auth.token_invalido` | warn | `rota` (`mcp`, `ics`), `ip`, `ausente` |
+| `auth.token_invalido` | warn | `rota` (`mcp`, `ics`), `ip`, `ausente`; token válido de quem perdeu o acesso (#96): também `usuarioId` e `motivo: "sem_acesso"` |
 | `auth.logout` | info | `usuarioId` (lido do cookie assinado, sem consultar o banco; o logout nunca falha por causa do log) |
 | `auth.config_invalida` | error | `erro` (proxy) |
 | `dados.importacao` / `dados.importacao_recusada` / `dados.importacao_erro` | info / info / error | `usuarioId`, contagens do resumo, `motivo` ou `erro` |
@@ -792,7 +810,8 @@ Cada item = uma branch `feature/*` a partir de `develop`; cada milestone fecha c
 | **Desempenho** → `v2.3.0` | `feature/performance-mutacoes` (#73) | Mutações com uma viagem só ao servidor e esqueletos de carregamento |
 | **Uso diário** → `v2.4.0` | `feature/atualizar-dados` (#77) · `feature/sino-unico` (#78) · `feature/tema-layout` (#81, #82) · `feature/eventos-dashboard` (#84, #85) · `feature/calendario-navegacao` (#83) | Botão Atualizar, contagem regressiva das provas, pendências de status e navegação rápida no calendário |
 | **Observabilidade** → `v2.5.0` | `feature/logs` (#91) | Logger estruturado, `onRequestError` e eventos de segurança e operação |
-| **M7 — Anexos** → `v2.6.0` | `feature/anexos` | RF02 desejável |
+| **UX dos eventos** → `v2.6.0` | `feature/ux-fluxo-eventos` (#100) | Painel do evento, concluir no dashboard, link direto para o evento, voltar à origem e avisos com Desfazer |
+| **M7 — Anexos** → `v2.7.0` | `feature/anexos` | RF02 desejável |
 
 ---
 

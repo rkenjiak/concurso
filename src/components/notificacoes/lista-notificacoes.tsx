@@ -6,6 +6,7 @@ import { useState, useTransition } from "react";
 import { MarcadorConcurso } from "@/components/concurso/marcador-concurso";
 import { Button } from "@/components/ui/button";
 import type { CorConcurso } from "@/domain/cores";
+import { hrefPrazo } from "@/domain/navegacao-concurso";
 import { formatarData } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import {
@@ -17,6 +18,8 @@ import {
 /** Notificação já pronta para exibir (serializável para o cliente). */
 export interface ItemNotificacao {
   chave: string;
+  /** Evento de origem; `null` para o fim da validade derivado (vai ao card Validade, #100). */
+  eventoId: number | null;
   mensagem: string;
   data: string;
   hora: string | null;
@@ -28,7 +31,7 @@ type ResultadoSimples = { ok: true } | { ok: false; erros: { _form?: string[] } 
 
 /**
  * Central de notificações (#65): marcar como lida, dispensar e marcar todas como lidas. Abrir o
- * concurso marca a notificação como lida.
+ * evento no concurso (#100) marca a notificação como lida.
  */
 export function ListaNotificacoes({ itens }: { itens: readonly ItemNotificacao[] }) {
   const [pendente, iniciar] = useTransition();
@@ -85,7 +88,9 @@ export function ListaNotificacoes({ itens }: { itens: readonly ItemNotificacao[]
             )}
           >
             <Link
-              href={`/concursos/${n.concurso.id}`}
+              href={hrefPrazo(n.concurso.id, n.eventoId === null ? null : { id: n.eventoId }, {
+                de: "notificacoes",
+              })}
               onClick={() => {
                 if (!n.lida) void marcarNotificacaoLidaAcao(n.chave);
               }}

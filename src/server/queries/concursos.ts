@@ -1,7 +1,12 @@
 /** Leituras de concurso (RF01, RF07), sempre restritas aos concursos do usuário (#49). */
 import { and, asc, desc, eq, gte, inArray, lte, type SQL, sql } from "drizzle-orm";
 import { normalizarTexto } from "@/lib/normalize";
-import { FILTROS_VAZIOS, type FiltrosConcursos } from "@/lib/schemas/filtros-concursos";
+import {
+  FILTROS_VAZIOS,
+  type FiltrosConcursos,
+  MAX_BUSCA,
+  MAX_TERMOS_BUSCA,
+} from "@/lib/schemas/filtros-concursos";
 import { type DataISO, hojeSP } from "@/lib/tz";
 import type { Db } from "../db/client";
 import { type Concurso, concurso, evento } from "../db/schema";
@@ -35,11 +40,22 @@ function escaparLike(texto: string): string {
 }
 
 /**
- * Condições da busca/filtros. A busca textual exige que cada termo (normalizado, sem acento)
+ * Termos da busca textual: palavras normalizadas (sem acento), sem repetição. Limitada aqui, e não
+ * só nos formulários, para valer em qualquer ponto de entrada (UI, MCP): até {@link MAX_BUSCA}
+ * caracteres e {@link MAX_TERMOS_BUSCA} termos (#96).
+ */
+export function termosDaBusca(busca: string | null): string[] {
+  if (!busca) return [];
+  const palavras = normalizarTexto(busca.slice(0, MAX_BUSCA)).split(" ").filter(Boolean);
+  return [...new Set(palavras)].slice(0, MAX_TERMOS_BUSCA);
+}
+
+/**
+ * Condições da busca/filtros. A busca textual exige que cada termo ({@link termosDaBusca})
  * apareça em `busca_normalizada` (órgão + cargo + banca + tags).
  */
 function condicoes(usuarioId: number, filtros: FiltrosConcursos): SQL | undefined {
-  const termos = filtros.busca ? normalizarTexto(filtros.busca).split(" ").filter(Boolean) : [];
+  const termos = termosDaBusca(filtros.busca);
   return and(
     eq(concurso.usuarioId, usuarioId),
     ...termos.map(

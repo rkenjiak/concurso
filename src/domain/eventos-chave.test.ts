@@ -7,7 +7,6 @@ import {
   type EventoChave,
   eventoChegou,
   eventoPassou,
-  nomeEvento,
   proximoEvento,
   TIPOS_PROVA,
   ultimoEvento,
@@ -106,10 +105,8 @@ describe("ultimoEvento", () => {
   });
 });
 
-describe("nomeEvento / dataBr", () => {
-  it("título ou rótulo; data em pt-BR", () => {
-    expect(nomeEvento({ tipo: "PROVA_OBJETIVA", titulo: null })).toBe("Prova objetiva");
-    expect(nomeEvento({ tipo: "PROVA_OBJETIVA", titulo: "Prova TJ" })).toBe("Prova TJ");
+describe("dataBr", () => {
+  it("data em pt-BR", () => {
     expect(dataBr("2026-11-14")).toBe("14/11/2026");
   });
 });

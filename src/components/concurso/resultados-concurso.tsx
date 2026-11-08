@@ -4,6 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
+import { useAvisos } from "@/components/avisos/avisos";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -72,6 +73,7 @@ function Dado({ rotulo, valor }: { rotulo: string; valor: string | null }) {
 
 /** Lista e gerencia as notas, classificações e situação por fase (RF05). */
 export function ResultadosConcurso({ concursoId, resultados }: ResultadosConcursoProps) {
+  const { avisar } = useAvisos();
   const [editando, setEditando] = useState<ResultadoFaseItem | "novo" | null>(null);
 
   return (
@@ -135,6 +137,7 @@ export function ResultadosConcurso({ concursoId, resultados }: ResultadosConcurs
                     tamanho="icon"
                     rotuloAcessivel={`Excluir resultado ${nome}`}
                     acao={() => excluirResultadoFase(concursoId, r.id)}
+                    aoConcluir={() => avisar({ texto: `Resultado “${nome}” excluído.` })}
                   >
                     <Trash2 aria-hidden />
                   </BotaoConfirmar>
@@ -156,7 +159,12 @@ export function ResultadosConcurso({ concursoId, resultados }: ResultadosConcurs
               key={editando === "novo" ? "novo" : editando.id}
               concursoId={concursoId}
               resultado={editando === "novo" ? null : editando}
-              aoConcluir={() => setEditando(null)}
+              aoConcluir={() => {
+                avisar({
+                  texto: editando === "novo" ? "Resultado adicionado." : "Resultado salvo.",
+                });
+                setEditando(null);
+              }}
             />
           ) : null}
         </DialogContent>

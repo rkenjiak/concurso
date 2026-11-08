@@ -45,7 +45,7 @@ test("calendário mensal: hoje, destaque crítico, detalhes em popup, navegaçã
   await expect(detalhes).toContainText(`${orgao} — Analista`);
   await expect(detalhes).toContainText("09:00");
   await expect(detalhes).toContainText("Inscrito");
-  await expect(detalhes.getByRole("link", { name: "Ir para o concurso" })).toHaveAttribute(
+  await expect(detalhes.getByRole("link", { name: /^Ver no concurso/ })).toHaveAttribute(
     "href",
     new URL(url).pathname,
   );
@@ -75,6 +75,6 @@ test("calendário mensal: hoje, destaque crítico, detalhes em popup, navegaçã
   await agenda.click();
   await expect(detalhes).toBeVisible();
   await expect(page).toHaveURL(mesUrl);
-  await detalhes.getByRole("link", { name: "Ir para o concurso" }).click();
+  await detalhes.getByRole("link", { name: /^Ver no concurso/ }).click();
   await expect(page).toHaveURL(url);
 });

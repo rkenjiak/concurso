@@ -1,9 +1,10 @@
 import { AlertTriangle, Clock, EyeOff, MapPin } from "lucide-react";
 import Link from "next/link";
 import { MarcadorConcurso } from "@/components/concurso/marcador-concurso";
+import { BadgeSituacao } from "@/components/evento/badge-situacao";
+import { COR_URGENCIA } from "@/components/evento/urgencia";
 import { Badge } from "@/components/ui/badge";
-import { ROTULO_TIPO_EVENTO } from "@/domain/labels";
-import { type Criticidade, descreverDias, type Prazo } from "@/domain/prazos";
+import { descreverDias, nomePrazo, type Prazo, situacaoPrazo } from "@/domain/prazos";
 import { formatarData } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { ConcursoDoPrazo, EventoDoPrazo } from "@/server/queries/dashboard";
@@ -11,32 +12,11 @@ import { BotaoOcultarPrazo } from "./botao-ocultar-prazo";
 
 type PrazoDashboard = Prazo<EventoDoPrazo, ConcursoDoPrazo>;
 
-export const BORDA_CRITICIDADE: Readonly<Record<Criticidade, string>> = {
-  ALTA: "border-l-destructive",
-  MEDIA: "border-l-aviso",
-  NORMAL: "border-l-transparent",
-};
-
 const DIA_SEMANA = new Intl.DateTimeFormat("pt-BR", { weekday: "short", timeZone: "UTC" });
 
 /** "sáb." a partir de `YYYY-MM-DD` (data de calendário, sem conversão de fuso). */
 function diaDaSemana(data: string): string {
   return DIA_SEMANA.format(new Date(`${data}T12:00:00Z`));
-}
-
-/** Nome exibido: título do evento, rótulo do tipo ou "Fim da validade" (pseudo-evento). */
-export function nomePrazo(p: Pick<PrazoDashboard, "derivado" | "titulo" | "tipo">): string {
-  if (p.derivado) return "Fim da validade do concurso";
-  return p.titulo ?? ROTULO_TIPO_EVENTO[p.tipo];
-}
-
-function BadgeCriticidade({ prazo }: { prazo: PrazoDashboard }) {
-  if (prazo.dias < 0) return <Badge variant="destructive">Vencido</Badge>;
-  if (prazo.criticidade === "ALTA") return <Badge variant="destructive">Urgente</Badge>;
-  if (prazo.criticidade === "MEDIA") {
-    return <Badge className="bg-aviso/15 text-aviso-foreground">Esta semana</Badge>;
-  }
-  return prazo.critico ? <Badge variant="outline">Prazo crítico</Badge> : null;
 }
 
 /**
@@ -53,7 +33,7 @@ export function ListaPrazos({ prazos }: { prazos: readonly PrazoDashboard[] }) {
           <li
             key={p.chave}
             data-oculto={p.oculto || undefined}
-            className={cn("flex items-start border-l-4", BORDA_CRITICIDADE[p.criticidade])}
+            className={cn("flex items-start border-l-4", COR_URGENCIA[p.criticidade].bordaEsquerda)}
           >
             <Link
               href={`/concursos/${p.concurso.id}`}
@@ -74,7 +54,13 @@ export function ListaPrazos({ prazos }: { prazos: readonly PrazoDashboard[] }) {
                     <AlertTriangle className="size-4 shrink-0 text-destructive" aria-hidden />
                   ) : null}
                   <span className="font-medium">{nome}</span>
-                  <BadgeCriticidade prazo={p} />
+                  <BadgeSituacao
+                    situacao={situacaoPrazo({
+                      tipo: p.tipo,
+                      dias: p.dias,
+                      status: p.concurso.status,
+                    })}
+                  />
                   {p.oculto ? (
                     <Badge variant="outline" className="text-muted-foreground">
                       <EyeOff aria-hidden />

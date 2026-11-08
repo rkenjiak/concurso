@@ -5,7 +5,6 @@
  */
 import { type DataISO, diasEntre, ehDataISO } from "../lib/tz";
 import type { Status, TipoEvento } from "./enums";
-import { ROTULO_TIPO_EVENTO } from "./labels";
 import { ehTerminal } from "./status";
 
 /** Dados mínimos de um evento datado. */
@@ -101,11 +100,6 @@ export function ultimoEvento<E extends EventoChave>(
     .filter((x) => ocorreu(x, hoje))
     .at(-1);
   return e ? { evento: e, dias: diasEntre(hoje, e.data) } : null;
-}
-
-/** Nome exibido do evento: título ou rótulo do tipo. */
-export function nomeEvento(e: Pick<EventoChave, "titulo" | "tipo">): string {
-  return e.titulo ?? ROTULO_TIPO_EVENTO[e.tipo];
 }
 
 /** `YYYY-MM-DD` → `dd/mm/aaaa` (data de calendário, sem conversão de fuso). */

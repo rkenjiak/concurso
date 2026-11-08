@@ -4,6 +4,7 @@
  */
 import { type DataISO, diasEntre, ehDataISO } from "../lib/tz";
 import type { Status, TipoEvento } from "./enums";
+import { ROTULO_TIPO_EVENTO } from "./labels";
 import { ehAtivo } from "./status";
 
 /** Janela padrão de "próximos dias" do dashboard. */
@@ -43,6 +44,57 @@ export function criticidade(tipo: TipoEvento, dias: number): Criticidade {
   if (dias <= DIAS_CRITICIDADE_ALTA) return "ALTA";
   if (dias <= DIAS_CRITICIDADE_MEDIA) return "MEDIA";
   return "NORMAL";
+}
+
+/**
+ * Nome exibido de um prazo/evento em todas as telas (#100): título do evento, rótulo do tipo ou
+ * "Fim da validade do concurso" para o pseudo-evento derivado.
+ */
+export function nomePrazo(p: {
+  tipo: TipoEvento;
+  titulo: string | null;
+  derivado?: boolean;
+}): string {
+  if (p.derivado) return "Fim da validade do concurso";
+  return p.titulo ?? ROTULO_TIPO_EVENTO[p.tipo];
+}
+
+/**
+ * Situação de um prazo exibida no badge (#100, D11), em ordem de precedência: concluído > vencido
+ * > urgente > esta semana > prazo crítico.
+ */
+export type SituacaoPrazo = "CONCLUIDO" | "VENCIDO" | "URGENTE" | "ESTA_SEMANA" | "CRITICO";
+
+export const ROTULO_SITUACAO: Readonly<Record<SituacaoPrazo, string>> = {
+  CONCLUIDO: "Concluído",
+  VENCIDO: "Vencido",
+  URGENTE: "Urgente",
+  ESTA_SEMANA: "Esta semana",
+  CRITICO: "Prazo crítico",
+};
+
+/**
+ * Regra única da situação de um prazo (#100, D11). Só prazos de tipo crítico, pendentes e de
+ * concurso acompanhado ({@link concursoAcompanhado}) recebem destaque: vencido (data passada),
+ * urgente (≤ {@link DIAS_CRITICIDADE_ALTA} dias), esta semana (≤ {@link DIAS_CRITICIDADE_MEDIA}
+ * dias) ou apenas "prazo crítico". Concluído vale para qualquer evento. `null` = sem badge.
+ */
+export function situacaoPrazo(p: {
+  tipo: TipoEvento;
+  /** Dias de hoje até a data (negativo = passou). */
+  dias: number;
+  concluido?: boolean;
+  /** Status do concurso; ausente = acompanhado. */
+  status?: Status;
+}): SituacaoPrazo | null {
+  if (p.concluido) return "CONCLUIDO";
+  if (p.status !== undefined && !concursoAcompanhado(p.status)) return null;
+  if (!ehTipoCritico(p.tipo)) return null;
+  if (p.dias < 0) return "VENCIDO";
+  const c = criticidade(p.tipo, p.dias);
+  if (c === "ALTA") return "URGENTE";
+  if (c === "MEDIA") return "ESTA_SEMANA";
+  return "CRITICO";
 }
 
 /** Dados mínimos de um evento para o cálculo de prazos. */

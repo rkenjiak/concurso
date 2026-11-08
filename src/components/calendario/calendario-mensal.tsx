@@ -1,8 +1,9 @@
-import { AlertTriangle, Check, Clock } from "lucide-react";
+import { AlertTriangle, Clock } from "lucide-react";
 import { DetalhesEvento } from "@/components/calendario/detalhes-evento";
 import { FiltroConcursos } from "@/components/calendario/filtro-concursos";
 import { MarcadorConcurso } from "@/components/concurso/marcador-concurso";
-import { BORDA_CRITICIDADE, nomePrazo } from "@/components/dashboard/lista-prazos";
+import { NomeEvento } from "@/components/evento/nome-evento";
+import { COR_URGENCIA } from "@/components/evento/urgencia";
 import {
   agruparPorData,
   DIAS_SEMANA,
@@ -11,6 +12,7 @@ import {
   proximosDoConcurso,
 } from "@/domain/calendario";
 import { concursoVisivel, type SelecaoConcursos } from "@/domain/navegacao-calendario";
+import { nomePrazo, ROTULO_SITUACAO } from "@/domain/prazos";
 import { formatarDataLonga } from "@/lib/format";
 import type { DataISO } from "@/lib/tz";
 import { cn } from "@/lib/utils";
@@ -29,10 +31,7 @@ const NOME_DIA_SEMANA = [
 function rotuloItem(item: ItemDoCalendario): string {
   const partes = [nomePrazo(item), `${item.concurso.orgao} — ${item.concurso.cargo}`];
   if (item.hora) partes.push(item.hora);
-  if (item.concluido) partes.push("concluído");
-  if (!item.esmaecido && item.criticidade === "ALTA") {
-    partes.push(item.dias < 0 ? "vencido" : "urgente");
-  }
+  if (item.situacao) partes.push(ROTULO_SITUACAO[item.situacao].toLowerCase());
   return partes.join(" · ");
 }
 
@@ -55,11 +54,10 @@ function ItemGrade({
           data-esmaecido={item.esmaecido || undefined}
           className={cn(
             "block w-full cursor-pointer truncate rounded border-l-4 text-left bg-muted/60 px-1.5 py-0.5 text-xs transition-colors hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring",
-            BORDA_CRITICIDADE[item.criticidade],
-            item.criticidade === "ALTA" && "bg-destructive/10 font-medium text-destructive",
-            item.criticidade === "MEDIA" && "bg-aviso/15 text-aviso-foreground",
+            COR_URGENCIA[item.criticidade].bordaEsquerda,
+            COR_URGENCIA[item.criticidade].fundo,
+            item.criticidade === "ALTA" && "font-medium",
             item.esmaecido && "text-muted-foreground opacity-60",
-            item.concluido && "line-through",
           )}
         >
           <MarcadorConcurso
@@ -69,7 +67,7 @@ function ItemGrade({
             className="mr-1"
           />
           {item.hora ? <span className="tabular-nums">{item.hora} </span> : null}
-          {nomePrazo(item)} · {item.concurso.orgao}
+          <NomeEvento nome={nomePrazo(item)} concluido={item.concluido} /> · {item.concurso.orgao}
         </button>
       </DetalhesEvento>
     </li>
@@ -195,7 +193,7 @@ export function AgendaMes({
             {doDia.map((item) => (
               <li
                 key={item.chave}
-                className={cn("border-l-4", BORDA_CRITICIDADE[item.criticidade])}
+                className={cn("border-l-4", COR_URGENCIA[item.criticidade].bordaEsquerda)}
               >
                 <DetalhesEvento item={item} proximos={proximosDoConcurso(itens, item, hoje)}>
                   <button
@@ -206,19 +204,11 @@ export function AgendaMes({
                     )}
                   >
                     <div className="min-w-0 flex-1 space-y-0.5">
-                      <p
-                        className={cn(
-                          "flex items-center gap-1.5 font-medium",
-                          item.concluido && "line-through",
-                        )}
-                      >
+                      <p className="flex items-center gap-1.5 font-medium">
                         {item.criticidade === "ALTA" ? (
                           <AlertTriangle className="size-4 shrink-0 text-destructive" aria-hidden />
                         ) : null}
-                        {item.concluido ? (
-                          <Check className="size-4 shrink-0" aria-label="Concluído" />
-                        ) : null}
-                        {nomePrazo(item)}
+                        <NomeEvento nome={nomePrazo(item)} concluido={item.concluido} />
                       </p>
                       <p className="flex items-center gap-1.5 text-muted-foreground text-sm">
                         <MarcadorConcurso cor={item.concurso.cor} icone={item.concurso.icone} />

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { AgendaMes, GradeMes, LegendaConcursos } from "@/components/calendario/calendario-mensal";
 import { SeletorMes } from "@/components/calendario/seletor-mes";
+import { COR_URGENCIA } from "@/components/evento/urgencia";
 import { CabecalhoPagina } from "@/components/layout/cabecalho-pagina";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -22,6 +23,7 @@ import {
 } from "@/domain/navegacao-calendario";
 import { formatarMes } from "@/lib/format";
 import { hojeSP } from "@/lib/tz";
+import { cn } from "@/lib/utils";
 import { exigirUsuarioPagina } from "@/server/auth/acesso";
 import { getDb } from "@/server/db/client";
 import { obterCalendarioCompleto } from "@/server/queries/calendario";
@@ -158,11 +160,23 @@ export default async function CalendarioPage({ searchParams }: PageProps<"/calen
             className="flex flex-wrap gap-x-4 gap-y-1 text-muted-foreground text-xs"
           >
             <li className="inline-flex items-center gap-1.5">
-              <span className="size-3 rounded-sm border-l-4 border-l-destructive bg-destructive/10" />
+              <span
+                className={cn(
+                  "size-3 rounded-sm border-l-4",
+                  COR_URGENCIA.ALTA.bordaEsquerda,
+                  COR_URGENCIA.ALTA.fundo,
+                )}
+              />
               Prazo crítico em até 3 dias ou vencido
             </li>
             <li className="inline-flex items-center gap-1.5">
-              <span className="size-3 rounded-sm border-l-4 border-l-aviso bg-aviso/15" />
+              <span
+                className={cn(
+                  "size-3 rounded-sm border-l-4",
+                  COR_URGENCIA.MEDIA.bordaEsquerda,
+                  COR_URGENCIA.MEDIA.fundo,
+                )}
+              />
               Prazo crítico em até 7 dias
             </li>
             <li className="inline-flex items-center gap-1.5">

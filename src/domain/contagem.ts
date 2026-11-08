@@ -9,13 +9,8 @@
  */
 import type { DataISO } from "../lib/tz";
 import type { Status, TipoEvento } from "./enums";
-import {
-  concursoEmAndamento,
-  dataBr,
-  type EventoChave,
-  nomeEvento,
-  proximoEvento,
-} from "./eventos-chave";
+import { concursoEmAndamento, dataBr, type EventoChave, proximoEvento } from "./eventos-chave";
+import { type Criticidade, nomePrazo } from "./prazos";
 
 /** Tipos de evento com contagem regressiva por padrão. */
 export const TIPOS_CONTAGEM_PADRAO = [
@@ -47,6 +42,16 @@ export function destaqueContagem(dias: number): DestaqueContagem {
   return "NORMAL";
 }
 
+/**
+ * Nível de urgência da contagem no mapa único de cores (#100): hoje/amanhã = alta, próxima =
+ * média.
+ */
+export function urgenciaContagem(destaque: DestaqueContagem): Criticidade {
+  if (destaque === "HOJE" || destaque === "AMANHA") return "ALTA";
+  if (destaque === "PROXIMA") return "MEDIA";
+  return "NORMAL";
+}
+
 /** "é hoje", "é amanhã", "faltam N dias". */
 export function textoContagem(dias: number): string {
   if (dias <= 0) return "é hoje";
@@ -56,7 +61,7 @@ export function textoContagem(dias: number): string {
 
 function rotuloContagem(e: EventoChave, dias: number): string {
   const quando = dias <= 0 ? "hoje" : dias === 1 ? "amanhã" : `em ${dias} dias`;
-  return `${nomeEvento(e)} ${quando}, ${dataBr(e.data)}`;
+  return `${nomePrazo(e)} ${quando}, ${dataBr(e.data)}`;
 }
 
 /** Contagem regressiva do concurso, ou `null` se não houver evento futuro dos tipos ativos. */

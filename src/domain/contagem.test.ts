@@ -5,6 +5,7 @@ import {
   DIAS_CONTAGEM_PROXIMA,
   destaqueContagem,
   textoContagem,
+  urgenciaContagem,
 } from "./contagem";
 import type { Status, TipoEvento } from "./enums";
 import type { EventoChave } from "./eventos-chave";
@@ -117,5 +118,14 @@ describe("compararContagens", () => {
     const d = c(2, "2026-11-05", "08:00");
     const e = c(1, "2026-11-10");
     expect([a, b, d, e].sort(compararContagens)).toEqual([d, b, e, a]);
+  });
+});
+
+describe("urgenciaContagem (#100)", () => {
+  it("mapeia o destaque para o nível de urgência compartilhado com os prazos", () => {
+    expect(urgenciaContagem("HOJE")).toBe("ALTA");
+    expect(urgenciaContagem("AMANHA")).toBe("ALTA");
+    expect(urgenciaContagem("PROXIMA")).toBe("MEDIA");
+    expect(urgenciaContagem("NORMAL")).toBe("NORMAL");
   });
 });

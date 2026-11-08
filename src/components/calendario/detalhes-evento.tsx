@@ -5,8 +5,8 @@ import Link from "next/link";
 import type { ReactElement } from "react";
 import { BadgeStatus } from "@/components/concurso/badge-status";
 import { MarcadorConcurso } from "@/components/concurso/marcador-concurso";
-import { nomePrazo } from "@/components/dashboard/lista-prazos";
-import { Badge } from "@/components/ui/badge";
+import { BadgeSituacao } from "@/components/evento/badge-situacao";
+import { NomeEvento } from "@/components/evento/nome-evento";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -17,23 +17,14 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { nomePrazo } from "@/domain/prazos";
 import { formatarData, formatarDataLonga } from "@/lib/format";
 import type { ItemDoCalendario } from "@/server/queries/calendario";
-
-function BadgeSituacao({ item }: { item: ItemDoCalendario }) {
-  if (item.concluido) return <Badge variant="secondary">Concluído</Badge>;
-  if (item.esmaecido) return null;
-  if (item.criticidade === "ALTA") {
-    return <Badge variant="destructive">{item.dias < 0 ? "Vencido" : "Urgente"}</Badge>;
-  }
-  if (item.criticidade === "MEDIA") return <Badge variant="outline">Esta semana</Badge>;
-  return null;
-}
 
 /**
  * Detalhes de um item do calendário em diálogo (Radix: Esc/clique fora fecham, foco preso e
  * devolvido ao gatilho). `children` é o gatilho — um único `<button>` —, que recebe os atributos
- * de abertura; navegar ao concurso fica a cargo do botão "Ir para o concurso".
+ * de abertura; navegar ao concurso fica a cargo do link "Ver no concurso".
  */
 export function DetalhesEvento({
   item,
@@ -52,7 +43,9 @@ export function DetalhesEvento({
       <DialogTrigger asChild>{children}</DialogTrigger>
       <DialogContent>
         <DialogHeader className="pr-8">
-          <DialogTitle className={item.concluido ? "line-through" : undefined}>{nome}</DialogTitle>
+          <DialogTitle>
+            <NomeEvento nome={nome} concluido={item.concluido} />
+          </DialogTitle>
           <DialogDescription className="flex items-center gap-1.5">
             <MarcadorConcurso cor={item.concurso.cor} icone={item.concurso.icone} rotulado />
             <span>
@@ -63,7 +56,7 @@ export function DetalhesEvento({
 
         <div className="flex flex-wrap items-center gap-1.5">
           <BadgeStatus status={item.concurso.status} />
-          <BadgeSituacao item={item} />
+          <BadgeSituacao situacao={item.situacao} />
         </div>
 
         <dl className="grid grid-cols-[auto_1fr] items-center gap-x-2 gap-y-1.5">
@@ -117,7 +110,8 @@ export function DetalhesEvento({
         <DialogFooter>
           <Button asChild>
             <Link href={`/concursos/${item.concurso.id}`}>
-              Ir para o concurso
+              Ver no concurso
+              <span className="sr-only">: {nome}</span>
               <ArrowRight aria-hidden />
             </Link>
           </Button>

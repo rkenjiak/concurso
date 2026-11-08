@@ -4,6 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { CalendarDays, Clock, MapPin, Pencil, Plus, Trash2 } from "lucide-react";
 import { useState, useTransition } from "react";
 import { Controller, useForm } from "react-hook-form";
+import { NomeEvento } from "@/components/evento/nome-evento";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -21,6 +22,7 @@ import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
 import { Textarea } from "@/components/ui/textarea";
 import { TIPO_EVENTO, type TipoEvento } from "@/domain/enums";
 import { opcoes, ROTULO_TIPO_EVENTO } from "@/domain/labels";
+import { nomePrazo } from "@/domain/prazos";
 import { formatarData } from "@/lib/format";
 import {
   type EventoFormValores,
@@ -49,9 +51,6 @@ interface EventosConcursoProps {
   eventos: readonly EventoItem[];
 }
 
-const nomeEvento = (e: Pick<EventoItem, "titulo" | "tipo">) =>
-  e.titulo ?? ROTULO_TIPO_EVENTO[e.tipo];
-
 /** Lista e gerencia as datas e eventos do concurso (RF04). */
 export function EventosConcurso({ concursoId, eventos }: EventosConcursoProps) {
   const [editando, setEditando] = useState<EventoItem | "novo" | null>(null);
@@ -75,7 +74,7 @@ export function EventosConcurso({ concursoId, eventos }: EventosConcursoProps) {
       ) : (
         <ul className="divide-y rounded-lg border">
           {eventos.map((e) => {
-            const nome = nomeEvento(e);
+            const nome = nomePrazo(e);
             const checkId = `evento-${e.id}-concluido`;
             return (
               <li key={e.id} className="flex items-start gap-3 p-3">
@@ -89,18 +88,14 @@ export function EventosConcurso({ concursoId, eventos }: EventosConcursoProps) {
                 />
                 <div className="min-w-0 flex-1 space-y-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span
-                      className={cn(
-                        "font-medium",
-                        e.concluido && "text-muted-foreground line-through",
-                      )}
-                    >
-                      {nome}
-                    </span>
+                    <NomeEvento
+                      nome={nome}
+                      concluido={e.concluido}
+                      className={cn("font-medium", e.concluido && "text-muted-foreground")}
+                    />
                     {e.titulo ? (
                       <Badge variant="secondary">{ROTULO_TIPO_EVENTO[e.tipo]}</Badge>
                     ) : null}
-                    {e.concluido ? <Badge variant="outline">Concluído</Badge> : null}
                   </div>
                   <div className="flex flex-wrap gap-x-4 gap-y-1 text-muted-foreground text-sm">
                     <span className="inline-flex items-center gap-1">

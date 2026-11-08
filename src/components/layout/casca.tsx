@@ -1,4 +1,5 @@
-import type { ReactNode } from "react";
+import { type ReactNode, Suspense } from "react";
+import { AvisoDaUrl } from "@/components/avisos/aviso-da-url";
 import { AvisosProvider } from "@/components/avisos/avisos";
 import { BotaoAtualizar } from "@/components/layout/botao-atualizar";
 import { Marca } from "@/components/layout/marca";
@@ -82,6 +83,10 @@ export function Casca({
         </div>
       </div>
       <NavegacaoInferior secao={secao} />
+      {/* `useSearchParams` fora de um limite de Suspense tiraria as páginas da pré-renderização. */}
+      <Suspense fallback={null}>
+        <AvisoDaUrl />
+      </Suspense>
     </AvisosProvider>
   );
 }

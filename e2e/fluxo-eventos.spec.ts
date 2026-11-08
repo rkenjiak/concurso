@@ -46,10 +46,15 @@ test("concurso novo abre na aba Eventos com estado vazio; salvar e adicionar out
   await expect(page.getByText(`Prova ${id}`, { exact: true })).toBeVisible();
   await expect(vazio).toBeHidden();
 
-  // Cancelar fecha o modal sem salvar; na edição não há "Salvar e adicionar outro".
+  // Cancelar fecha o modal sem salvar (com alterações, depois de confirmar o descarte, D10); na
+  // edição não há "Salvar e adicionar outro".
   await page.getByRole("button", { name: "Adicionar evento" }).click();
   await dialogo.getByLabel("Título").fill(`Descartado ${id}`);
   await dialogo.getByRole("button", { name: "Cancelar" }).click();
+  await page
+    .getByRole("alertdialog", { name: "Descartar alterações?" })
+    .getByRole("button", { name: "Descartar e sair" })
+    .click();
   await expect(dialogo).toBeHidden();
   await expect(page.getByText(`Descartado ${id}`)).toHaveCount(0);
   await page.getByRole("button", { name: `Editar evento Prova ${id}` }).click();

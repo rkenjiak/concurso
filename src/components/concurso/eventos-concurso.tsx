@@ -3,10 +3,22 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CalendarDays, CalendarPlus, Clock, MapPin, Pencil, Plus, Trash2 } from "lucide-react";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useState, useTransition } from "react";
+import {
+  type Ref,
+  startTransition,
+  useEffect,
+  useImperativeHandle,
+  useOptimistic,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
 import { Controller, useForm } from "react-hook-form";
+import { useAvisos } from "@/components/avisos/avisos";
 import { classesDestaque, useDestaqueAlvo } from "@/components/evento/destaque";
 import { NomeEvento } from "@/components/evento/nome-evento";
+import { useFocoNoErro } from "@/components/formulario/use-foco-no-erro";
+import { useProtecaoSaida } from "@/components/formulario/use-protecao-saida";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -55,15 +67,26 @@ interface EventosConcursoProps {
   eventos: readonly EventoItem[];
 }
 
+type Otimistas = ReadonlyMap<number, boolean>;
+const SEM_OTIMISTAS: Otimistas = new Map();
+
 /**
  * Lista e gerencia as datas e eventos do concurso (RF04). `?evento=<id>` (#100, D2) destaca o
  * evento: rola até ele, dá foco e marca `aria-current` enquanto o parâmetro existir. Id que não é
  * de um evento deste concurso (inválido, de outro concurso ou excluído) é removido da URL.
+ *
+ * Concluir/reabrir é otimista e por item (#100, item 14): só o evento em gravação fica ocupado; o
+ * aviso "concluído" oferece Desfazer e, em falha, a marcação volta e o erro é anunciado.
  */
 export function EventosConcurso({ concursoId, eventos }: EventosConcursoProps) {
+  const { avisar } = useAvisos();
   const [editando, setEditando] = useState<EventoItem | "novo" | null>(null);
-  const [erro, setErro] = useState<string | null>(null);
-  const [alternando, iniciarAlternar] = useTransition();
+  const formularioRef = useRef<ControleSaida>(null);
+  const [otimistas, aplicarOtimista] = useOptimistic(
+    SEM_OTIMISTAS,
+    (atual: Otimistas, { id, concluido }: { id: number; concluido: boolean }) =>
+      new Map(atual).set(id, concluido),
+  );
   const paramEvento = useSearchParams().get(PARAM_EVENTO);
   const idPedido = lerIdEvento(paramEvento);
   const alvoId = idPedido !== null && eventos.some((e) => e.id === idPedido) ? idPedido : null;
@@ -75,19 +98,59 @@ export function EventosConcurso({ concursoId, eventos }: EventosConcursoProps) {
     }
   }, [paramEvento, alvoId]);
 
-  function alternar(e: EventoItem, concluido: boolean) {
-    setErro(null);
-    iniciarAlternar(async () => {
-      const r = await alternarConcluido(concursoId, e.id, concluido);
-      if (!r.ok) setErro(r.erros._form?.[0] ?? "Não foi possível atualizar o evento.");
+  /** Conclui ou reabre; a promessa termina com a gravação (o "Desfazer" do aviso a aguarda). */
+  function alternar(e: EventoItem, concluido: boolean, desfazendo = false): Promise<void> {
+    const nome = nomePrazo(e);
+    const chave = `concluir-evento-${e.id}`;
+    return new Promise<void>((resolver) => {
+      startTransition(async () => {
+        aplicarOtimista({ id: e.id, concluido });
+        const r = await alternarConcluido(concursoId, e.id, concluido);
+        if (!r.ok) {
+          avisar({
+            texto:
+              r.erros._form?.[0] ??
+              `Não foi possível ${concluido ? "concluir" : "reabrir"} “${nome}”.`,
+            tipo: "erro",
+            chave,
+          });
+        } else if (concluido) {
+          avisar({
+            texto: `“${nome}” concluído.`,
+            chave,
+            acao: {
+              rotulo: "Desfazer",
+              executar: async () => {
+                await alternar(e, false, true);
+                // O foco estava no aviso, que vai fechar: volta à caixa do evento.
+                if (document.activeElement?.closest("[data-avisos]")) {
+                  document.getElementById(`evento-${e.id}-concluido`)?.focus();
+                }
+              },
+            },
+          });
+        } else if (!desfazendo) {
+          avisar({ texto: `“${nome}” reaberto.`, chave });
+        }
+        resolver();
+      });
     });
   }
+
+  const fecharModal = () => setEditando(null);
+  /** Quem abriu o modal (botão Adicionar ou Editar): recebe o foco quando ele fecha. */
+  const gatilhoRef = useRef<HTMLElement | null>(null);
+  const abrirModal = (alvo: EventoItem | "novo", gatilho: HTMLElement) => {
+    gatilhoRef.current = gatilho;
+    setEditando(alvo);
+  };
 
   // Sem eventos, o CTA fica no estado vazio e em destaque (variante primária, #100, D9).
   const botaoAdicionar = (
     <Button
       variant={eventos.length === 0 ? "default" : "outline"}
-      onClick={() => setEditando("novo")}
+      data-adicionar-evento=""
+      onClick={(ev) => abrirModal("novo", ev.currentTarget)}
     >
       <Plus aria-hidden />
       Adicionar evento
@@ -119,6 +182,8 @@ export function EventosConcurso({ concursoId, eventos }: EventosConcursoProps) {
             const nome = nomePrazo(e);
             const checkId = `evento-${e.id}-concluido`;
             const alvo = e.id === alvoId;
+            const concluido = otimistas.get(e.id) ?? e.concluido;
+            const gravando = otimistas.has(e.id);
             return (
               <li
                 key={e.id}
@@ -132,20 +197,24 @@ export function EventosConcurso({ concursoId, eventos }: EventosConcursoProps) {
                   classesDestaque(alvo, forte),
                 )}
               >
+                {/* Em gravação: `aria-disabled` (não `disabled`), para o foco não se perder. */}
                 <Checkbox
                   id={checkId}
                   className="mt-1"
-                  checked={e.concluido}
-                  disabled={alternando}
-                  aria-label={`${e.concluido ? "Desmarcar" : "Marcar"} "${nome}" como concluído`}
-                  onCheckedChange={(v) => alternar(e, v === true)}
+                  checked={concluido}
+                  aria-disabled={gravando || undefined}
+                  aria-busy={gravando || undefined}
+                  aria-label={`${concluido ? "Desmarcar" : "Marcar"} "${nome}" como concluído`}
+                  onCheckedChange={(v) => {
+                    if (!gravando) void alternar(e, v === true);
+                  }}
                 />
                 <div className="min-w-0 flex-1 space-y-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <NomeEvento
                       nome={nome}
-                      concluido={e.concluido}
-                      className={cn("font-medium", e.concluido && "text-muted-foreground")}
+                      concluido={concluido}
+                      className={cn("font-medium", concluido && "text-muted-foreground")}
                     />
                     {e.titulo ? (
                       <Badge variant="secondary">{ROTULO_TIPO_EVENTO[e.tipo]}</Badge>
@@ -178,7 +247,7 @@ export function EventosConcurso({ concursoId, eventos }: EventosConcursoProps) {
                     variant="ghost"
                     size="icon"
                     aria-label={`Editar evento ${nome}`}
-                    onClick={() => setEditando(e)}
+                    onClick={(ev) => abrirModal(e, ev.currentTarget)}
                   >
                     <Pencil aria-hidden />
                   </Button>
@@ -191,6 +260,7 @@ export function EventosConcurso({ concursoId, eventos }: EventosConcursoProps) {
                     tamanho="icon"
                     rotuloAcessivel={`Excluir evento ${nome}`}
                     acao={() => excluirEvento(concursoId, e.id)}
+                    aoConcluir={() => avisar({ texto: `“${nome}” excluído.` })}
                   >
                     <Trash2 aria-hidden />
                   </BotaoConfirmar>
@@ -200,22 +270,42 @@ export function EventosConcurso({ concursoId, eventos }: EventosConcursoProps) {
           })}
         </ul>
       )}
-      {erro ? (
-        <p role="alert" className="text-destructive text-sm">
-          {erro}
-        </p>
-      ) : null}
       {eventos.length > 0 ? botaoAdicionar : null}
 
-      <Dialog open={editando !== null} onOpenChange={(aberto) => !aberto && setEditando(null)}>
-        <DialogContent className="max-h-[90dvh] overflow-y-auto">
+      {/* Esc, clique fora e o X passam pelo formulário: com alterações, pedem confirmação (D10). */}
+      <Dialog
+        open={editando !== null}
+        onOpenChange={(aberto) => {
+          if (aberto) return;
+          if (formularioRef.current) formularioRef.current.sair(fecharModal);
+          else fecharModal();
+        }}
+      >
+        <DialogContent
+          className="max-h-[90dvh] overflow-y-auto"
+          onCloseAutoFocus={(ev) => {
+            // Explícito: o retorno automático do Radix se perdia (o foco ia para o body). Se o
+            // gatilho sumiu (ex.: estado vazio trocado pela lista), vale o botão Adicionar.
+            const gatilho = gatilhoRef.current;
+            const alvo = gatilho?.isConnected
+              ? gatilho
+              : document.querySelector<HTMLElement>("[data-adicionar-evento]");
+            if (!alvo) return;
+            ev.preventDefault();
+            alvo.focus();
+          }}
+        >
           {editando !== null ? (
             <FormularioEvento
               key={editando === "novo" ? "novo" : editando.id}
+              ref={formularioRef}
               concursoId={concursoId}
               evento={editando === "novo" ? null : editando}
-              aoConcluir={() => setEditando(null)}
-              aoCancelar={() => setEditando(null)}
+              aoConcluir={(nome) => {
+                avisar({ texto: `“${nome}” salvo.` });
+                fecharModal();
+              }}
+              aoCancelar={fecharModal}
             />
           ) : null}
         </DialogContent>
@@ -224,11 +314,20 @@ export function EventosConcurso({ concursoId, eventos }: EventosConcursoProps) {
   );
 }
 
+/** Saída protegida do formulário, para quem controla o modal (Esc, clique fora, X). */
+export interface ControleSaida {
+  /** Com alterações não salvas, pede confirmação antes de chamar `prosseguir` (#100, D10). */
+  sair: (prosseguir: () => void) => void;
+}
+
 export interface FormularioEventoProps {
   concursoId: number;
   evento: EventoItem | null;
-  aoConcluir: () => void;
+  /** Depois de salvar (com o nome do evento salvo, para o aviso). */
+  aoConcluir: (nome: string) => void;
+  /** Cancelar (já confirmado, se havia alterações). */
   aoCancelar: () => void;
+  ref?: Ref<ControleSaida>;
 }
 
 const CAMPOS = ["tipo", "titulo", "data", "hora", "local", "observacao", "concluido"] as const;
@@ -238,12 +337,15 @@ const CAMPOS = ["tipo", "titulo", "data", "hora", "local", "observacao", "conclu
  * todos os campos ao padrão (inclusive o tipo: cada data do edital costuma ser de um tipo
  * diferente — inscrições, boleto, prova — e manter o anterior induziria a erro) e devolve o foco
  * ao primeiro campo, anunciando o evento salvo. Também usado no painel do evento (#100).
+ * Com alterações não salvas, Cancelar, fechar o modal (via `ref`), links e recarregar pedem
+ * confirmação (D10); erro de validação leva o foco ao primeiro campo inválido.
  */
 export function FormularioEvento({
   concursoId,
   evento,
   aoConcluir,
   aoCancelar,
+  ref,
 }: FormularioEventoProps) {
   const [erroGeral, setErroGeral] = useState<string | null>(null);
   const [salvo, setSalvo] = useState<string | null>(null);
@@ -256,9 +358,10 @@ export function FormularioEvento({
     reset,
     setFocus,
     setError,
-    formState: { errors },
+    formState: { errors, isDirty },
   } = useForm({
     resolver: zodResolver(eventoSchema),
+    shouldFocusError: false,
     defaultValues: evento
       ? {
           tipo: evento.tipo,
@@ -271,6 +374,9 @@ export function FormularioEvento({
         }
       : VALORES_INICIAIS_EVENTO,
   });
+  const { formRef, erroGeralRef, focarErro } = useFocoNoErro();
+  const protecao = useProtecaoSaida(isDirty && !enviando);
+  useImperativeHandle(ref, () => ({ sair: protecao.sair }), [protecao.sair]);
 
   // Foco no 1º campo depois de "Salvar e adicionar outro", só quando o envio termina: durante o
   // envio os botões ficam desabilitados e o navegador tiraria o foco de onde estivesse.
@@ -279,30 +385,42 @@ export function FormularioEvento({
   }, [salvo, enviando, setFocus]);
 
   const enviar = (adicionarOutro: boolean) =>
-    handleSubmit(() => {
-      setErroGeral(null);
-      setSalvo(null);
-      const valores = getValues();
-      iniciar(async () => {
-        const r = await salvarEvento(concursoId, evento?.id ?? null, valores);
-        if (r.ok && adicionarOutro) {
-          reset(VALORES_INICIAIS_EVENTO);
-          setSalvo(nomePrazo({ tipo: valores.tipo, titulo: valores.titulo?.trim() || null }));
-          return;
-        }
-        if (r.ok) return aoConcluir();
-        for (const campo of CAMPOS) {
-          const msg = r.erros[campo]?.[0];
-          if (msg) setError(campo, { message: msg });
-        }
-        setErroGeral(r.erros._form?.[0] ?? null);
-      });
-    });
+    handleSubmit(
+      () => {
+        setErroGeral(null);
+        setSalvo(null);
+        const valores = getValues();
+        iniciar(async () => {
+          const r = await salvarEvento(concursoId, evento?.id ?? null, valores);
+          if (r.ok && adicionarOutro) {
+            reset(VALORES_INICIAIS_EVENTO);
+            setSalvo(nomePrazo({ tipo: valores.tipo, titulo: valores.titulo?.trim() || null }));
+            return;
+          }
+          if (r.ok) {
+            return aoConcluir(
+              nomePrazo({ tipo: valores.tipo, titulo: valores.titulo?.trim() || null }),
+            );
+          }
+          let erroDeCampo = false;
+          for (const campo of CAMPOS) {
+            const msg = r.erros[campo]?.[0];
+            if (msg) {
+              setError(campo, { message: msg });
+              erroDeCampo = true;
+            }
+          }
+          setErroGeral(r.erros._form?.[0] ?? null);
+          focarErro(erroDeCampo);
+        });
+      },
+      () => focarErro(true),
+    );
 
   const erro = (campo: keyof EventoFormValores) => errors[campo]?.message;
 
   return (
-    <form onSubmit={enviar(false)} noValidate className="grid gap-4">
+    <form ref={formRef} onSubmit={enviar(false)} noValidate className="grid gap-4">
       <DialogHeader>
         <DialogTitle>{evento ? "Editar evento" : "Novo evento"}</DialogTitle>
         <DialogDescription>Inscrições, boleto, provas, recursos, resultados…</DialogDescription>
@@ -374,7 +492,12 @@ export function FormularioEvento({
         <Label htmlFor="evento-concluido">Concluído</Label>
       </div>
       {erroGeral ? (
-        <p role="alert" className="text-destructive text-sm">
+        <p
+          ref={erroGeralRef}
+          role="alert"
+          tabIndex={-1}
+          className="text-destructive text-sm outline-none"
+        >
           {erroGeral}
         </p>
       ) : null}
@@ -383,7 +506,12 @@ export function FormularioEvento({
         {salvo ? `“${salvo}” salvo. Preencha o próximo evento.` : null}
       </p>
       <DialogFooter>
-        <Button type="button" variant="outline" onClick={aoCancelar} disabled={enviando}>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => protecao.sair(aoCancelar)}
+          disabled={enviando}
+        >
           Cancelar
         </Button>
         {evento ? null : (
@@ -395,6 +523,7 @@ export function FormularioEvento({
           {enviando ? "Salvando…" : "Salvar"}
         </Button>
       </DialogFooter>
+      {protecao.dialogo}
     </form>
   );
 }

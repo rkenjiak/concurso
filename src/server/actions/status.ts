@@ -63,6 +63,15 @@ export async function desfazerUltimoStatus(
   );
 }
 
+/** O que a resposta a uma pendência mudou — o necessário para desfazê-la (#100). */
+export interface RespostaAplicada {
+  status: Status;
+  /** A resposta registrou uma mudança de status (último item do histórico). */
+  mudouStatus: boolean;
+  /** Evento que a resposta concluiu (ex.: boleto pago); `null` = nenhum. */
+  eventoConcluido: number | null;
+}
+
 /**
  * Responde a uma pendência de status (#65, #85). A pendência é recalculada aqui (não confia no
  * cliente) e a resposta aplicada pela mesma transição validada, com pergunta, resposta e motivo
@@ -72,7 +81,7 @@ export async function responderPendenciaStatus(
   idBruto: unknown,
   chaveBruta: unknown,
   respostaBruta: unknown,
-): Promise<ResultadoAcao<{ status: Status }>> {
+): Promise<ResultadoAcao<RespostaAplicada>> {
   const sessao = await exigirUsuarioAcao();
   if (!sessao.ok) return sessao;
   const usuarioId = sessao.usuario.id;
@@ -112,9 +121,53 @@ export async function responderPendenciaStatus(
         }
       });
       revalidar(id.data);
-      return sucesso({ status: resposta.para ?? concurso.status });
+      if (concluirEvento) revalidatePath("/", "layout");
+      return sucesso({
+        status: resposta.para ?? concurso.status,
+        mudouStatus: para !== null,
+        eventoConcluido: concluirEvento ? pendencia.eventoId : null,
+      });
     },
     { acao: "status.responderPendenciaStatus", usuarioId },
+  );
+}
+
+const desfazerRespostaSchema = z.object({
+  mudouStatus: z.boolean(),
+  eventoConcluido: idSchema.nullable(),
+});
+
+/**
+ * Desfaz a resposta a uma pendência ("Desfazer" do aviso, #100): volta o último status, se a
+ * resposta o mudou, e reabre o evento que ela concluiu. A pergunta volta a valer.
+ */
+export async function desfazerRespostaPendencia(
+  idBruto: unknown,
+  entrada: unknown,
+): Promise<ResultadoAcao<{ status: Status }>> {
+  const sessao = await exigirUsuarioAcao();
+  if (!sessao.ok) return sessao;
+  const usuarioId = sessao.usuario.id;
+  const id = idSchema.safeParse(idBruto);
+  if (!id.success) return falha("Concurso não encontrado.");
+  const dados = desfazerRespostaSchema.safeParse(entrada);
+  if (!dados.success) return falha("Resposta inválida.");
+  const { mudouStatus, eventoConcluido } = dados.data;
+  return executar(
+    async () => {
+      const db = getDb();
+      const status = mudouStatus
+        ? await repo.desfazerUltimoStatus(db, usuarioId, id.data)
+        : (await obterConcurso(db, usuarioId, id.data))?.status;
+      if (!status) return falha("Concurso não encontrado.");
+      if (eventoConcluido !== null) {
+        await definirConcluido(db, usuarioId, id.data, eventoConcluido, false);
+        revalidatePath("/", "layout");
+      }
+      revalidar(id.data);
+      return sucesso({ status });
+    },
+    { acao: "status.desfazerRespostaPendencia", usuarioId },
   );
 }
 

@@ -19,7 +19,10 @@ interface ConfirmacaoProps {
   descricao: ReactNode;
   rotuloConfirmar: string;
   destrutivo?: boolean;
-  acao: () => Promise<ResultadoAcao<unknown>>;
+  /** Rótulo do botão que desiste (padrão: "Cancelar"). */
+  rotuloCancelar?: string;
+  /** Server Action a executar; ausente = só confirma (ex.: descartar alterações, #100). */
+  acao?: () => Promise<ResultadoAcao<unknown>>;
   /** Chamado após sucesso (ex.: navegar). */
   aoConcluir?: () => void;
 }
@@ -59,6 +62,11 @@ interface DialogoConfirmarProps extends ConfirmacaoProps {
   children?: ReactNode;
   /** Para onde o foco volta ao fechar (ex.: o botão do menu que abriu a confirmação). */
   focoAoFechar?: () => HTMLElement | null;
+  /**
+   * Chamado quando o diálogo terminou de fechar (depois da animação), antes de o foco voltar: para
+   * fechar o que está por baixo sem disputar o foco com esta camada.
+   */
+  aoFechado?: () => void;
 }
 
 /**
@@ -70,10 +78,12 @@ export function DialogoConfirmar({
   aoMudarAberto,
   children,
   focoAoFechar,
+  aoFechado,
   titulo,
   descricao,
   rotuloConfirmar,
   destrutivo = false,
+  rotuloCancelar = "Cancelar",
   acao,
   aoConcluir,
 }: DialogoConfirmarProps) {
@@ -82,6 +92,11 @@ export function DialogoConfirmar({
 
   function confirmar() {
     setErro(null);
+    if (!acao) {
+      aoMudarAberto(false);
+      aoConcluir?.();
+      return;
+    }
     iniciar(async () => {
       const r = await acao();
       if (r.ok) {
@@ -103,16 +118,13 @@ export function DialogoConfirmar({
     >
       {children}
       <AlertDialogContent
-        onCloseAutoFocus={
-          focoAoFechar
-            ? (e) => {
-                const alvo = focoAoFechar();
-                if (!alvo) return;
-                e.preventDefault();
-                alvo.focus();
-              }
-            : undefined
-        }
+        onCloseAutoFocus={(e) => {
+          aoFechado?.();
+          const alvo = focoAoFechar?.();
+          if (!alvo) return;
+          e.preventDefault();
+          alvo.focus();
+        }}
       >
         <AlertDialogHeader>
           <AlertDialogTitle>{titulo}</AlertDialogTitle>
@@ -124,7 +136,7 @@ export function DialogoConfirmar({
           </p>
         ) : null}
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={pendente}>Cancelar</AlertDialogCancel>
+          <AlertDialogCancel disabled={pendente}>{rotuloCancelar}</AlertDialogCancel>
           <Button
             variant={destrutivo ? "destructive" : "default"}
             onClick={confirmar}

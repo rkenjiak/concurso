@@ -1,13 +1,21 @@
 "use client";
 
 import { BellOff, Clock, Lightbulb, Loader2 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import { useAvisos } from "@/components/avisos/avisos";
 import { Button } from "@/components/ui/button";
 import type { Status } from "@/domain/enums";
 import { ROTULO_STATUS } from "@/domain/labels";
 import { DIAS_LEMBRAR_DEPOIS } from "@/domain/sugestao-status";
 import { cn } from "@/lib/utils";
-import { dispensarPendenciaStatus, responderPendenciaStatus } from "@/server/actions/status";
+import type { ResultadoAcao } from "@/server/actions/resultado";
+import {
+  desfazerRespostaPendencia,
+  dispensarPendenciaStatus,
+  type RespostaAplicada,
+  responderPendenciaStatus,
+} from "@/server/actions/status";
 
 export interface RespostaExibida {
   id: string;
@@ -20,7 +28,8 @@ export interface RespostaExibida {
 /**
  * Pendência de status (#65, #85): pergunta o que aconteceu quando um evento importante chega ou
  * passa. Cada resposta usa a transição validada e grava o histórico; "Lembrar depois" esconde a
- * pergunta por alguns dias e "Não perguntar mais" a dispensa (ambos ficam salvos).
+ * pergunta por alguns dias e "Não perguntar mais" a dispensa (ambos ficam salvos). O resultado é
+ * anunciado num aviso (#100); a resposta pode ser desfeita por ele ("Status → X — Desfazer").
  */
 export function SugestaoStatus({
   concursoId,
@@ -40,6 +49,8 @@ export function SugestaoStatus({
   nomeConcurso?: string;
   compacta?: boolean;
 }) {
+  const router = useRouter();
+  const { avisar } = useAvisos();
   const [pendente, iniciar] = useTransition();
   const [erro, setErro] = useState<string | null>(null);
   const [escondida, setEscondida] = useState(false);
@@ -48,23 +59,77 @@ export function SugestaoStatus({
   /** Resposta aguardando confirmação. */
   const [confirmando, setConfirmando] = useState<RespostaExibida | null>(null);
   if (escondida) return null;
+  const chaveAviso = `pendencia-${concursoId}`;
 
-  function executar(
+  function executar<T>(
     qual: string,
-    acaoServidor: () => Promise<{ ok: boolean; erros?: { _form?: string[] } }>,
+    acaoServidor: () => Promise<ResultadoAcao<T>>,
+    aoConcluir: (dados: T) => void,
   ) {
     setErro(null);
     setAcao(qual);
     iniciar(async () => {
       const r = await acaoServidor();
-      if (r.ok) setEscondida(true);
-      else setErro(r.erros?._form?.[0] ?? "Não foi possível concluir a operação.");
+      if (r.ok) {
+        setEscondida(true);
+        aoConcluir(r.data);
+      } else setErro(r.erros._form?.[0] ?? "Não foi possível concluir a operação.");
     });
   }
 
+  /** Desfaz a resposta; a promessa termina com a ação (o aviso mostra a pendência). */
+  async function desfazer(aplicada: RespostaAplicada) {
+    const r = await desfazerRespostaPendencia(concursoId, aplicada);
+    if (r.ok) {
+      // A pergunta volta (no painel, a pendência é estado local; na página, vem do servidor).
+      setEscondida(false);
+      avisar({
+        texto: aplicada.mudouStatus
+          ? `Resposta desfeita: de volta a “${ROTULO_STATUS[r.data.status]}”.`
+          : "Resposta desfeita.",
+        tipo: "info",
+        chave: chaveAviso,
+      });
+    } else {
+      avisar({
+        texto: r.erros._form?.[0] ?? "Não foi possível desfazer.",
+        tipo: "erro",
+        chave: chaveAviso,
+      });
+      router.refresh();
+    }
+  }
+
   const unica = respostas.length === 1 ? respostas[0] : undefined;
-  const responder = (r: RespostaExibida) =>
-    executar(r.id, () => responderPendenciaStatus(concursoId, chave, r.id));
+  const responder = (resposta: RespostaExibida) =>
+    executar(
+      resposta.id,
+      () => responderPendenciaStatus(concursoId, chave, resposta.id),
+      (aplicada) =>
+        avisar({
+          texto: resposta.para
+            ? `Status → “${ROTULO_STATUS[resposta.para]}”.`
+            : `${pergunta} ${resposta.rotulo}.`,
+          chave: chaveAviso,
+          acao:
+            aplicada.mudouStatus || aplicada.eventoConcluido !== null
+              ? { rotulo: "Desfazer", executar: () => desfazer(aplicada) }
+              : undefined,
+        }),
+    );
+  const adiar = (modo: "lembrar" | "dispensar") =>
+    executar(
+      modo,
+      () => dispensarPendenciaStatus(concursoId, chave, modo),
+      () =>
+        avisar({
+          texto:
+            modo === "lembrar"
+              ? `Vamos perguntar de novo em ${DIAS_LEMBRAR_DEPOIS} dias.`
+              : "Pergunta dispensada.",
+          chave: chaveAviso,
+        }),
+    );
   const carregando = (qual: string) =>
     pendente && acao === qual ? <Loader2 className="animate-spin" aria-hidden /> : null;
 
@@ -140,9 +205,7 @@ export function SugestaoStatus({
             type="button"
             size="sm"
             variant="ghost"
-            onClick={() =>
-              executar("lembrar", () => dispensarPendenciaStatus(concursoId, chave, "lembrar"))
-            }
+            onClick={() => adiar("lembrar")}
             disabled={pendente}
             title={`Perguntar de novo em ${DIAS_LEMBRAR_DEPOIS} dias`}
           >
@@ -153,9 +216,7 @@ export function SugestaoStatus({
             type="button"
             size="sm"
             variant="ghost"
-            onClick={() =>
-              executar("dispensar", () => dispensarPendenciaStatus(concursoId, chave, "dispensar"))
-            }
+            onClick={() => adiar("dispensar")}
             disabled={pendente}
           >
             {carregando("dispensar") ?? <BellOff aria-hidden />}

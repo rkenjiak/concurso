@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { urlComAba } from "@/lib/aba-concurso";
+import { urlComAviso } from "@/lib/aviso-url";
 import { idSchema } from "@/lib/schemas/comum";
 import { concursoEdicaoSchema, concursoSchema } from "@/lib/schemas/concurso";
 import { exigirUsuarioAcao } from "../auth/acesso";
@@ -17,7 +18,8 @@ const NAO_ENCONTRADO = "Concurso não encontrado.";
  * a página de destino (uma viagem só, #73), em vez de re-renderizar a atual e o cliente navegar
  * depois. Fica fora de `executar`, cujo `catch` engoliria o erro de controle do `redirect`. Em
  * caso de sucesso a action não retorna; só as falhas chegam ao cliente. O concurso recém-criado abre
- * na aba Eventos, onde o estado vazio orienta a cadastrar as datas (#100, D9).
+ * na aba Eventos, onde o estado vazio orienta a cadastrar as datas (#100, D9). O destino leva
+ * `?aviso=` para a página confirmar a ação com um aviso, e o remove da URL (#100, item 12).
  */
 
 export async function criarConcurso(entrada: unknown): Promise<ResultadoAcao> {
@@ -35,7 +37,8 @@ export async function criarConcurso(entrada: unknown): Promise<ResultadoAcao> {
     },
     { acao: "concursos.criarConcurso", usuarioId },
   );
-  if (r.ok) redirect(urlComAba(`/concursos/${r.data.id}`, "eventos"));
+  if (r.ok)
+    redirect(urlComAviso(urlComAba(`/concursos/${r.data.id}`, "eventos"), "concurso-criado"));
   return r;
 }
 
@@ -61,7 +64,7 @@ export async function atualizarConcurso(
     },
     { acao: "concursos.atualizarConcurso", usuarioId },
   );
-  if (r.ok) redirect(`/concursos/${id.data}`);
+  if (r.ok) redirect(urlComAviso(`/concursos/${id.data}`, "concurso-salvo"));
   return r;
 }
 
@@ -80,6 +83,6 @@ export async function excluirConcurso(idBruto: unknown): Promise<ResultadoAcao> 
     },
     { acao: "concursos.excluirConcurso", usuarioId },
   );
-  if (r.ok) redirect("/concursos");
+  if (r.ok) redirect(urlComAviso("/concursos", "concurso-excluido"));
   return r;
 }

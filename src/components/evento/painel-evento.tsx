@@ -26,7 +26,7 @@ import {
 } from "react";
 import { useAvisos } from "@/components/avisos/avisos";
 import { BadgeStatus } from "@/components/concurso/badge-status";
-import { FormularioEvento } from "@/components/concurso/eventos-concurso";
+import { type ControleSaida, FormularioEvento } from "@/components/concurso/eventos-concurso";
 import { MarcadorConcurso } from "@/components/concurso/marcador-concurso";
 import { SugestaoStatus } from "@/components/concurso/sugestao-status";
 import { BotaoOcultarPrazo } from "@/components/dashboard/botao-ocultar-prazo";
@@ -158,6 +158,8 @@ export function PainelEventoProvider({
       new Map(atual).set(chave, concluido),
   );
   const raizRef = useRef<HTMLDivElement>(null);
+  /** Formulário de edição aberto no painel: fechar com alterações pede confirmação (D10). */
+  const formularioRef = useRef<ControleSaida>(null);
   const gatilhoRef = useRef<HTMLElement | null>(null);
   const ultimaChaveRef = useRef<string | null>(null);
   const itensRef = useRef(itens);
@@ -284,7 +286,15 @@ export function PainelEventoProvider({
       <div ref={raizRef} tabIndex={-1} className={cn("outline-none", className)}>
         {children}
       </div>
-      <Dialog open={aberto !== null} onOpenChange={(abrirAgora) => !abrirAgora && setAberto(null)}>
+      <Dialog
+        open={aberto !== null}
+        onOpenChange={(abrirAgora) => {
+          if (abrirAgora) return;
+          const fechar = () => setAberto(null);
+          if (formularioRef.current) formularioRef.current.sair(fechar);
+          else fechar();
+        }}
+      >
         <DialogContent
           variante="gaveta"
           data-testid="painel-evento"
@@ -306,6 +316,7 @@ export function PainelEventoProvider({
           {item && aberto ? (
             aberto.modo === "editar" && item.evento ? (
               <FormularioEvento
+                ref={formularioRef}
                 concursoId={item.concurso.id}
                 evento={item.evento}
                 aoConcluir={() => {

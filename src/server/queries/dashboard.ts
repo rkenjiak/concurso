@@ -40,6 +40,8 @@ export interface EventoDoPrazo {
   data: DataISO;
   hora: string | null;
   local: string | null;
+  /** Para editar o evento pelo painel (#100). */
+  observacao: string | null;
   concluido: boolean;
   /** Oculto do dashboard (#44). */
   ocultoDashboard: boolean;
@@ -129,6 +131,7 @@ export const COLUNAS_EVENTO_PRAZO = {
   data: evento.data,
   hora: evento.hora,
   local: evento.local,
+  observacao: evento.observacao,
   concluido: evento.concluido,
   ocultoDashboard: evento.ocultoDashboard,
 };

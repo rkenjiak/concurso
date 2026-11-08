@@ -137,8 +137,30 @@ export function podeDesfazer(ultimo: RegistroHistorico | null | undefined): bool
   return ultimo?.de != null;
 }
 
-/** Status restaurado ao desfazer `ultimo`. Lança {@link ErroDominio} se não houver o que desfazer. */
-export function statusAoDesfazer(ultimo: RegistroHistorico | null | undefined): Status {
+/**
+ * O que o "Desfazer" espera desfazer (#100): o registro do histórico criado pela mudança (aviso
+ * logo após mudar) e/ou o status que o usuário vê como atual (diálogo "Mudar status").
+ */
+export interface DesfazerEsperado {
+  registroId?: number;
+  status?: Status;
+}
+
+export const MSG_STATUS_MUDOU = "O status mudou desde então; nada foi desfeito.";
+
+/**
+ * Status restaurado ao desfazer `ultimo`. Lança {@link ErroDominio} se não houver o que desfazer
+ * ou se `ultimo` não for a mudança `esperado` (o status mudou em outra aba, "Desfazer" duplo…):
+ * nesse caso nada pode ser desfeito, para não desfazer a coisa errada (#100).
+ */
+export function statusAoDesfazer(
+  ultimo: (RegistroHistorico & { id?: number }) | null | undefined,
+  esperado: DesfazerEsperado = {},
+): Status {
+  const confere =
+    (esperado.registroId === undefined || ultimo?.id === esperado.registroId) &&
+    (esperado.status === undefined || ultimo?.para === esperado.status);
+  if (!confere) throw new ErroDominio(MSG_STATUS_MUDOU);
   if (!ultimo || ultimo.de == null) {
     throw new ErroDominio("Não há mudança de status para desfazer.");
   }

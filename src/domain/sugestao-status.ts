@@ -36,11 +36,11 @@ import {
   type EventoChave,
   eventoPassou,
   eventosDosTipos,
-  nomeEvento,
   proximoEvento,
   TIPOS_PROVA,
   ultimoEvento,
 } from "./eventos-chave";
+import { nomePrazo } from "./prazos";
 import { podeTransicionar } from "./status";
 
 export const REGRAS_PENDENCIA = [
@@ -125,15 +125,15 @@ const nao = (para: Status, rotulo = "Não"): RespostaPendencia => ({
 
 function chegou(e: EventoChave, hoje: DataISO): string {
   const d = dataBr(e.data);
-  if (e.data === hoje) return `${nomeEvento(e)} é hoje (${d}).`;
-  if (e.data < hoje) return `${nomeEvento(e)} foi em ${d}.`;
-  return `${nomeEvento(e)} (${d}) está concluído.`;
+  if (e.data === hoje) return `${nomePrazo(e)} é hoje (${d}).`;
+  if (e.data < hoje) return `${nomePrazo(e)} foi em ${d}.`;
+  return `${nomePrazo(e)} (${d}) está concluído.`;
 }
 
 function passou(e: EventoChave, hoje: DataISO): string {
   const d = dataBr(e.data);
-  if (e.data < hoje) return `${nomeEvento(e)} em ${d} já passou.`;
-  return `${nomeEvento(e)} (${d}) está concluído.`;
+  if (e.data < hoje) return `${nomePrazo(e)} em ${d} já passou.`;
+  return `${nomePrazo(e)} (${d}) está concluído.`;
 }
 
 function pendencia(
@@ -221,7 +221,7 @@ export function pendenciasStatus(
         "RECURSO",
         recurso,
         "Mudar para Aguardando resultado?",
-        `${nomeEvento(recurso)} até ${dataBr(recurso.data)} já terminou.`,
+        `${nomePrazo(recurso)} até ${dataBr(recurso.data)} já terminou.`,
         [sim("AGUARDANDO_RESULTADO")],
       ),
     );
@@ -264,7 +264,7 @@ export function pendenciasStatus(
           "PROVA_AGENDADA",
           e,
           "Mudar para Prova agendada?",
-          `${nomeEvento(e)} marcada para ${dataBr(e.data)}.`,
+          `${nomePrazo(e)} marcada para ${dataBr(e.data)}.`,
           [sim("PROVA_AGENDADA")],
         ),
       );

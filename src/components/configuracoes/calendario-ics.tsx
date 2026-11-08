@@ -2,6 +2,7 @@
 
 import { CalendarPlus, Copy, Download, Link2, Trash2 } from "lucide-react";
 import { useId, useState, useTransition } from "react";
+import { useAvisos } from "@/components/avisos/avisos";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -37,6 +38,7 @@ interface Props {
  */
 export function CalendarioIcs({ temToken: temTokenInicial, ...opcoesIniciais }: Props) {
   const idUrl = useId();
+  const { avisar } = useAvisos();
   const [temToken, setTemToken] = useState(temTokenInicial);
   const [url, setUrl] = useState<string | null>(null);
   const [opcoes, setOpcoes] = useState(opcoesIniciais);
@@ -82,6 +84,8 @@ export function CalendarioIcs({ temToken: temTokenInicial, ...opcoesIniciais }: 
         return;
       }
       setErro(null);
+      // A caixa já mostra o novo estado; o aviso confirma que foi gravado (#100).
+      avisar({ texto: "Opções do calendário salvas.", chave: "opcoes-ics" });
     });
   }
 

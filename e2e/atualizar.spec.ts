@@ -68,7 +68,7 @@ test("Atualizar traz dados novos sem recarregar e bloqueia por 60 s", async ({ p
   const dialogo = outra.getByRole("dialog", { name: "Novo link" });
   await dialogo.getByLabel("Rótulo").fill("Edital atualizado");
   await dialogo.getByLabel("URL").fill("https://example.com/edital.pdf");
-  await dialogo.getByRole("button", { name: "Salvar" }).click();
+  await dialogo.getByRole("button", { name: "Salvar", exact: true }).click();
   await expect(dialogo).toBeHidden();
   await outra.close();
 

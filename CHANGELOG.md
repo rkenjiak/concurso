@@ -7,6 +7,59 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 
 ## [Unreleased]
 
+### Adicionado
+
+- **Painel do evento** (#100) no dashboard e no calendário: clicar num prazo abre os detalhes
+  (concurso, status, situação, data, hora, local e próximos eventos) com as ações **Marcar como
+  concluído**/**Reabrir**, **Ocultar do dashboard**/**Mostrar no dashboard**, **Editar** e **Ver
+  no concurso**. No celular abre como gaveta inferior; no desktop, como diálogo. Se concluir o
+  evento gera uma pergunta de status, ela aparece no próprio painel.
+- **Concluir direto do dashboard** (#100): cada prazo tem o botão de concluir, com resposta
+  imediata e aviso "Concluído — Desfazer". Ocultar passou para o painel, que explica a diferença:
+  ocultar só tira do dashboard, o prazo continua pendente.
+- **Link direto para o evento** (#100): prazos, próximas provas, notificações e o painel levam a
+  `/concursos/{id}?aba=eventos&evento={id}`, com o evento rolado, focado e destacado por alguns
+  segundos (sem animação com `prefers-reduced-motion`). O fim da validade leva ao card Validade
+  (`?aba=geral&foco=validade`). Um id que não é do concurso sai da URL.
+- **Voltar para a origem** (#100): vindo do dashboard, das notificações ou do calendário, o detalhe
+  do concurso mostra "← Dashboard", "← Notificações" ou "← Calendário · novembro de 2026",
+  preservando mês e filtro de concursos (`de`, `mes` e `concursos`, remontados por allowlist).
+- **Avisos** (#100) com fila, expiração, pausa com o mouse ou o foco e `aria-live`, sem dependência
+  nova: salvar e excluir concurso, eventos, links e resultados, concluir evento, responder
+  pendência de status ("Status → X — Desfazer"), opções do feed `.ics` e o quadro por status. Com
+  um diálogo aberto, o aviso aparece dentro dele, alcançável pelo teclado.
+- **"Mudar status"** (#100) ao lado do badge no cabeçalho do concurso, com as transições
+  permitidas, observação e "Desfazer última mudança"; `?mudar=status` (link da edição) já abre o
+  diálogo.
+- **"Salvar e adicionar outro"** (#100) ao criar um evento, e botão **Cancelar** no modal.
+- **Alterações não salvas** (#100): no formulário do concurso e no modal de evento, sair por um
+  link do app, Cancelar, Esc ou clique fora pede confirmação; fechar a aba usa o aviso do
+  navegador.
+
+### Alterado
+
+- Concurso recém-cadastrado abre na aba **Eventos** (#100), com orientação para cadastrar as datas
+  (inscrições, boleto, prova) que alimentam o dashboard, o calendário e os avisos.
+- Cabeçalho do concurso (#100): só **Editar** e **Mudar status** ficam à vista; **Baixar eventos
+  (.ics)**, **Silenciar notificações** e **Excluir…** foram para o menu **Mais ações** (⋯). A aba
+  Histórico ficou só com a linha do tempo.
+- Dashboard (#100): **Pendências de status** fica no topo, em largura total. "E mais N no
+  calendário" virou **"Ver mais N a partir de <mês>"**, que abre o mês da 7ª prova.
+- Situação do prazo unificada (#100): mesma regra e mesmo badge no dashboard e no calendário
+  (Concluído > Vencido > Urgente > Esta semana > Prazo crítico). "Vencido" só vale para prazo
+  crítico pendente; as cores de urgência são as mesmas nos prazos e nas próximas provas.
+- No calendário, "Ir para o concurso" virou **"Ver no concurso"**.
+- O **Desfazer** de status (aviso do quadro, do cabeçalho e da pendência) confere se a mudança
+  ainda é a última; se o status mudou depois, nada é desfeito e o aviso explica.
+- Erros de formulário levam o foco ao primeiro campo inválido; o checkbox de concluído da aba
+  Eventos responde na hora e só trava o evento que está gravando.
+
+### Corrigido
+
+- **Cancelar** nos formulários de concurso usava "voltar" do navegador e saía do app quando a
+  página era aberta direto ou recarregada; agora vai ao detalhe (edição) ou à lista (cadastro).
+- O modal de evento devolve o foco ao botão que o abriu.
+
 ## [2.5.0] - 2026-11-05
 
 ### Adicionado

@@ -12,10 +12,10 @@ import { ID_USUARIO_INICIAL as U } from "@/server/db/schema";
 import { criarBancoTeste, criarUsuarioTeste } from "../db/banco-teste";
 import type { Db } from "../db/client";
 import { criarConcurso } from "../repositories/concursos";
-import { atualizarEvento, criarEvento } from "../repositories/eventos";
+import { atualizarEvento, criarEvento, definirConcluido } from "../repositories/eventos";
 import { dispensarPendencia } from "../repositories/pendencias";
 import { listarContagens } from "./contagem";
-import { listarPendenciasStatus } from "./sugestoes";
+import { listarPendenciasStatus, obterPendenciaDoEvento } from "./sugestoes";
 
 let db: Db;
 let client: Client;
@@ -125,5 +125,24 @@ describe("listarPendenciasStatus (#85)", () => {
     } as const;
     await expect(dispensarPendencia(db, outra, trf, dados)).rejects.toThrow(ErroDominio);
     await expect(dispensarPendencia(db, U, tj, dados)).rejects.toThrow("Evento não encontrado.");
+  });
+});
+
+describe("obterPendenciaDoEvento (#100, D5)", () => {
+  it("pendência do evento recém-concluído; nada se for de outro evento ou de outro usuário", async () => {
+    const trf = await novoConcurso("TRF", "EDITAL_PUBLICADO");
+    const fim = await novoEvento(trf, { tipo: "FIM_INSCRICOES", data: "2026-11-20" });
+    const boleto = await novoEvento(trf, { tipo: "VENCIMENTO_BOLETO", data: "2026-11-25" });
+
+    // Antes de concluir, o fim das inscrições (futuro) não gera pergunta.
+    expect(await obterPendenciaDoEvento(db, U, trf, fim, HOJE)).toBeNull();
+    await definirConcluido(db, U, trf, fim, true);
+    expect((await obterPendenciaDoEvento(db, U, trf, fim, HOJE))?.chave).toBe(`INSCRICAO-${fim}`);
+    // A pendência atual do concurso é de outro evento.
+    await definirConcluido(db, U, trf, boleto, true);
+    expect(await obterPendenciaDoEvento(db, U, trf, boleto, HOJE)).toBeNull();
+    // Concurso de outro usuário.
+    const outra = await criarUsuarioTeste(db);
+    expect(await obterPendenciaDoEvento(db, outra, trf, fim, HOJE)).toBeNull();
   });
 });

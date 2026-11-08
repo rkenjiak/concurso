@@ -19,7 +19,7 @@ test("calendário mensal: hoje, destaque crítico, detalhes em popup, navegaçã
   await dialogo.getByLabel("Título").fill(titulo);
   await dialogo.getByLabel("Data").fill(data);
   await dialogo.getByLabel("Hora").fill("09:00");
-  await dialogo.getByRole("button", { name: "Salvar" }).click();
+  await dialogo.getByRole("button", { name: "Salvar", exact: true }).click();
   await expect(dialogo).toBeHidden();
 
   // Pela navegação: mês atual com hoje destacado.
@@ -45,9 +45,12 @@ test("calendário mensal: hoje, destaque crítico, detalhes em popup, navegaçã
   await expect(detalhes).toContainText(`${orgao} — Analista`);
   await expect(detalhes).toContainText("09:00");
   await expect(detalhes).toContainText("Inscrito");
-  await expect(detalhes.getByRole("link", { name: "Ir para o concurso" })).toHaveAttribute(
+  // Leva ao evento na aba Eventos, guardando o mês para o "voltar" (#100).
+  await expect(detalhes.getByRole("link", { name: /^Ver no concurso/ })).toHaveAttribute(
     "href",
-    new URL(url).pathname,
+    new RegExp(
+      `^${new URL(url).pathname}[?]aba=eventos&evento=[0-9]+&de=calendario&mes=${mesDaData(data)}$`,
+    ),
   );
   await page.keyboard.press("Escape");
   await expect(detalhes).toBeHidden();
@@ -75,6 +78,6 @@ test("calendário mensal: hoje, destaque crítico, detalhes em popup, navegaçã
   await agenda.click();
   await expect(detalhes).toBeVisible();
   await expect(page).toHaveURL(mesUrl);
-  await detalhes.getByRole("link", { name: "Ir para o concurso" }).click();
-  await expect(page).toHaveURL(url);
+  await detalhes.getByRole("link", { name: /^Ver no concurso/ }).click();
+  await expect(page).toHaveURL(new RegExp(`^${url}[?]aba=eventos&evento=[0-9]+&de=calendario`));
 });

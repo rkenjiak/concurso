@@ -44,7 +44,7 @@ test("mobile: telas principais sem rolagem horizontal em 360 px", async ({ page 
   await dialogo.getByLabel("Tipo").selectOption({ label: "Prova objetiva" });
   await dialogo.getByLabel("Título").fill("Prova objetiva");
   await dialogo.getByLabel("Data").fill(emDias(10));
-  await dialogo.getByRole("button", { name: "Salvar" }).click();
+  await dialogo.getByRole("button", { name: "Salvar", exact: true }).click();
   await expect(dialogo).toBeHidden();
 
   for (const rota of [

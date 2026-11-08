@@ -353,10 +353,10 @@ seguinte, seletor e atalhos), então o filtro se mantém ao trocar de mês.
 
 | Rota | Tela | Fase |
 |---|---|---|
-| `/` | **Dashboard**: próximos prazos (vencidos/hoje/30 dias), contagem por status, atalhos; ocultar/reexibir prazos, `?ocultos=1` mostra os ocultos | MVP |
+| `/` | **Dashboard**: pendências de status no topo, próximos prazos (vencidos/hoje/30 dias) com concluir na linha e painel do evento (#100), próximas provas, contagem por status; ocultar/reexibir prazos pelo painel, `?ocultos=1` mostra os ocultos | MVP |
 | `/concursos` | **Lista** com busca, filtros e ordenação em `searchParams` (URL compartilhável) | MVP |
-| `/concursos/novo` | **Formulário** de cadastro | MVP |
-| `/concursos/[id]` | **Detalhe** em abas: Visão geral · Eventos · Links · Resultados · Histórico; a aba aberta fica em `?aba=` (#77): abas controladas pelo `useSearchParams`, troca gravada com `history.replaceState`, sem ir ao servidor | MVP |
+| `/concursos/novo` | **Formulário** de cadastro; ao salvar abre o detalhe na aba Eventos (#100) | MVP |
+| `/concursos/[id]` | **Detalhe** em abas: Visão geral · Eventos · Links · Resultados · Histórico; a aba aberta fica em `?aba=` (#77): abas controladas pelo `useSearchParams`, troca gravada com `history.replaceState`, sem ir ao servidor. `?evento=<id>` destaca um evento e `?foco=validade` o card Validade; `de`/`mes`/`concursos` definem o link de volta (allowlist); `?mudar=status` abre "Mudar status". Cabeçalho: Editar, Mudar status e menu Mais ações (.ics, Silenciar, Excluir) (#100) | MVP |
 | `/concursos/[id]/editar` | Formulário de edição | MVP |
 | `/configuracoes` | Regras de notificação, calendário (.ics), exportar/importar dados, token do MCP, acesso | MVP |
 | `/notificacoes` | **Central de notificações** (#65): marcar como lida, marcar todas, dispensar | v2.2 |
@@ -366,7 +366,7 @@ seguinte, seletor e atalhos), então o filtro se mantém ao trocar de mês.
 | `/admin/acesso` | Allowlist do login Google: e-mails das variáveis (só leitura) e liberados no painel (adicionar/retirar) | v1.4 |
 | `/admin/auditoria` | Log das ações administrativas (últimas 200) | v1.4 |
 | `/concursos?visao=quadro` | Quadro por status (kanban; arrastar ou “Mover para” = transição validada) | v1.1 |
-| `/calendario?mes=AAAA-MM&concursos=1,3` | Visão mensal de eventos (agenda em lista no celular); clique abre os detalhes do evento; cor/ícone por concurso com legenda (#46); seletor de mês e ano com eventos por mês, atalhos "Próximos eventos" e "Próxima prova", e filtro de concursos pela legenda (#83, §4.6) | v1.1 |
+| `/calendario?mes=AAAA-MM&concursos=1,3` | Visão mensal de eventos (agenda em lista no celular); clique abre o painel do evento (concluir, ocultar, editar, ver no concurso; gaveta no celular, #100); cor/ícone por concurso com legenda (#46); seletor de mês e ano com eventos por mês, atalhos "Próximos eventos" e "Próxima prova", e filtro de concursos pela legenda (#83, §4.6) | v1.1 |
 
 Layout responsivo (alvo: 360 px sem rolagem horizontal, #48): navegação lateral no desktop, barra
 inferior no celular; menu da conta (avatar) com Sair e, só para admins, o seletor de
@@ -498,8 +498,11 @@ Decisões (issue #39):
 │   ├── components/
 │   │   ├── ui/                     # shadcn/ui
 │   │   ├── concurso/               # formulários, cards, quadro, badges, sugestão de status
-│   │   ├── calendario/             # visão mensal, detalhes do evento, seletor de mês, filtro (#83)
-│   │   ├── dashboard/              # lista de prazos, ocultar/reexibir
+│   │   ├── calendario/             # visão mensal, seletor de mês, filtro (#83)
+│   │   ├── evento/                 # painel do evento, badge de situação, destaque do deep-link (#100)
+│   │   ├── avisos/                 # avisos (toast) com Desfazer e aviso vindo da URL (#100)
+│   │   ├── formulario/             # proteção de alterações não salvas, foco no erro (#100)
+│   │   ├── dashboard/              # lista de prazos (concluir na linha), ocultar/reexibir
 │   │   ├── configuracoes/          # regras de notificação, calendário .ics, export/import, token MCP
 │   │   ├── admin/                  # painel admin (#50)
 │   │   ├── auth/                   # login (Google/senha) e sair
@@ -659,7 +662,7 @@ do React). O e2e `seguranca.spec.ts` confere os cabeçalhos e a ausência de vio
 |---|---|---|---|
 | Unitário | Vitest | `domain/*` (transições, prazos, validade, criticidade), `lib/format`, parsers BRL, schemas Zod | meta: cobertura ≥ 90% em `domain/` (medida no CI, sem limite configurado) |
 | Integração | Vitest + libSQL `:memory:` + migrações | repositories/queries (transação de status, tags, filtros, export→import ida e volta); servidor MCP com cliente em memória (`InMemoryTransport`) | casos principais |
-| E2E | Playwright (Chromium) | smoke: criar concurso → evento → aparece no dashboard → mudar status → exportar/importar; login, MCP, PWA e lembretes com auth ativa; painel admin com o usuário inicial (sem auth); busca, quadro, calendário (navegação rápida e filtro de concursos no desktop e em 360 px, #83), cor/ícone, ocultar prazos, tema, lembretes (sino, regras, feed .ics), sino único por tela e tema pelo menu no celular, tema e Configurações sem duplicação (#82), PWA, aba do detalhe na URL e botão Atualizar com limite de 60 s (#77) e layout em 360 px; `/api/mcp` com token → concurso visível no app. Dois servidores (com e sem auth) com bancos temporários em `e2e/.tmp` | poucos fluxos |
+| E2E | Playwright (Chromium) | smoke: criar concurso → evento → aparece no dashboard → mudar status → exportar/importar; login, MCP, PWA e lembretes com auth ativa; painel admin com o usuário inicial (sem auth); busca, quadro, calendário (navegação rápida e filtro de concursos no desktop e em 360 px, #83), cor/ícone, ocultar prazos, tema, lembretes (sino, regras, feed .ics), sino único por tela e tema pelo menu no celular, tema e Configurações sem duplicação (#82), PWA, aba do detalhe na URL e botão Atualizar com limite de 60 s (#77), deep-link e volta à origem, painel do evento com concluir/Desfazer, cabeçalho do concurso, avisos e alterações não salvas (#100) e layout em 360 px; `/api/mcp` com token → concurso visível no app. Dois servidores (com e sem auth) com bancos temporários em `e2e/.tmp` | poucos fluxos |
 
 Datas sempre fixadas (`vi.setSystemTime` / `hoje` injetado).
 

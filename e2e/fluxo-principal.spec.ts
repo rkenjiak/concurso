@@ -9,11 +9,14 @@ test("cadastrar concurso → mudar status → adicionar evento → ver no dashbo
   const titulo = `Prova E2E ${id}`;
   await cadastrarConcurso(page, { orgao, cargo: "Analista" });
 
-  // Status: Previsto → Inscrito (aba Histórico).
+  // Status: Previsto → Inscrito ("Mudar status" no cabeçalho, #100 D7); fica no Histórico.
+  await page.getByRole("button", { name: "Mudar status" }).click();
+  const dialogoStatus = page.getByRole("dialog", { name: "Mudar status" });
+  await dialogoStatus.getByLabel("Novo status").selectOption({ label: "Inscrito" });
+  await dialogoStatus.getByLabel("Observação (opcional)").fill("boleto pago");
+  await dialogoStatus.getByRole("button", { name: "Alterar status" }).click();
+  await expect(dialogoStatus).toBeHidden();
   await page.getByRole("tab", { name: "Histórico" }).click();
-  await page.getByLabel("Novo status").selectOption({ label: "Inscrito" });
-  await page.getByLabel("Observação (opcional)").fill("boleto pago");
-  await page.getByRole("button", { name: "Alterar status" }).click();
   await expect(page.getByText("boleto pago")).toBeVisible();
 
   // Evento daqui a 5 dias (aba Eventos).
@@ -24,7 +27,7 @@ test("cadastrar concurso → mudar status → adicionar evento → ver no dashbo
   await dialogo.getByLabel("Título").fill(titulo);
   await dialogo.getByLabel("Data").fill(emDias(5));
   await dialogo.getByLabel("Hora").fill("13:00");
-  await dialogo.getByRole("button", { name: "Salvar" }).click();
+  await dialogo.getByRole("button", { name: "Salvar", exact: true }).click();
   await expect(dialogo).toBeHidden();
   await expect(page.getByText(titulo, { exact: true })).toBeVisible();
 
@@ -44,16 +47,17 @@ test("cadastrar concurso → mudar status → adicionar evento → ver no dashbo
   await page.getByRole("tab", { name: "Histórico" }).click();
   await expect(page.getByText(/^Pendência: .*marcada para/)).toBeVisible();
 
-  // Dashboard: a contagem e o prazo aparecem com o concurso; o prazo leva ao detalhe.
+  // Dashboard: a contagem e o prazo aparecem com o concurso; o nome do concurso, link irmão da
+  // área que abre o painel (#100, D6), leva ao detalhe.
   await page.goto("/");
   await expect(
     page.getByTestId("lista-contagens").getByRole("link", { name: new RegExp(orgao) }),
   ).toBeVisible();
   const prazo = page
     .getByRole("region", { name: /^Próximos \d+ dias$/ })
-    .getByRole("link", { name: new RegExp(titulo) });
-  await expect(prazo).toBeVisible();
-  await expect(prazo).toContainText(orgao);
-  await prazo.click();
+    .getByRole("listitem")
+    .filter({ hasText: titulo });
+  await expect(prazo.locator("[data-painel-chave]")).toBeVisible();
+  await prazo.getByRole("link", { name: new RegExp(orgao) }).click();
   await expect(page.getByRole("heading", { level: 1, name: orgao })).toBeVisible();
 });

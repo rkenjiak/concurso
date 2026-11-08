@@ -7,6 +7,7 @@ import { BadgeStatus } from "@/components/concurso/badge-status";
 import { ListaContagens } from "@/components/concurso/contagem-prova";
 import { SugestaoStatus } from "@/components/concurso/sugestao-status";
 import { ListaPrazos } from "@/components/dashboard/lista-prazos";
+import { PainelEventoProvider } from "@/components/evento/painel-evento";
 import { CabecalhoPagina } from "@/components/layout/cabecalho-pagina";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,9 +18,12 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { mesDaData, proximosDoConcurso } from "@/domain/calendario";
+import { hrefCalendario } from "@/domain/navegacao-calendario";
+import { paraPainel } from "@/domain/painel-evento";
 import { JANELA_PADRAO_DIAS, semOcultos, totalPrazos } from "@/domain/prazos";
 import { ehAtivo } from "@/domain/status";
-import { formatarData } from "@/lib/format";
+import { formatarData, formatarMes } from "@/lib/format";
 import { hojeSP } from "@/lib/tz";
 import { exigirUsuarioPagina } from "@/server/auth/acesso";
 import { visaoAtual } from "@/server/auth/admin";
@@ -80,6 +84,12 @@ export default async function DashboardPage({ searchParams }: PageProps<"/">) {
   const { porStatus, totalConcursos, ocultos } = dashboard;
   const prazos = mostrarOcultos ? dashboard.prazos : semOcultos(dashboard.prazos);
   const totalExibidos = totalPrazos(prazos);
+  // Dados do painel do evento (#100): os prazos exibidos, com os próximos do mesmo concurso.
+  const listados = [...prazos.vencidos, ...prazos.hoje, ...prazos.proximos];
+  const itensPainel = listados.map((p) => paraPainel(p, proximosDoConcurso(listados, p, hoje)));
+  // Primeira prova fora da lista (a 7ª): o "Ver mais" abre o calendário no mês dela (#100, D13).
+  const proximaOculta = contagens[MAX_CONTAGENS];
+  const mesVerMais = proximaOculta ? mesDaData(proximaOculta.contagem.evento.data) : null;
   const ativos = porStatus.filter((s) => ehAtivo(s.status)).reduce((n, s) => n + s.quantidade, 0);
 
   const novo = (
@@ -120,6 +130,38 @@ export default async function DashboardPage({ searchParams }: PageProps<"/">) {
         acoes={novo}
       />
 
+      {/* Pendências primeiro, em largura total (#100, D12): pedem resposta antes dos prazos. */}
+      {pendencias.length > 0 ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Pendências de status</CardTitle>
+            <CardDescription>
+              Eventos que chegaram ou passaram. Responda para atualizar o status; nada muda sem
+              você.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {pendencias.map((c) => (
+              <SugestaoStatus
+                key={c.pendencia.chave}
+                concursoId={c.id}
+                chave={c.pendencia.chave}
+                pergunta={c.pendencia.pergunta}
+                motivo={c.pendencia.motivo}
+                respostas={c.pendencia.respostas.map(({ id, rotulo, para, confirmar }) => ({
+                  id,
+                  rotulo,
+                  para,
+                  confirmar,
+                }))}
+                nomeConcurso={`${c.icone ? `${c.icone} ` : ""}${c.orgao} — ${c.cargo}`}
+                compacta
+              />
+            ))}
+          </CardContent>
+        </Card>
+      ) : null}
+
       <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <Card>
           <CardHeader>
@@ -146,87 +188,63 @@ export default async function DashboardPage({ searchParams }: PageProps<"/">) {
               </CardAction>
             ) : null}
           </CardHeader>
-          <CardContent className="space-y-6">
-            {totalExibidos === 0 ? (
-              <div className="space-y-2 py-6 text-center">
-                <CalendarCheck className="mx-auto size-8 text-muted-foreground" aria-hidden />
-                {ocultos > 0 ? (
-                  <>
-                    <p className="font-medium">Todos os prazos estão ocultos</p>
-                    <p className="text-muted-foreground text-sm">
-                      Use “Mostrar ocultos” para vê-los e reexibir os que voltarem a interessar.
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <p className="font-medium">
-                      Nenhum prazo nos próximos {JANELA_PADRAO_DIAS} dias
-                    </p>
-                    <p className="text-muted-foreground text-sm">
-                      Adicione eventos na aba “Eventos” de cada concurso para acompanhá-los aqui.
-                    </p>
-                  </>
-                )}
-              </div>
-            ) : (
-              <>
-                {prazos.vencidos.length > 0 ? (
-                  <Grupo
-                    titulo="Vencidos"
-                    descricao="Prazos críticos não marcados como concluídos"
-                    vazio=""
-                    quantidade={prazos.vencidos.length}
-                  >
-                    <ListaPrazos prazos={prazos.vencidos} />
+          <CardContent>
+            <PainelEventoProvider
+              itens={itensPainel}
+              origem={{ de: "dashboard" }}
+              className="space-y-6"
+            >
+              {totalExibidos === 0 ? (
+                <div className="space-y-2 py-6 text-center">
+                  <CalendarCheck className="mx-auto size-8 text-muted-foreground" aria-hidden />
+                  {ocultos > 0 ? (
+                    <>
+                      <p className="font-medium">Todos os prazos estão ocultos</p>
+                      <p className="text-muted-foreground text-sm">
+                        Use “Mostrar ocultos” para vê-los e reexibir os que voltarem a interessar.
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="font-medium">
+                        Nenhum prazo nos próximos {JANELA_PADRAO_DIAS} dias
+                      </p>
+                      <p className="text-muted-foreground text-sm">
+                        Adicione eventos na aba “Eventos” de cada concurso para acompanhá-los aqui.
+                      </p>
+                    </>
+                  )}
+                </div>
+              ) : (
+                <>
+                  {prazos.vencidos.length > 0 ? (
+                    <Grupo
+                      titulo="Vencidos"
+                      descricao="Prazos críticos não marcados como concluídos"
+                      vazio=""
+                      quantidade={prazos.vencidos.length}
+                    >
+                      <ListaPrazos prazos={prazos.vencidos} />
+                    </Grupo>
+                  ) : null}
+                  <Grupo titulo="Hoje" vazio="Nada para hoje." quantidade={prazos.hoje.length}>
+                    <ListaPrazos prazos={prazos.hoje} />
                   </Grupo>
-                ) : null}
-                <Grupo titulo="Hoje" vazio="Nada para hoje." quantidade={prazos.hoje.length}>
-                  <ListaPrazos prazos={prazos.hoje} />
-                </Grupo>
-                <Grupo
-                  titulo={`Próximos ${JANELA_PADRAO_DIAS} dias`}
-                  vazio="Nenhum prazo nos próximos dias."
-                  quantidade={prazos.proximos.length}
-                >
-                  <ListaPrazos prazos={prazos.proximos} />
-                </Grupo>
-              </>
-            )}
+                  <Grupo
+                    titulo={`Próximos ${JANELA_PADRAO_DIAS} dias`}
+                    vazio="Nenhum prazo nos próximos dias."
+                    quantidade={prazos.proximos.length}
+                  >
+                    <ListaPrazos prazos={prazos.proximos} />
+                  </Grupo>
+                </>
+              )}
+            </PainelEventoProvider>
           </CardContent>
         </Card>
 
         {/* min-w-0: item de grid não encolhe abaixo do conteúdo (nome do concurso truncado). */}
         <div className="flex min-w-0 flex-col gap-6">
-          {pendencias.length > 0 ? (
-            <Card>
-              <CardHeader>
-                <CardTitle>Pendências de status</CardTitle>
-                <CardDescription>
-                  Eventos que chegaram ou passaram. Responda para atualizar o status; nada muda sem
-                  você.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                {pendencias.map((c) => (
-                  <SugestaoStatus
-                    key={c.pendencia.chave}
-                    concursoId={c.id}
-                    chave={c.pendencia.chave}
-                    pergunta={c.pendencia.pergunta}
-                    motivo={c.pendencia.motivo}
-                    respostas={c.pendencia.respostas.map(({ id, rotulo, para, confirmar }) => ({
-                      id,
-                      rotulo,
-                      para,
-                      confirmar,
-                    }))}
-                    nomeConcurso={`${c.icone ? `${c.icone} ` : ""}${c.orgao} — ${c.cargo}`}
-                    compacta
-                  />
-                ))}
-              </CardContent>
-            </Card>
-          ) : null}
           {contagens.length > 0 ? (
             <Card>
               <CardHeader>
@@ -237,13 +255,15 @@ export default async function DashboardPage({ searchParams }: PageProps<"/">) {
               </CardHeader>
               <CardContent className="space-y-2">
                 <ListaContagens itens={contagens.slice(0, MAX_CONTAGENS)} />
-                {contagens.length > MAX_CONTAGENS ? (
-                  <p className="text-muted-foreground text-xs">
-                    E mais {contagens.length - MAX_CONTAGENS} no{" "}
-                    <Link href="/calendario" className="underline underline-offset-2">
-                      calendário
+                {mesVerMais ? (
+                  <p className="text-xs">
+                    <Link
+                      href={hrefCalendario(mesVerMais)}
+                      className="text-muted-foreground underline underline-offset-2 hover:text-foreground"
+                    >
+                      Ver mais {contagens.length - MAX_CONTAGENS} a partir de{" "}
+                      {formatarMes(mesVerMais)}
                     </Link>
-                    .
                   </p>
                 ) : null}
               </CardContent>

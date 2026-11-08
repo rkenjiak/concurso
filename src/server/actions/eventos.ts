@@ -1,18 +1,25 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import type { PendenciaStatus } from "@/domain/sugestao-status";
 import { idSchema } from "@/lib/schemas/comum";
 import { concluidoSchema, eventoSchema } from "@/lib/schemas/evento";
+import { hojeSP } from "@/lib/tz";
 import { exigirUsuarioAcao } from "../auth/acesso";
 import { getDb } from "../db/client";
+import { obterPendenciaDoEvento } from "../queries/sugestoes";
 import * as repo from "../repositories/eventos";
 import { executar, falha, falhaValidacao, type ResultadoAcao, sucesso } from "./resultado";
 
 const INVALIDO = "Evento não encontrado.";
 
+/**
+ * Eventos aparecem no detalhe, no dashboard, no calendário, em /notificacoes e no contador do
+ * sino (calculado no layout): revalida o layout raiz, que cobre todas essas telas (#100, D15).
+ */
 function revalidar(concursoId: number) {
   revalidatePath(`/concursos/${concursoId}`);
-  revalidatePath("/");
+  revalidatePath("/", "layout");
 }
 
 /** Cria (`eventoId` nulo) ou atualiza um evento do concurso. */
@@ -67,12 +74,23 @@ export async function excluirEvento(
   );
 }
 
-/** Marca (`concluido = true`) ou desmarca o evento como concluído. */
+export interface ResultadoConcluir {
+  /**
+   * Pendência de status do evento recém-concluído (#100, D5), para o painel perguntar na hora;
+   * `null` ao reabrir ou se a pendência atual do concurso for de outro evento.
+   */
+  pendencia: PendenciaStatus | null;
+}
+
+/**
+ * Marca (`concluido = true`) ou desmarca o evento como concluído. O evento precisa ser do
+ * concurso, e o concurso do usuário (D15, verificado no repositório).
+ */
 export async function alternarConcluido(
   concursoIdBruto: unknown,
   eventoIdBruto: unknown,
   concluidoBruto: unknown,
-): Promise<ResultadoAcao> {
+): Promise<ResultadoAcao<ResultadoConcluir>> {
   const sessao = await exigirUsuarioAcao();
   if (!sessao.ok) return sessao;
   const usuarioId = sessao.usuario.id;
@@ -83,15 +101,13 @@ export async function alternarConcluido(
   if (!concluido.success) return falhaValidacao(concluido.error);
   return executar(
     async () => {
-      await repo.definirConcluido(
-        getDb(),
-        usuarioId,
-        concursoId.data,
-        eventoId.data,
-        concluido.data,
-      );
+      const db = getDb();
+      await repo.definirConcluido(db, usuarioId, concursoId.data, eventoId.data, concluido.data);
       revalidar(concursoId.data);
-      return sucesso(null);
+      const pendencia = concluido.data
+        ? await obterPendenciaDoEvento(db, usuarioId, concursoId.data, eventoId.data, hojeSP())
+        : null;
+      return sucesso({ pendencia });
     },
     { acao: "eventos.alternarConcluido", usuarioId },
   );

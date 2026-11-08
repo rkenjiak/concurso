@@ -1,6 +1,12 @@
 import { expect, type Page } from "@playwright/test";
 import { hojeSP, somarDias } from "../src/lib/tz";
 
+/**
+ * Região de avisos que está mostrando os avisos: a global ou, com um diálogo aberto, a de dentro
+ * dele (a outra fica vazia) (#100, D4).
+ */
+export const regiaoAvisos = (page: Page) => page.locator("[data-avisos]").filter({ visible: true });
+
 /** Sufixo único por teste, para não depender da ordem nem de dados de outros testes. */
 export const unico = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 
@@ -27,7 +33,10 @@ export async function escolherCor(page: Page, nome: string | RegExp): Promise<vo
   await expect(radio).toBeChecked();
 }
 
-/** Cadastra um concurso pela interface e espera a página de detalhe. Retorna a URL. */
+/**
+ * Cadastra um concurso pela interface e espera o detalhe, que abre na aba Eventos (#100, D9).
+ * Retorna a URL do detalhe sem parâmetros (aba Visão geral).
+ */
 export async function cadastrarConcurso(page: Page, dados: NovoConcurso): Promise<string> {
   await page.goto("/concursos/novo");
   await page.getByLabel("Nome / órgão").fill(dados.orgao);
@@ -43,7 +52,8 @@ export async function cadastrarConcurso(page: Page, dados: NovoConcurso): Promis
   if (dados.cor) await escolherCor(page, dados.cor);
   if (dados.icone) await page.getByLabel("Ícone (opcional)").fill(dados.icone);
   await page.getByRole("button", { name: "Cadastrar concurso" }).click();
-  await expect(page).toHaveURL(/\/concursos\/\d+$/);
+  await expect(page).toHaveURL(/\/concursos\/\d+\?aba=eventos$/);
   await expect(page.getByRole("heading", { level: 1, name: dados.orgao })).toBeVisible();
-  return page.url();
+  const url = new URL(page.url());
+  return `${url.origin}${url.pathname}`;
 }

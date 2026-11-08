@@ -142,7 +142,8 @@ funciona até localmente — e seguem as **regras de notificação** de **Config
 para cada tipo de evento, ligar/desligar e as antecedências em dias (0 = no dia). O padrão: fim das
 inscrições em 7, 1 e 0 dias; isenção e boleto em 2 e 0; provas e demais fases em 7 e 1; recursos em
 1 e 0; convocação, nomeação e posse em 3 e 0; fim da validade em 90 e 30. "Restaurar padrão" desfaz
-as mudanças. No detalhe do concurso, **Silenciar** cala os avisos e alarmes só daquele concurso.
+as mudanças. No detalhe do concurso, **Mais ações (⋯) → Silenciar notificações** cala os avisos e alarmes só
+daquele concurso.
 Eventos concluídos e concursos encerrados não notificam. Se a data de um evento muda (retificação),
 o aviso acompanha a nova data, sem duplicar.
 

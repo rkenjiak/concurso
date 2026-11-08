@@ -175,6 +175,7 @@ describe("itensCalendario", () => {
       esmaecido: false,
       derivado: false,
       concluido: false,
+      situacao: "URGENTE",
     });
   });
 
@@ -189,9 +190,9 @@ describe("itensCalendario", () => {
       FIM,
       HOJE,
     );
-    expect(itens.map((i) => [i.esmaecido, i.criticidade, i.concluido])).toEqual([
-      [true, "NORMAL", true],
-      [true, "NORMAL", false],
+    expect(itens.map((i) => [i.esmaecido, i.criticidade, i.concluido, i.situacao])).toEqual([
+      [true, "NORMAL", true, "CONCLUIDO"],
+      [true, "NORMAL", false, null],
     ]);
   });
 
@@ -203,7 +204,7 @@ describe("itensCalendario", () => {
       "2026-10-31",
       HOJE,
     );
-    expect(item).toMatchObject({ dias: -11, criticidade: "ALTA" });
+    expect(item).toMatchObject({ dias: -11, criticidade: "ALTA", situacao: "VENCIDO" });
   });
 
   it("inclui o fim de validade calculado de concursos acompanhados sem evento VALIDADE", () => {
@@ -227,6 +228,7 @@ describe("itensCalendario", () => {
       evento: null,
       esmaecido: false,
       dias: 15,
+      situacao: null,
     });
   });
 

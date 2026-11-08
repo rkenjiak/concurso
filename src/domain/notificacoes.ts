@@ -13,8 +13,7 @@
  */
 import { type DataISO, diasEntre, ehDataISO, somarDias } from "../lib/tz";
 import { TIPO_EVENTO, type TipoEvento } from "./enums";
-import { ROTULO_TIPO_EVENTO } from "./labels";
-import { type ConcursoPrazo, concursoAcompanhado, type EventoPrazo } from "./prazos";
+import { type ConcursoPrazo, concursoAcompanhado, type EventoPrazo, nomePrazo } from "./prazos";
 
 /** Maior antecedência aceita, em dias (a validade costuma ser lembrada com meses de folga). */
 export const ANTECEDENCIA_MAXIMA = 365;
@@ -206,12 +205,6 @@ export function lerChaveNotificacao(chave: unknown): AlvoNotificacao | null {
     : { tipo: "validade", concursoId: id, antecedencia };
 }
 
-/** Nome do prazo usado nas notificações e no calendário. */
-export function nomeDoPrazo(p: { derivado: boolean; titulo: string | null; tipo: TipoEvento }) {
-  if (p.derivado) return "Fim da validade do concurso";
-  return p.titulo ?? ROTULO_TIPO_EVENTO[p.tipo];
-}
-
 function mensagem(nome: string, dias: number): string {
   if (dias === 0) return `${nome} é hoje`;
   if (dias === 1) return `${nome} é amanhã`;
@@ -312,7 +305,7 @@ export function notificacoesDisparadas<E extends EventoPrazo, C extends Concurso
     const chave = chaveNotificacao(p.chavePrazo, antecedencia);
     const estado = estados.get(chave);
     if (estado?.dispensada) continue;
-    const nome = nomeDoPrazo(p);
+    const nome = nomePrazo(p);
     notificacoes.push({
       chave,
       chavePrazo: p.chavePrazo,

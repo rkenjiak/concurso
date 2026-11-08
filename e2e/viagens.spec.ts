@@ -81,7 +81,8 @@ test("editar e excluir concurso redirecionam na própria resposta da action (#73
   expect(editar).toEqual({ posts: 1, refreshes: 0 });
 
   const excluir = await contarViagens(page, async () => {
-    await page.getByRole("button", { name: "Excluir", exact: true }).click();
+    await page.getByRole("button", { name: "Mais ações" }).click();
+    await page.getByRole("menuitem", { name: /^Excluir/ }).click();
     await page.getByRole("alertdialog").getByRole("button", { name: "Excluir" }).click();
     await expect(page).toHaveURL(/\/concursos$/);
   });

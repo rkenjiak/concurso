@@ -1,6 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
@@ -21,6 +22,7 @@ import {
   ROTULO_UF,
 } from "@/domain/labels";
 import { VALIDADE_MESES_MAX, VALIDADE_MESES_MIN } from "@/domain/validade";
+import { MUDAR_STATUS, PARAM_MUDAR } from "@/lib/aba-concurso";
 import { CAMPOS_CONCURSO, type ConcursoFormValores, concursoSchema } from "@/lib/schemas/concurso";
 import { atualizarConcurso, criarConcurso } from "@/server/actions/concursos";
 import { ariaCampo, Campo } from "./campo";
@@ -117,8 +119,15 @@ export function FormularioConcurso({
             <div className="grid gap-1.5">
               <Label>Status</Label>
               <p className="text-muted-foreground text-sm">
-                {ROTULO_STATUS[valoresIniciais.status as keyof typeof ROTULO_STATUS]} — altere na
-                página do concurso para registrar no histórico.
+                {ROTULO_STATUS[valoresIniciais.status as keyof typeof ROTULO_STATUS]} —{" "}
+                {/* Abre o "Mudar status" do cabeçalho (#100, D7). */}
+                <Link
+                  href={`/concursos/${concursoId}?${PARAM_MUDAR}=${MUDAR_STATUS}`}
+                  className="text-foreground underline underline-offset-3 hover:text-primary"
+                >
+                  altere na página do concurso
+                </Link>{" "}
+                para registrar no histórico.
               </p>
             </div>
           ) : (

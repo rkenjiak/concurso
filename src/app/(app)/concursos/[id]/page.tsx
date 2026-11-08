@@ -1,12 +1,9 @@
-import { ArrowLeft, CalendarArrowDown, Pencil } from "lucide-react";
+import { ArrowLeft, Pencil } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AbasConcurso } from "@/components/concurso/abas-concurso";
-import { AlterarStatus } from "@/components/concurso/alterar-status";
 import { BadgeStatus } from "@/components/concurso/badge-status";
-import { BotaoExcluirConcurso } from "@/components/concurso/botao-excluir-concurso";
-import { BotaoSilenciarConcurso } from "@/components/concurso/botao-silenciar-concurso";
 import { ContagemProva } from "@/components/concurso/contagem-prova";
 import { EventosConcurso } from "@/components/concurso/eventos-concurso";
 import { FocoValidade } from "@/components/concurso/foco-validade";
@@ -14,6 +11,8 @@ import { LinksConcurso } from "@/components/concurso/links-concurso";
 import { ListaTags } from "@/components/concurso/lista-tags";
 import { MarcadorConcurso } from "@/components/concurso/marcador-concurso";
 import { Markdown } from "@/components/concurso/markdown";
+import { MenuAcoesConcurso } from "@/components/concurso/menu-acoes-concurso";
+import { MudarStatus } from "@/components/concurso/mudar-status";
 import { ResultadosConcurso } from "@/components/concurso/resultados-concurso";
 import { SugestaoStatus } from "@/components/concurso/sugestao-status";
 import { TimelineStatus } from "@/components/concurso/timeline-status";
@@ -104,31 +103,32 @@ export default async function ConcursoPage({ params, searchParams }: PageProps<"
             <span className="text-muted-foreground text-xs">
               desde {formatarDataInstante(c.statusDesde)}
             </span>
+            {/* Status muda pelo cabeçalho (#100, D7); a aba Histórico fica só com a timeline. */}
+            <MudarStatus
+              concursoId={c.id}
+              atual={c.status}
+              transicoes={opcoes.transicoes}
+              desfazerPara={opcoes.desfazerPara}
+            />
           </div>
           <div className="pt-1">
             <ListaTags tags={c.tags} />
           </div>
           {contagem ? <ContagemProva contagem={contagem} className="mt-2" /> : null}
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button asChild variant="outline">
-            <a
-              href={`/api/export?formato=ics&concurso=${c.id}`}
-              download
-              title="Baixar os eventos deste concurso para o calendário"
-            >
-              <CalendarArrowDown aria-hidden />
-              .ics
-            </a>
-          </Button>
-          <BotaoSilenciarConcurso concursoId={c.id} silenciado={c.notificacoesSilenciadas} />
-          <Button asChild variant="outline">
+        {/* Só "Editar" visível; o resto no menu "Mais ações" (#100, D8). */}
+        <div className="flex shrink-0 gap-2">
+          <Button asChild variant="outline" className="max-md:h-11 max-md:px-3">
             <Link href={`/concursos/${c.id}/editar`}>
               <Pencil aria-hidden />
               Editar
             </Link>
           </Button>
-          <BotaoExcluirConcurso id={c.id} nome={`${c.orgao} — ${c.cargo}`} />
+          <MenuAcoesConcurso
+            concursoId={c.id}
+            nome={`${c.orgao} — ${c.cargo}`}
+            silenciado={c.notificacoesSilenciadas}
+          />
         </div>
       </header>
 
@@ -293,20 +293,7 @@ export default async function ConcursoPage({ params, searchParams }: PageProps<"
           </Card>
         </TabsContent>
 
-        <TabsContent value="historico" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Status</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <AlterarStatus
-                concursoId={c.id}
-                atual={c.status}
-                transicoes={opcoes.transicoes}
-                desfazerPara={opcoes.desfazerPara}
-              />
-            </CardContent>
-          </Card>
+        <TabsContent value="historico">
           <Card>
             <CardHeader>
               <CardTitle>Histórico de status</CardTitle>

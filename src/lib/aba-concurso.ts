@@ -20,6 +20,15 @@ export const PARAM_FOCO = "foco";
 /** Único valor aceito em `?foco=`. */
 export const FOCO_VALIDADE = "validade";
 
+/**
+ * `?mudar=status` abre o controle "Mudar status" do cabeçalho (#100, D7): destino do link na
+ * edição do concurso. É removido da URL quando o diálogo fecha.
+ */
+export const PARAM_MUDAR = "mudar";
+
+/** Único valor aceito em `?mudar=`. */
+export const MUDAR_STATUS = "status";
+
 export function ehAbaConcurso(valor: unknown): valor is AbaConcurso {
   return typeof valor === "string" && (ABAS_CONCURSO as readonly string[]).includes(valor);
 }

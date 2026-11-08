@@ -9,11 +9,14 @@ test("cadastrar concurso → mudar status → adicionar evento → ver no dashbo
   const titulo = `Prova E2E ${id}`;
   await cadastrarConcurso(page, { orgao, cargo: "Analista" });
 
-  // Status: Previsto → Inscrito (aba Histórico).
+  // Status: Previsto → Inscrito ("Mudar status" no cabeçalho, #100 D7); fica no Histórico.
+  await page.getByRole("button", { name: "Mudar status" }).click();
+  const dialogoStatus = page.getByRole("dialog", { name: "Mudar status" });
+  await dialogoStatus.getByLabel("Novo status").selectOption({ label: "Inscrito" });
+  await dialogoStatus.getByLabel("Observação (opcional)").fill("boleto pago");
+  await dialogoStatus.getByRole("button", { name: "Alterar status" }).click();
+  await expect(dialogoStatus).toBeHidden();
   await page.getByRole("tab", { name: "Histórico" }).click();
-  await page.getByLabel("Novo status").selectOption({ label: "Inscrito" });
-  await page.getByLabel("Observação (opcional)").fill("boleto pago");
-  await page.getByRole("button", { name: "Alterar status" }).click();
   await expect(page.getByText("boleto pago")).toBeVisible();
 
   // Evento daqui a 5 dias (aba Eventos).

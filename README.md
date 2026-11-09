@@ -148,8 +148,8 @@ restore do serviço e o export JSON periódico.
 
 **Notificações no app.** O contador de não lidas fica no item **Notificações** da barra inferior
 (celular) ou no sino da barra lateral (desktop) e leva à central (`/notificacoes`), que lista os
-avisos do mais recente para o mais antigo, agrupados por dia, e onde cada aviso pode ser marcado
-como lido ou dispensado. Para o que fazer agora, use o Dashboard. Os avisos são calculados na hora a partir dos eventos pendentes — não há cron, então
+avisos agrupados pela proximidade do prazo (Hoje e amanhã, Próximos 7 dias, Mais adiante), o mais
+próximo primeiro, e onde cada aviso pode ser marcado como lido ou dispensado. Para o que fazer agora, use o Dashboard. Os avisos são calculados na hora a partir dos eventos pendentes — não há cron, então
 funciona até localmente — e seguem as **regras de notificação** de **Configurações → Notificações**:
 para cada tipo de evento, ligar/desligar e as antecedências em dias (0 = no dia). O padrão: fim das
 inscrições em 7, 1 e 0 dias; isenção e boleto em 2 e 0; provas e demais fases em 7 e 1; recursos em

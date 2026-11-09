@@ -31,17 +31,21 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 ### Alterado
 
 - **Papel de Notificações** (#104): o Dashboard mostra o que fazer agora; `/notificacoes` mostra os
-  avisos que as suas regras geraram para prazos ainda pendentes, do mais recente para o mais
-  antigo, agrupados por dia do aviso (**Hoje**, **Ontem**, **Anteriores**). A descrição da tela
-  diz isso e aponta para o Dashboard, o botão **Regras** virou **Configurar avisos** e os botões
+  avisos que as suas regras geraram para prazos ainda pendentes, agrupados pela proximidade do
+  prazo (**Hoje e amanhã**, **Próximos 7 dias**, **Mais adiante**) e, em cada grupo, do prazo mais
+  próximo para o mais distante (data e hora). Agrupar pelo dia do disparo enganava: com a regra de
+  prova em 7 e 1 dias, "Prova objetiva é hoje" ficava em "Ontem". Os grupos são título e lista,
+  sem landmark por grupo. A descrição da tela diz isso e aponta para o Dashboard, o botão **Regras** virou **Configurar avisos** e os botões
   de marcar como lida e dispensar têm 44 px no toque.
 - **Notificações na barra inferior do celular** (#105): Notificações, com o contador de não lidas
   (o nome acessível traz o número real), ocupa o lugar de Configurações, que é de uso raro.
   Configurações passou para o menu da conta (avatar) e o sino saiu do cabeçalho do celular, para
-  manter um só ponto de entrada de notificações por layout (#78). O desktop não muda.
+  manter um só ponto de entrada de notificações por layout (#78). O desktop não muda. Sem nome nem
+  e-mail (usuário local), o avatar mostra um ícone de pessoa em vez de "?".
 - Limpeza sem mudança de comportamento (#107): `useConcluirEvento` e `useDesfazerStatus` têm uma
-  fonte única, e o zoom do `alert-dialog` só anima quando o sistema não pede movimento reduzido
-  (`prefers-reduced-motion`); o fade continua.
+  fonte única, e o zoom do `dialog` (centro e gaveta no desktop) e do `alert-dialog` só anima
+  quando o sistema não pede movimento reduzido (`prefers-reduced-motion`); o fade continua, e o
+  slide da gaveta no celular já seguia a mesma regra.
 
 - Gerar ou revogar um token, bloquear e desbloquear passam a zerar também o último uso do token
   (#108), para o painel não mostrar "usado há 2 dias" em quem já não tem token.

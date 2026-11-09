@@ -7,6 +7,8 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 
 ## [Unreleased]
 
+## [2.7.0] - 2026-11-09
+
 ### Adicionado
 
 - **Índice e seções em Configurações** (#106): os cards ficam agrupados em **Avisos**
@@ -14,7 +16,6 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
   e **Conta** (Acesso), com títulos h2/h3 reais, e um índice "Nesta página" com âncoras para cada
   card (`#notificacoes`, `#calendario`, `#exportar`, `#mcp`, `#acesso`). As âncoras param abaixo
   do cabeçalho fixo do celular e os links do índice têm 44 px no toque.
-
 - **Uso real no painel admin** (#108): a visão geral mostra quantos usuários estiveram ativos em 7
   e 30 dias e quantos têm token do MCP ou feed `.ics` ativo. A tabela de usuários ganhou os selos
   **MCP** e **.ics** (token ativo), com o último uso na dica e para leitores de tela, e o selo
@@ -46,7 +47,6 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
   fonte única, e o zoom do `dialog` (centro e gaveta no desktop) e do `alert-dialog` só anima
   quando o sistema não pede movimento reduzido (`prefers-reduced-motion`); o fade continua, e o
   slide da gaveta no celular já seguia a mesma regra.
-
 - Gerar ou revogar um token, bloquear e desbloquear passam a zerar também o último uso do token
   (#108), para o painel não mostrar "usado há 2 dias" em quem já não tem token.
 

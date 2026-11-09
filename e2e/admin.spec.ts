@@ -52,3 +52,71 @@ test("admin: último admin não é rebaixado; allowlist e auditoria", async ({ p
   await page.goto("/admin/auditoria");
   await expect(page.getByRole("row").filter({ hasText: email })).toHaveCount(2);
 });
+
+test("admin: selos MCP/.ics, detalhe do usuário e revogar tokens sem bloquear (#108)", async ({
+  page,
+  request,
+}) => {
+  // Sem login, o token do usuário inicial vale para o MCP e o feed.
+  await page.goto("/configuracoes");
+  await page.getByRole("button", { name: "Gerar token" }).click();
+  const campoMcp = page.getByLabel(/Novo token/);
+  await expect(campoMcp).toHaveValue(/^cmcp_/);
+  const token = await campoMcp.inputValue();
+  await page.getByRole("button", { name: "Gerar link de assinatura" }).click();
+  const campoIcs = page.getByTestId("url-feed-ics");
+  await expect(campoIcs).toHaveValue(/token=cics_/);
+  const feed = new URL(await campoIcs.inputValue());
+  const urlFeed = `${feed.pathname}${feed.search}`;
+
+  const chamarMcp = () =>
+    request.post("/api/mcp", {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        accept: "application/json, text/event-stream",
+      },
+      data: {
+        jsonrpc: "2.0",
+        id: 1,
+        method: "initialize",
+        params: {
+          protocolVersion: "2025-06-18",
+          capabilities: {},
+          clientInfo: { name: "e2e", version: "0.0.0" },
+        },
+      },
+    });
+  expect((await chamarMcp()).status()).toBe(200);
+  expect((await request.get(urlFeed)).status()).toBe(200);
+
+  // Tabela: selos dos tokens ativos, com o último uso para leitores de tela.
+  await page.goto("/admin/usuarios");
+  const linha = page.getByRole("row").filter({ hasText: "(você)" });
+  await expect(linha.getByTitle(/^MCP ativo, usado por último em/)).toBeVisible();
+  await expect(linha.getByTitle(/^\.ics ativo, usado por último em/)).toBeVisible();
+  await expect(linha).toContainText("token ativo, usado por último em");
+
+  // Detalhe: origem, contagens e tokens; revogar não bloqueia.
+  await linha.getByRole("link").first().click();
+  await expect(page).toHaveURL(/\/admin\/usuarios\/\d+$/);
+  await expect(page.getByText("Com acesso hoje")).toBeVisible();
+  await expect(page.getByText("Usuário inicial (senha ou uso sem login)")).toBeVisible();
+  await expect(
+    page.getByText("Só contagens: o conteúdo dos concursos continua privado."),
+  ).toBeVisible();
+  await page.getByRole("button", { name: /^Revogar tokens de/ }).click();
+  await page.getByRole("alertdialog").getByRole("button", { name: "Revogar" }).click();
+  await expect(page.getByRole("button", { name: /^Revogar tokens de/ })).toHaveCount(0);
+  await expect(page.getByText("Inativo")).toHaveCount(2);
+  await expect(page.getByText("Com acesso hoje")).toBeVisible();
+
+  expect((await chamarMcp()).status()).toBe(401);
+  expect((await request.get(urlFeed)).status()).toBe(404);
+
+  await page.goto("/admin/auditoria");
+  await expect(page.getByRole("row").filter({ hasText: "Revogou os tokens" })).toHaveCount(1);
+
+  // ID inexistente: página 404 (com o loading.tsx do painel, o status HTTP já saiu como 200).
+  await page.goto("/admin/usuarios/999999");
+  await expect(page.getByText("This page could not be found.")).toBeVisible();
+});

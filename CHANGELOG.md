@@ -9,6 +9,12 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 
 ### Adicionado
 
+- **Índice e seções em Configurações** (#106): os cards ficam agrupados em **Avisos**
+  (Notificações, Calendário .ics), **Dados** (Exportar e importar), **Integrações** (Token do MCP)
+  e **Conta** (Acesso), com títulos h2/h3 reais, e um índice "Nesta página" com âncoras para cada
+  card (`#notificacoes`, `#calendario`, `#exportar`, `#mcp`, `#acesso`). As âncoras param abaixo
+  do cabeçalho fixo do celular e os links do índice têm 44 px no toque.
+
 - **Uso real no painel admin** (#108): a visão geral mostra quantos usuários estiveram ativos em 7
   e 30 dias e quantos têm token do MCP ou feed `.ics` ativo. A tabela de usuários ganhou os selos
   **MCP** e **.ics** (token ativo), com o último uso na dica e para leitores de tela, e o selo
@@ -23,6 +29,19 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
   ativos, nada muda nem é auditado.
 
 ### Alterado
+
+- **Papel de Notificações** (#104): o Dashboard mostra o que fazer agora; `/notificacoes` mostra os
+  avisos que as suas regras geraram para prazos ainda pendentes, do mais recente para o mais
+  antigo, agrupados por dia do aviso (**Hoje**, **Ontem**, **Anteriores**). A descrição da tela
+  diz isso e aponta para o Dashboard, o botão **Regras** virou **Configurar avisos** e os botões
+  de marcar como lida e dispensar têm 44 px no toque.
+- **Notificações na barra inferior do celular** (#105): Notificações, com o contador de não lidas
+  (o nome acessível traz o número real), ocupa o lugar de Configurações, que é de uso raro.
+  Configurações passou para o menu da conta (avatar) e o sino saiu do cabeçalho do celular, para
+  manter um só ponto de entrada de notificações por layout (#78). O desktop não muda.
+- Limpeza sem mudança de comportamento (#107): `useConcluirEvento` e `useDesfazerStatus` têm uma
+  fonte única, e o zoom do `alert-dialog` só anima sem `prefers-reduced-motion`, como os outros
+  diálogos.
 
 - Gerar ou revogar um token, bloquear e desbloquear passam a zerar também o último uso do token
   (#108), para o painel não mostrar "usado há 2 dias" em quem já não tem token.

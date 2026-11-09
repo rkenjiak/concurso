@@ -297,7 +297,7 @@ senão → indefinida
   restantes (quem abre o app na véspera vê só "amanhã"). Identidade = (prazo, antecedência), sem a
   data: retificar a data mantém a notificação (e o estado). Do banco vêm só lida/dispensada.
 - Ordenação: dia de disparo (`data − antecedência`) desc, depois data/hora do prazo.
-- O contador do sino é calculado no layout do app. Toda Server Action que chama `revalidatePath`
+- O contador de não lidas (sino no desktop, item Notificações da barra no celular) é calculado no layout do app. Toda Server Action que chama `revalidatePath`
   recebe na própria resposta a rota atual re-renderizada a partir da raiz (layout incluso), então o
   sino atualiza sem `router.refresh()` (#73).
 - Mudanças feitas fora desta aba (MCP, outro aparelho) não chegam sozinhas: não há refresh
@@ -366,8 +366,8 @@ seguinte, seletor e atalhos), então o filtro se mantém ao trocar de mês.
 | `/concursos/novo` | **Formulário** de cadastro; ao salvar abre o detalhe na aba Eventos (#100) | MVP |
 | `/concursos/[id]` | **Detalhe** em abas: Visão geral · Eventos · Links · Resultados · Histórico; a aba aberta fica em `?aba=` (#77): abas controladas pelo `useSearchParams`, troca gravada com `history.replaceState`, sem ir ao servidor. `?evento=<id>` destaca um evento e `?foco=validade` o card Validade; `de`/`mes`/`concursos` definem o link de volta (allowlist); `?mudar=status` abre "Mudar status". Cabeçalho: Editar, Mudar status e menu Mais ações (.ics, Silenciar, Excluir) (#100) | MVP |
 | `/concursos/[id]/editar` | Formulário de edição | MVP |
-| `/configuracoes` | Regras de notificação, calendário (.ics), exportar/importar dados, token do MCP, acesso | MVP |
-| `/notificacoes` | **Central de notificações** (#65): marcar como lida, marcar todas, dispensar | v2.2 |
+| `/configuracoes` | Seções Avisos (regras de notificação, calendário .ics), Dados (exportar/importar), Integrações (token do MCP) e Conta (acesso), com índice de âncoras (#106) | MVP |
+| `/notificacoes` | **Central de notificações** (#65): avisos gerados pelas regras para prazos pendentes, agrupados por dia do aviso (Hoje, Ontem, Anteriores, #104); marcar como lida, marcar todas, dispensar. O dashboard é o "o que fazer agora" | v2.2 |
 | `/login` | Login Google e/ou senha única (só se auth habilitada) | MVP |
 | `/admin` | **Painel admin** (#50, só papel `ADMIN`; 403 para os demais): visão geral com totais de usuários, concursos e eventos, uso (ativos em 7/30 dias, com token do MCP, com feed .ics; #108) e ações recentes | v1.4 |
 | `/admin/usuarios` | Usuários (nome, e-mail, papel, cadastro, último acesso real, selos MCP/.ics e "Sem acesso hoje", nº de concursos); promover/rebaixar, bloquear/desbloquear | v1.4 · #108 |
@@ -379,10 +379,11 @@ seguinte, seletor e atalhos), então o filtro se mantém ao trocar de mês.
 
 Layout responsivo (alvo: 360 px sem rolagem horizontal, #48): navegação lateral no desktop, barra
 inferior no celular; menu da conta (avatar) com Sair e, só para admins, o seletor de
-visão (§7.1). No celular o cabeçalho tem só marca, sino de notificações e menu da conta (na
-visão admin, o selo no lugar do sino); o tema fica dentro do menu (#78). Um único sino por tela,
-e sobra espaço para mais um ícone em 360 px. Configurações fica só na navegação principal e o
-tema só junto ao avatar (barra lateral no desktop, menu da conta no celular), sem duplicação (#82).
+visão (§7.1). No celular a barra inferior é Dashboard, Concursos, Calendário e Notificações (com
+contador; o nome acessível traz o número), e o cabeçalho tem só marca, Atualizar e menu da conta
+(na visão admin, com o selo); o tema e Configurações ficam dentro do menu (#78, #105). No desktop,
+o sino fica na lateral e Configurações na navegação. Um só ponto de entrada de notificações e um
+só lugar para Configurações e para o tema por layout, sem duplicação (#82, #105).
 Em telas de toque (`pointer: coarse`), botões,
 campos, abas e seletores crescem para 36–40 px, sem mudar o desktop. Tabelas largas rolam dentro do próprio contêiner (`relative
 overflow-x-auto`, para o `sr-only` não escapar). Links externos com
@@ -706,7 +707,7 @@ do React). O e2e `seguranca.spec.ts` confere os cabeçalhos e a ausência de vio
 |---|---|---|---|
 | Unitário | Vitest | `domain/*` (transições, prazos, validade, criticidade), `lib/format`, parsers BRL, schemas Zod | meta: cobertura ≥ 90% em `domain/` (medida no CI, sem limite configurado) |
 | Integração | Vitest + libSQL `:memory:` + migrações | repositories/queries (transação de status, tags, filtros, export→import ida e volta); servidor MCP com cliente em memória (`InMemoryTransport`) | casos principais |
-| E2E | Playwright (Chromium) | smoke: criar concurso → evento → aparece no dashboard → mudar status → exportar/importar; login, MCP, PWA e lembretes com auth ativa; painel admin com o usuário inicial (sem auth), incluindo selos MCP/.ics, detalhe do usuário e revogar tokens → `/api/mcp` 401 e feed 404 (#108); status HTTP 404 nas rotas `[id]` (inexistente, malformado, de outro usuário), 403 no painel para não admin e esqueleto nas listagens (#110); busca, quadro, calendário (navegação rápida e filtro de concursos no desktop e em 360 px, #83), cor/ícone, ocultar prazos, tema, lembretes (sino, regras, feed .ics), sino único por tela e tema pelo menu no celular, tema e Configurações sem duplicação (#82), PWA, aba do detalhe na URL e botão Atualizar com limite de 60 s (#77), deep-link e volta à origem, painel do evento com concluir/Desfazer, cabeçalho do concurso, avisos e alterações não salvas (#100) e layout em 360 px; `/api/mcp` com token → concurso visível no app. Dois servidores (com e sem auth) com bancos temporários em `e2e/.tmp` | poucos fluxos |
+| E2E | Playwright (Chromium) | smoke: criar concurso → evento → aparece no dashboard → mudar status → exportar/importar; login, MCP, PWA e lembretes com auth ativa; painel admin com o usuário inicial (sem auth), incluindo selos MCP/.ics, detalhe do usuário e revogar tokens → `/api/mcp` 401 e feed 404 (#108); status HTTP 404 nas rotas `[id]` (inexistente, malformado, de outro usuário), 403 no painel para não admin e esqueleto nas listagens (#110); busca, quadro, calendário (navegação rápida e filtro de concursos no desktop e em 360 px, #83), cor/ícone, ocultar prazos, tema, lembretes (sino, regras, feed .ics), um só ponto de entrada de notificações por layout (barra inferior no celular, sino no desktop) e tema e Configurações pelo menu no celular, sem duplicação (#82, #105); seções, índice e âncoras de Configurações (#106); grupos por dia em Notificações (#104), PWA, aba do detalhe na URL e botão Atualizar com limite de 60 s (#77), deep-link e volta à origem, painel do evento com concluir/Desfazer, cabeçalho do concurso, avisos e alterações não salvas (#100) e layout em 360 px; `/api/mcp` com token → concurso visível no app. Dois servidores (com e sem auth) com bancos temporários em `e2e/.tmp` | poucos fluxos |
 
 Datas sempre fixadas (`vi.setSystemTime` / `hoje` injetado).
 

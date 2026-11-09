@@ -11,6 +11,11 @@ describe("grupoDoDia", () => {
     expect(grupoDoDia("2025-12-31", HOJE)).toBe("anteriores");
   });
 
+  it("reconhece ontem na virada do ano", () => {
+    expect(grupoDoDia("2025-12-31", "2026-01-01")).toBe("ontem");
+    expect(grupoDoDia("2025-12-30", "2026-01-01")).toBe("anteriores");
+  });
+
   it("trata datas futuras como hoje", () => {
     expect(grupoDoDia("2026-03-02", HOJE)).toBe("hoje");
   });

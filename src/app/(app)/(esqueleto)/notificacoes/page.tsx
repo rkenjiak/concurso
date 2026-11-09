@@ -25,8 +25,9 @@ export default async function NotificacoesPage() {
         titulo="Notificações"
         descricao={
           <>
-            Avisos gerados pelas suas regras para prazos ainda pendentes, do mais recente para o
-            mais antigo. Para ver o que fazer agora, use o{" "}
+            Avisos gerados pelas suas regras para prazos ainda pendentes, agrupados pela proximidade
+            do prazo (hoje e amanhã, próximos 7 dias, mais adiante), o mais próximo primeiro. Para
+            ver o que fazer agora, use o{" "}
             <Link
               href="/"
               className="text-foreground underline underline-offset-4 hover:text-primary"
@@ -64,7 +65,7 @@ export default async function NotificacoesPage() {
                 mensagem: n.mensagem,
                 data: n.data,
                 hora: n.hora,
-                disparadaEm: n.disparadaEm,
+                dias: n.dias,
                 lida: n.lida,
                 concurso: {
                   id: n.concurso.id,
@@ -74,7 +75,6 @@ export default async function NotificacoesPage() {
                   icone: n.concurso.icone,
                 },
               }))}
-              hoje={hoje}
             />
           )}
         </CardContent>

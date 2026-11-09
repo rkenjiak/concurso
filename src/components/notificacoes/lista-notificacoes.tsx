@@ -2,14 +2,13 @@
 
 import { Check, CheckCheck, Clock, Loader2, X } from "lucide-react";
 import Link from "next/link";
-import { useId, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { MarcadorConcurso } from "@/components/concurso/marcador-concurso";
 import { Button } from "@/components/ui/button";
 import type { CorConcurso } from "@/domain/cores";
 import { hrefPrazo } from "@/domain/navegacao-concurso";
-import { agruparPorDia } from "@/lib/agrupar-por-dia";
+import { agruparPorPrazo } from "@/lib/agrupar-por-prazo";
 import { formatarData } from "@/lib/format";
-import type { DataISO } from "@/lib/tz";
 import { cn } from "@/lib/utils";
 import {
   dispensarNotificacaoAcao,
@@ -25,8 +24,8 @@ export interface ItemNotificacao {
   mensagem: string;
   data: string;
   hora: string | null;
-  /** Dia em que o aviso foi disparado (`YYYY-MM-DD`): base do agrupamento Hoje/Ontem/Anteriores. */
-  disparadaEm: DataISO;
+  /** Dias de hoje (servidor) até `data`: base do agrupamento pela proximidade do prazo (#104). */
+  dias: number;
   lida: boolean;
   concurso: { id: number; orgao: string; cargo: string; cor: CorConcurso; icone: string | null };
 }
@@ -35,19 +34,11 @@ type ResultadoSimples = { ok: true } | { ok: false; erros: { _form?: string[] } 
 
 /**
  * Central de notificações (#65): marcar como lida, dispensar e marcar todas como lidas. Abrir o
- * evento no concurso (#100) marca a notificação como lida. Os avisos vêm agrupados pelo dia em que
- * foram disparados (#104), relativo ao `hoje` do servidor.
+ * evento no concurso (#100) marca a notificação como lida. Os avisos vêm agrupados pela proximidade
+ * do prazo (#104; `dias` calculado no servidor), o mais próximo primeiro em cada grupo.
  */
-export function ListaNotificacoes({
-  itens,
-  hoje,
-}: {
-  itens: readonly ItemNotificacao[];
-  /** "Hoje" em São Paulo, calculado no servidor (`hojeSP()`). */
-  hoje: DataISO;
-}) {
-  const idBase = useId();
-  const grupos = agruparPorDia(itens, (n) => n.disparadaEm, hoje);
+export function ListaNotificacoes({ itens }: { itens: readonly ItemNotificacao[] }) {
+  const grupos = agruparPorPrazo(itens);
   const [pendente, iniciar] = useTransition();
   const [emAndamento, setEmAndamento] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
@@ -93,12 +84,10 @@ export function ListaNotificacoes({
       ) : null}
       <div className="space-y-4" data-testid="lista-notificacoes">
         {grupos.map((grupo) => {
-          const idTitulo = `${idBase}-${grupo.chave}`;
+          // Sem nome acessível: título (h2) + lista, sem criar landmarks "region" por grupo.
           return (
-            <section key={grupo.chave} aria-labelledby={idTitulo} className="space-y-2">
-              <h2 id={idTitulo} className="font-medium text-muted-foreground text-sm">
-                {grupo.rotulo}
-              </h2>
+            <div key={grupo.chave} className="space-y-2">
+              <h2 className="font-medium text-muted-foreground text-sm">{grupo.rotulo}</h2>
               <ul className="divide-y rounded-lg border">
                 {grupo.itens.map((n) => (
                   <li
@@ -179,7 +168,7 @@ export function ListaNotificacoes({
                   </li>
                 ))}
               </ul>
-            </section>
+            </div>
           );
         })}
       </div>

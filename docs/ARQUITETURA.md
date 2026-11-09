@@ -16,7 +16,7 @@
 | Runtime | **Node.js 24 LTS** | LTS atual; suportado por Vercel/Docker. |
 | Framework (front + back) | **Next.js (App Router) + React** | Um único projeto/processo: páginas via Server Components, mutações via Server Actions. Sem API separada para manter. |
 | UI | **Tailwind CSS + shadcn/ui** (Radix) | Componentes acessíveis e responsivos copiados para o repo (sem dependência de lib de UI pesada). |
-| Banco | **SQLite via libSQL** (`@libsql/client`) | Arquivo único local (`data/concurso.db`), backup trivial; o mesmo driver aponta para **Turso** se hospedado em serverless. |
+| Banco | **SQLite via libSQL** (`@libsql/client`) | Arquivo local (`data/concurso.db`, em WAL: com `-wal`/`-shm` ao lado), backup com `pnpm db:backup`; o mesmo driver aponta para **Turso** se hospedado em serverless. |
 | ORM / migrações | **Drizzle ORM + drizzle-kit** | Leve, SQL-like, tipagem inferida do schema, migrações versionadas em SQL. |
 | Validação | **Zod** | Um schema por formulário/ação, reaproveitado no cliente (react-hook-form) e no servidor. |
 | Formulários | **react-hook-form** + `@hookform/resolvers/zod` | Formulários grandes (RF01) com pouca re-renderização. |
@@ -102,7 +102,15 @@ obrigatório, garantido por triggers porque a coluna foi adicionada com `ALTER T
 - `auditoria_admin`: `id`, `admin_id` e `alvo_usuario_id` → `usuario.id` (`SET NULL`), `admin` e
   `alvo` (cópias do e-mail/descrição no momento da ação, para o registro sobreviver a mudanças),
   `acao` (`PROMOVER_ADMIN`, `REBAIXAR_ADMIN`, `BLOQUEAR_USUARIO`, `DESBLOQUEAR_USUARIO`,
-  `PERMITIR_EMAIL`, `REMOVER_EMAIL`), `created_at` (índice).
+  `PERMITIR_EMAIL`, `REMOVER_EMAIL`, `REVOGAR_TOKENS` — #108; o enum existe só em TS e a coluna é
+  texto, então novas ações não exigem migração), `created_at` (índice).
+
+**Uso real (#108, migração `0007_uso_tokens`):**
+- `usuario.mcp_token_usado_em` e `usuario.ics_token_usado_em` (epoch ms, nuláveis): último uso de
+  cada token pessoal. Zerados junto com o resumo ao gerar ou revogar o token, ao revogar pelo
+  painel e ao bloquear/desbloquear.
+- `usuario.ultimo_acesso_em` passa a ser o último acesso real (login, páginas e ações com sessão,
+  MCP por HTTP e feed `.ics`), não só o último login. Veja "Último acesso real" em §7.1.
 
 **Lembretes (#65, migração `0005_lembretes`):**
 - `usuario.ics_token_hash` (SHA-256 do token do feed de calendário, único), `ics_incluir_concluidos`
@@ -289,7 +297,7 @@ senão → indefinida
   restantes (quem abre o app na véspera vê só "amanhã"). Identidade = (prazo, antecedência), sem a
   data: retificar a data mantém a notificação (e o estado). Do banco vêm só lida/dispensada.
 - Ordenação: dia de disparo (`data − antecedência`) desc, depois data/hora do prazo.
-- O contador do sino é calculado no layout do app. Toda Server Action que chama `revalidatePath`
+- O contador de não lidas (sino no desktop, item Notificações da barra no celular) é calculado no layout do app. Toda Server Action que chama `revalidatePath`
   recebe na própria resposta a rota atual re-renderizada a partir da raiz (layout incluso), então o
   sino atualiza sem `router.refresh()` (#73).
 - Mudanças feitas fora desta aba (MCP, outro aparelho) não chegam sozinhas: não há refresh
@@ -358,11 +366,12 @@ seguinte, seletor e atalhos), então o filtro se mantém ao trocar de mês.
 | `/concursos/novo` | **Formulário** de cadastro; ao salvar abre o detalhe na aba Eventos (#100) | MVP |
 | `/concursos/[id]` | **Detalhe** em abas: Visão geral · Eventos · Links · Resultados · Histórico; a aba aberta fica em `?aba=` (#77): abas controladas pelo `useSearchParams`, troca gravada com `history.replaceState`, sem ir ao servidor. `?evento=<id>` destaca um evento e `?foco=validade` o card Validade; `de`/`mes`/`concursos` definem o link de volta (allowlist); `?mudar=status` abre "Mudar status". Cabeçalho: Editar, Mudar status e menu Mais ações (.ics, Silenciar, Excluir) (#100) | MVP |
 | `/concursos/[id]/editar` | Formulário de edição | MVP |
-| `/configuracoes` | Regras de notificação, calendário (.ics), exportar/importar dados, token do MCP, acesso | MVP |
-| `/notificacoes` | **Central de notificações** (#65): marcar como lida, marcar todas, dispensar | v2.2 |
+| `/configuracoes` | Seções Avisos (regras de notificação, calendário .ics), Dados (exportar/importar), Integrações (token do MCP) e Conta (acesso), com índice de âncoras (#106) | MVP |
+| `/notificacoes` | **Central de notificações** (#65): avisos gerados pelas regras para prazos pendentes, agrupados pela proximidade do prazo — Hoje e amanhã (0–1 dia), Próximos 7 dias (2–7), Mais adiante (8+) —, o mais próximo primeiro em cada grupo (`lib/agrupar-por-prazo.ts`, #104); marcar como lida, marcar todas, dispensar. O dashboard é o "o que fazer agora" | v2.2 |
 | `/login` | Login Google e/ou senha única (só se auth habilitada) | MVP |
-| `/admin` | **Painel admin** (#50, só papel `ADMIN`; 403 para os demais): visão geral com totais de usuários, concursos e eventos e ações recentes | v1.4 |
-| `/admin/usuarios` | Usuários (nome, e-mail, papel, cadastro, último acesso, nº de concursos); promover/rebaixar, bloquear/desbloquear | v1.4 |
+| `/admin` | **Painel admin** (#50, só papel `ADMIN`; 403 para os demais): visão geral com totais de usuários, concursos e eventos, uso (ativos em 7/30 dias, com token do MCP, com feed .ics; #108) e ações recentes | v1.4 |
+| `/admin/usuarios` | Usuários (nome, e-mail, papel, cadastro, último acesso real, selos MCP/.ics e "Sem acesso hoje", nº de concursos); promover/rebaixar, bloquear/desbloquear | v1.4 · #108 |
+| `/admin/usuarios/[id]` | Detalhe (#108): origem do acesso, "sem acesso hoje" e motivo, conta Google vinculada, contagens agregadas (concursos, eventos, links, resultados), tokens MCP/.ics com último uso; **Revogar tokens**. ID inválido ou inexistente → 404 (conferido no `layout.tsx` do `[id]`, #110) | #108 |
 | `/admin/acesso` | Allowlist do login Google: e-mails das variáveis (só leitura) e liberados no painel (adicionar/retirar) | v1.4 |
 | `/admin/auditoria` | Log das ações administrativas (últimas 200) | v1.4 |
 | `/concursos?visao=quadro` | Quadro por status (kanban; arrastar ou “Mover para” = transição validada) | v1.1 |
@@ -370,12 +379,14 @@ seguinte, seletor e atalhos), então o filtro se mantém ao trocar de mês.
 
 Layout responsivo (alvo: 360 px sem rolagem horizontal, #48): navegação lateral no desktop, barra
 inferior no celular; menu da conta (avatar) com Sair e, só para admins, o seletor de
-visão (§7.1). No celular o cabeçalho tem só marca, sino de notificações e menu da conta (na
-visão admin, o selo no lugar do sino); o tema fica dentro do menu (#78). Um único sino por tela,
-e sobra espaço para mais um ícone em 360 px. Configurações fica só na navegação principal e o
-tema só junto ao avatar (barra lateral no desktop, menu da conta no celular), sem duplicação (#82).
+visão (§7.1). No celular a barra inferior é Dashboard, Concursos, Calendário e Notificações (com
+contador; o nome acessível traz o número), e o cabeçalho tem só marca, Atualizar e menu da conta
+(na visão admin, com o selo); o tema e Configurações ficam dentro do menu (#78, #105). No desktop,
+o sino fica na lateral e Configurações na navegação. Um só ponto de entrada de notificações e um
+só lugar para Configurações e para o tema por layout, sem duplicação (#82, #105).
 Em telas de toque (`pointer: coarse`), botões,
-campos, abas e seletores crescem para 36–40 px, sem mudar o desktop. Tabelas largas rolam dentro do próprio contêiner (`relative
+campos, abas e seletores crescem para 36–40 px, sem mudar o desktop; a navegação (barra inferior,
+menu da conta, índice de Configurações) e os botões da central de notificações chegam a 44 px. Tabelas largas rolam dentro do próprio contêiner (`relative
 overflow-x-auto`, para o `sr-only` não escapar). Links externos com
 `target="_blank" rel="noopener noreferrer"`.
 
@@ -406,6 +417,7 @@ Os ícones são gerados de `assets/logo.svg` por `pnpm icones` (`scripts/gerar-i
 | `alternarVisaoAcao(visao)` | #50 — "usuario" ou "admin" (só admins); grava o cookie da visão e leva a `/` ou `/admin` |
 | `definirPapelAcao(id, papel)`, `definirBloqueioAcao(id, bloqueado)` | #50 — admin; protege o último admin ativo e os de `ADMIN_EMAILS` |
 | `adicionarEmailPermitidoAcao(email)`, `removerEmailPermitidoAcao(email)` | #50 — admin; allowlist do painel |
+| `revogarTokensAcao(id)` | #108 — admin; revoga os tokens MCP e .ics sem bloquear, auditado (`REVOGAR_TOKENS`); devolve `{ revogou }` (sem tokens ativos, não muda nada nem audita) |
 
 Todas: checagem de sessão (`exigirUsuarioAcao`, ou `exigirAdminAcao` no painel) → validação Zod →
 `executar` (transação no repositório; `ErroDominio` vira mensagem, exceção inesperada vira
@@ -421,11 +433,29 @@ nada. Criar, editar e excluir concurso terminam com `redirect()` na própria act
 `executar`, que engoliria o erro de controle): a resposta já traz a página de destino.
 
 As páginas têm `loading.tsx` (#73): o esqueleto é pré-carregado e aparece na hora ao navegar. Como
-o stream começa no fallback, o status HTTP fica fixado em 200 antes de a página rodar: um
-`notFound()` no detalhe de um concurso inexistente (ou de outro usuário) mostra a página de não
-encontrado com `<meta name="robots" content="noindex">`, mas com status 200, e o `redirect` da
-visão admin no dashboard vira redirecionamento no cliente. Aceito: as páginas exigem login. O
-`forbidden()` do painel admin continua 403, porque fica no layout, acima do `loading.tsx`.
+o stream começa no fallback, o status HTTP fica fixado em 200 a partir dele: um `notFound()`,
+`forbidden()` ou `redirect()` **abaixo** de um `loading.tsx` mostra a página certa, mas com status
+200 (ou vira redirecionamento no cliente). Por isso (#110):
+
+- os esqueletos genéricos ficam nos grupos `(app)/(esqueleto)/` e `admin/(esqueleto)/` (dashboard,
+  listas, novo concurso, configurações, notificações e páginas do painel), que **não** envolvem as
+  rotas `[id]`; o calendário tem o seu;
+- `concursos/[id]/layout.tsx` e `admin/usuarios/[id]/layout.tsx` conferem o formato do ID e a
+  existência (e o dono, no concurso) **acima** do `loading.tsx` do detalhe e chamam `notFound()`
+  → 404. A checagem (`carregar.ts`) é uma leitura enxuta pela chave primária, porque agora o
+  prefetch dos links para o detalhe passa pelo layout (vai até o primeiro `loading.tsx`): cada
+  link visível (dashboard, lista, quadro, calendário, tabela de usuários) custa essa leitura, e em
+  troca o esqueleto do detalhe também é pré-carregado. As páginas carregam o dado completo e
+  conferem de novo, como garantia: o layout não é reexecutado ao navegar entre o detalhe e a
+  edição. O `React.cache` deduplica cada leitura na mesma renderização (a do concurso entre
+  `generateMetadata` e a página);
+- o `forbidden()` do painel admin continua 403, porque fica no `admin/layout.tsx`, acima de tudo;
+- custo: sem o prefetch pronto, o esqueleto do detalhe só aparece depois da checagem (a navegação
+  espera o layout); numa navegação, uma leitura a mais pela chave primária;
+- ainda aceito: o `redirect` da visão admin no dashboard sai abaixo do esqueleto e vira
+  redirecionamento no cliente (as páginas exigem login).
+
+Uma rota `[id]` nova deve seguir o mesmo padrão; nada com `loading.tsx` deve ficar acima dela.
 
 ### 5.3 Route Handlers (`src/app/api`)
 
@@ -494,7 +524,7 @@ Decisões (issue #39):
 ├── public/icons/                   # ícones PNG do PWA (gerados por `pnpm icones`)
 ├── scripts/                        # migrate, seed, backup, mcp (stdio), gerar-icones, env
 ├── src/
-│   ├── app/                        # rotas: (app)/ com navegação, admin/, login/, api/, manifest.ts
+│   ├── app/                        # rotas: (app)/ com navegação, admin/, login/, api/, manifest.ts; (esqueleto)/ = páginas com o loading.tsx genérico (#110)
 │   ├── components/
 │   │   ├── ui/                     # shadcn/ui
 │   │   ├── concurso/               # formulários, cards, quadro, badges, sugestão de status
@@ -525,7 +555,7 @@ Decisões (issue #39):
 │   │   ├── log.ts                  # logger estruturado (§9.4)
 │   │   ├── erro-requisicao.ts      # onRequestError → log (§9.4)
 │   │   └── inicializacao.ts        # checagem do ambiente e migrações ao iniciar
-│   ├── lib/                        # format, tz, normalize, csv, tema, pwa, tags, aba-concurso, atualizar, schemas Zod
+│   ├── lib/                        # format, tz, normalize, csv, tema, pwa, tags, aba-concurso, atualizar, agrupar-por-prazo, schemas Zod
 │   ├── instrumentation.ts          # inicialização ao subir o servidor e onRequestError (§9.4)
 │   └── proxy.ts
 ├── biome.json  drizzle.config.ts  next.config.ts  vitest.config.ts  playwright.config.ts
@@ -594,8 +624,24 @@ Decisões (issue #39):
   `experimental.authInterrupts`) e as ações, `exigirAdminAcao()` ("Acesso restrito a
   administradores").
 - **Auditoria:** toda alteração do painel grava em `auditoria_admin` na mesma transação.
-- **Privacidade:** o painel mostra só totais e metadados das contas; não há impersonação nem acesso
-  aos concursos de outros usuários.
+- **Privacidade:** o painel mostra só totais e metadados das contas — flags, datas técnicas e
+  contagens agregadas (#108); não há impersonação nem acesso aos concursos de outros usuários. Os
+  resumos dos tokens e o `google_sub` saem das leituras convertidos em flag (testado).
+- **Último acesso real (#108):** `usuarioAtual` (`auth/acesso.ts`) registra o acesso, e não
+  `usuarioDaSessao` (pura) nem o `proxy.ts`; `/api/mcp` e `/api/calendario.ics`, após autorizar,
+  registram o acesso e o `*_usado_em` do canal (só para o token atual, conferido pelo resumo). É
+  uma única escrita condicional, sem leitura extra (`UPDATE … WHERE x IS NULL OR x < agora - 15
+  min`, throttle por usuário e coluna), tentada só quando a linha já lida na autorização está fora
+  da janela (no SQLite, até um `UPDATE` sem efeito pega o lock de escrita; o `UPDATE` condicional
+  fica como garantia contra corrida), aguardada (sem `after()`) e protegida por `try/catch` +
+  `log.warn("auth.registro_acesso_falhou")`. O `cache()` só deduplica por renderização; Server
+  Actions e Route Handlers podem chamar de novo, e o throttle limita. Prefetch conta como acesso.
+  Todos os chamadores são dinâmicos, então nada é gravado no build.
+- **Sem acesso hoje (#108):** `acessoHoje` (`auth/autorizacao.ts`) reproduz `donoDoTokenAutorizado`
+  sem consultas (a allowlist do painel vem de um `LEFT JOIN` na listagem) e explica o resultado:
+  origens (`OrigemAcesso`) e motivo (`MotivoSemAcesso`: bloqueado, login Google desligado, usuário
+  inicial sem conta Google com a senha desligada, e-mail fora das listas). Um teste confere as duas
+  regras em todas as combinações.
 
 **Cabeçalhos de segurança (#95):** `next.config.ts` aplica a todas as rotas os cabeçalhos de
 `src/lib/cabecalhos-seguranca.ts`: CSP, `X-Frame-Options: DENY`, `nosniff`,
@@ -662,7 +708,7 @@ do React). O e2e `seguranca.spec.ts` confere os cabeçalhos e a ausência de vio
 |---|---|---|---|
 | Unitário | Vitest | `domain/*` (transições, prazos, validade, criticidade), `lib/format`, parsers BRL, schemas Zod | meta: cobertura ≥ 90% em `domain/` (medida no CI, sem limite configurado) |
 | Integração | Vitest + libSQL `:memory:` + migrações | repositories/queries (transação de status, tags, filtros, export→import ida e volta); servidor MCP com cliente em memória (`InMemoryTransport`) | casos principais |
-| E2E | Playwright (Chromium) | smoke: criar concurso → evento → aparece no dashboard → mudar status → exportar/importar; login, MCP, PWA e lembretes com auth ativa; painel admin com o usuário inicial (sem auth); busca, quadro, calendário (navegação rápida e filtro de concursos no desktop e em 360 px, #83), cor/ícone, ocultar prazos, tema, lembretes (sino, regras, feed .ics), sino único por tela e tema pelo menu no celular, tema e Configurações sem duplicação (#82), PWA, aba do detalhe na URL e botão Atualizar com limite de 60 s (#77), deep-link e volta à origem, painel do evento com concluir/Desfazer, cabeçalho do concurso, avisos e alterações não salvas (#100) e layout em 360 px; `/api/mcp` com token → concurso visível no app. Dois servidores (com e sem auth) com bancos temporários em `e2e/.tmp` | poucos fluxos |
+| E2E | Playwright (Chromium) | smoke: criar concurso → evento → aparece no dashboard → mudar status → exportar/importar; login, MCP, PWA e lembretes com auth ativa; painel admin com o usuário inicial (sem auth), incluindo selos MCP/.ics, detalhe do usuário e revogar tokens → `/api/mcp` 401 e feed 404 (#108); status HTTP 404 nas rotas `[id]` (inexistente, malformado, de outro usuário), 403 no painel para não admin e esqueleto nas listagens (#110); busca, quadro, calendário (navegação rápida e filtro de concursos no desktop e em 360 px, #83), cor/ícone, ocultar prazos, tema, lembretes (sino, regras, feed .ics), um só ponto de entrada de notificações por layout (barra inferior no celular, sino no desktop) e tema e Configurações pelo menu no celular, sem duplicação (#82, #105); seções, índice e âncoras de Configurações (#106); grupos pela proximidade do prazo em Notificações (#104), menu da conta pelo teclado no celular (#105), PWA, aba do detalhe na URL e botão Atualizar com limite de 60 s (#77), deep-link e volta à origem, painel do evento com concluir/Desfazer, cabeçalho do concurso, avisos e alterações não salvas (#100) e layout em 360 px; `/api/mcp` com token → concurso visível no app. Dois servidores (com e sem auth) com bancos temporários em `e2e/.tmp` | poucos fluxos |
 
 Datas sempre fixadas (`vi.setSystemTime` / `hoje` injetado).
 
@@ -709,6 +755,35 @@ pnpm dev        # aplica migrações pendentes (predev) e sobe em http://localho
 | Docker (imagem `standalone`, `Dockerfile` na raiz) em VPS/Fly.io com volume para `data/`; migrações ao iniciar (`MIGRATE_ON_START=true`) | ~US$ 2–5/mês | Se quiser anexos em disco local ou evitar serviço de banco externo. |
 
 O mesmo código atende ambas: só muda `DATABASE_URL` (`file:./data/concurso.db` vs `libsql://…`).
+
+**Concorrência no SQLite local (#112, `src/server/db/local.ts`).** O `@libsql/client` abre um pool
+de conexões ao arquivo e cada transação fica com uma conexão só dela. Uma instrução que falha com
+`SQLITE_BUSY` fica ativa sem reset (o driver não expõe reset; só o GC a libera), e a conexão dela
+passa a segurar uma transação de leitura sem fim: no journal de rollback, todo COMMIT seguinte
+falha; em WAL, a conexão lê um snapshot velho. Por isso, com `file:` (não `:memory:` nem Turso),
+`criarDb` envolve o client para que escritas não levem `SQLITE_BUSY`:
+- **uma escrita por vez no processo** (fila FIFO): transações (exceto `"read"`), `batch`,
+  `migrate`, `executeMultiple` e todo `execute` que não comece com `SELECT`. A transação segura a
+  vez até `commit`/`rollback`/`close`; quem espera mais de 5 s recebe `SQLITE_BUSY`;
+- **WAL** (`PRAGMA journal_mode = WAL` na primeira operação, persistente no arquivo): leituras
+  não disputam lock com escritas;
+- **busy timeout de 5 s** (`timeout` do client) só para outros processos (`pnpm mcp`, scripts,
+  e2e). Dentro do processo ele não ajudaria: a espera do driver é síncrona e travaria o event
+  loop de que a outra transação precisa para terminar.
+
+Consequências e limites:
+- dentro de `db.transaction(async (tx) => …)`, escreva sempre pelo `tx`; uma escrita pelo `db` de
+  fora espera a vez que a própria transação segura e falha após 5 s;
+- os 5 s contam a espera na fila, não a duração da transação: enquanto uma transação longa (ex.:
+  a importação, que substitui tudo) segura a vez, escritas concorrentes podem falhar com
+  `SQLITE_BUSY`. Esse erro é da fila e não prende conexão;
+- a fila é por client: dois `criarDb` no mesmo arquivo e no mesmo processo (só em testes e
+  scripts) voltam a disputar o lock. O app usa um só (`getDb`);
+- a fila evita o caso comum, mas não cura uma conexão presa: um `SQLITE_BUSY` vindo do driver
+  (outro processo segurando o lock por mais de 5 s, ou `SQLITE_BUSY_SNAPSHOT` num `batch` que lê
+  antes de escrever) ainda pode prendê-la até o GC;
+- se o WAL não puder ser ligado (ex.: outro processo lendo no journal de rollback), o app segue
+  com um aviso `db.preparo_falhou` e tenta de novo após 60 s.
 
 ### 9.3 Backup
 - **Local:** `pnpm db:backup` → `VACUUM INTO 'backups/concurso-AAAAMMDD-HHmm.db'` (cópia consistente);
@@ -757,6 +832,7 @@ O hook só vê o que **escapa** do código: `executar` (Server Actions e MCP), `
 | `auth.login_falhou` | warn (info se `cancelado`) | `metodo`, `motivo`, `ip`; Google: `email` mascarado e `erro` quando houver. Motivos com senha: `senha_incorreta`, `conta_bloqueada` (só detectado depois que a senha confere). Com Google: `nao_autorizado` (fora da allowlist), `bloqueado`, `erro_google` (troca do código ou `id_token` inválido), `estado_invalido` (state/cookie expirado ou forjado), `cancelado` |
 | `auth.limite_tentativas` | warn | `rota` (`login`, `mcp`, `ics`), `ip`, `esperaMs`: só quando uma falha **inicia** um bloqueio, não a cada tentativa recusada durante a espera |
 | `auth.token_invalido` | warn | `rota` (`mcp`, `ics`), `ip`, `ausente`; token válido de quem perdeu o acesso (#96): também `usuarioId` e `motivo: "sem_acesso"` |
+| `auth.registro_acesso_falhou` | warn | `canal` (`sessao`, `mcp`, `ics`), `usuarioId`, `erro`: falha ao gravar o último acesso/uso (#108); a requisição segue normalmente |
 | `auth.logout` | info | `usuarioId` (lido do cookie assinado, sem consultar o banco; o logout nunca falha por causa do log) |
 | `auth.config_invalida` | error | `erro` (proxy) |
 | `dados.importacao` / `dados.importacao_recusada` / `dados.importacao_erro` | info / info / error | `usuarioId`, contagens do resumo, `motivo` ou `erro` |
@@ -811,7 +887,8 @@ Cada item = uma branch `feature/*` a partir de `develop`; cada milestone fecha c
 | **Uso diário** → `v2.4.0` | `feature/atualizar-dados` (#77) · `feature/sino-unico` (#78) · `feature/tema-layout` (#81, #82) · `feature/eventos-dashboard` (#84, #85) · `feature/calendario-navegacao` (#83) | Botão Atualizar, contagem regressiva das provas, pendências de status e navegação rápida no calendário |
 | **Observabilidade** → `v2.5.0` | `feature/logs` (#91) | Logger estruturado, `onRequestError` e eventos de segurança e operação |
 | **UX dos eventos** → `v2.6.0` | `feature/ux-fluxo-eventos` (#100) | Painel do evento, concluir no dashboard, link direto para o evento, voltar à origem e avisos com Desfazer |
-| **M7 — Anexos** → `v2.7.0` | `feature/anexos` | RF02 desejável |
+| **Uso e navegação** → `v2.7.0` | `feature/admin-uso` (#108) · `feature/notfound-404` (#110) · `feature/sqlite-wal` (#112) · `feature/arquitetura-informacao` (#104–#107) | Uso real no painel admin, 404 de verdade, WAL no SQLite local, papel de Notificações, barra do celular e seções de Configurações |
+| **M7 — Anexos** → `v2.8.0` | `feature/anexos` | RF02 desejável |
 
 ---
 

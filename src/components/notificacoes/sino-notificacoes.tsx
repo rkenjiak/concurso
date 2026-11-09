@@ -1,21 +1,16 @@
 import { Bell, BellDot } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
-
-/** Texto do contador: até 99, depois "99+". */
-export function textoContador(naoLidas: number): string {
-  return naoLidas > 99 ? "99+" : String(naoLidas);
-}
-
-/** Rótulo acessível do sino. */
-export function rotuloSino(naoLidas: number): string {
-  if (naoLidas === 0) return "Notificações (nenhuma não lida)";
-  return `Notificações (${naoLidas} não ${naoLidas === 1 ? "lida" : "lidas"})`;
-}
+import {
+  CLASSE_SELO_NOTIFICACOES,
+  rotuloNotificacoes,
+  textoContadorNotificacoes,
+} from "./contador-notificacoes";
 
 /**
  * Sino da central de notificações (#65): leva a `/notificacoes`, com o contador de não lidas.
- * Fica só na navegação (lateral no desktop, cabeçalho no celular): um único sino por tela (#78).
+ * Fica só na barra lateral do desktop; no celular a entrada é o item Notificações da barra
+ * inferior (#105). Um único ponto de entrada por layout (#78).
  */
 export function SinoNotificacoes({
   naoLidas,
@@ -28,7 +23,7 @@ export function SinoNotificacoes({
   return (
     <Link
       href="/notificacoes"
-      aria-label={rotuloSino(naoLidas)}
+      aria-label={rotuloNotificacoes(naoLidas)}
       title="Notificações"
       data-testid="sino-notificacoes"
       className={cn(
@@ -41,9 +36,9 @@ export function SinoNotificacoes({
         <span
           aria-hidden
           data-testid="contador-notificacoes"
-          className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 font-semibold text-[0.625rem] text-white tabular-nums leading-none"
+          className={cn(CLASSE_SELO_NOTIFICACOES, "-top-0.5 -right-0.5")}
         >
-          {textoContador(naoLidas)}
+          {textoContadorNotificacoes(naoLidas)}
         </span>
       ) : null}
     </Link>

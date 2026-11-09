@@ -7,6 +7,71 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 
 ## [Unreleased]
 
+## [2.7.0] - 2026-11-09
+
+### Adicionado
+
+- **Índice e seções em Configurações** (#106): os cards ficam agrupados em **Avisos**
+  (Notificações, Calendário .ics), **Dados** (Exportar e importar), **Integrações** (Token do MCP)
+  e **Conta** (Acesso), com títulos h2/h3 reais, e um índice "Nesta página" com âncoras para cada
+  card (`#notificacoes`, `#calendario`, `#exportar`, `#mcp`, `#acesso`). As âncoras param abaixo
+  do cabeçalho fixo do celular e os links do índice têm 44 px no toque.
+- **Uso real no painel admin** (#108): a visão geral mostra quantos usuários estiveram ativos em 7
+  e 30 dias e quantos têm token do MCP ou feed `.ics` ativo. A tabela de usuários ganhou os selos
+  **MCP** e **.ics** (token ativo), com o último uso na dica e para leitores de tela, e o selo
+  **Sem acesso hoje**. O MCP local por stdio (`pnpm mcp`) não usa token e não é contado.
+- **Detalhe do usuário** (#108) em `/admin/usuarios/{id}`: origem do acesso (`ADMIN_EMAILS`,
+  `ALLOWED_EMAILS`, liberado no painel, papel admin ou usuário inicial), "Sem acesso hoje" com o
+  motivo (pela mesma regra que vale para os tokens), conta Google vinculada, contagens de
+  concursos, eventos, links e resultados, e os tokens com o último uso. Só flags, datas e
+  contagens: o conteúdo dos concursos continua privado.
+- **Revogar tokens** (#108) sem bloquear: apaga o token do MCP e o link do feed `.ics` do usuário,
+  com confirmação e registro na auditoria ("Revogou os tokens (MCP e .ics) de"). Sem tokens
+  ativos, nada muda nem é auditado.
+
+### Alterado
+
+- **Papel de Notificações** (#104): o Dashboard mostra o que fazer agora; `/notificacoes` mostra os
+  avisos que as suas regras geraram para prazos ainda pendentes, agrupados pela proximidade do
+  prazo (**Hoje e amanhã**, **Próximos 7 dias**, **Mais adiante**) e, em cada grupo, do prazo mais
+  próximo para o mais distante (data e hora). Agrupar pelo dia do disparo enganava: com a regra de
+  prova em 7 e 1 dias, "Prova objetiva é hoje" ficava em "Ontem". Os grupos são título e lista,
+  sem landmark por grupo. A descrição da tela diz isso e aponta para o Dashboard, o botão **Regras** virou **Configurar avisos** e os botões
+  de marcar como lida e dispensar têm 44 px no toque.
+- **Notificações na barra inferior do celular** (#105): Notificações, com o contador de não lidas
+  (o nome acessível traz o número real), ocupa o lugar de Configurações, que é de uso raro.
+  Configurações passou para o menu da conta (avatar) e o sino saiu do cabeçalho do celular, para
+  manter um só ponto de entrada de notificações por layout (#78). O desktop não muda. Sem nome nem
+  e-mail (usuário local), o avatar mostra um ícone de pessoa em vez de "?".
+- Limpeza sem mudança de comportamento (#107): `useConcluirEvento` e `useDesfazerStatus` têm uma
+  fonte única, e o zoom do `dialog` (centro e gaveta no desktop) e do `alert-dialog` só anima
+  quando o sistema não pede movimento reduzido (`prefers-reduced-motion`); o fade continua, e o
+  slide da gaveta no celular já seguia a mesma regra.
+- Gerar ou revogar um token, bloquear e desbloquear passam a zerar também o último uso do token
+  (#108), para o painel não mostrar "usado há 2 dias" em quem já não tem token.
+
+### Corrigido
+
+- **"Último acesso"** no painel admin (#108) era, na verdade, o último login: com sessões de 30
+  dias e o uso por MCP ou `.ics`, quem usava o app todo dia aparecia com acesso de semanas atrás
+  (e, sem login configurado, o campo nunca mudava). Agora conta páginas, Server Actions, MCP por
+  HTTP e o feed `.ics`, gravado no máximo a cada 15 minutos por usuário, numa única escrita
+  condicional; uma falha ao registrar só gera aviso no log.
+- **HTTP 404 de verdade** em `/concursos/{id}`, `/concursos/{id}/editar` e
+  `/admin/usuarios/{id}` (#110): com ID inexistente, malformado ou (no concurso) de outro usuário,
+  a página de não encontrado saía com status 200, porque o `loading.tsx` já tinha começado o
+  stream. A checagem passou para um layout do `[id]`, acima do esqueleto do detalhe, e os
+  esqueletos das demais páginas foram para os grupos `(esqueleto)`, que não envolvem as rotas
+  `[id]`. A checagem é uma leitura enxuta pela chave primária, já que o prefetch dos links para o
+  detalhe agora passa por ela (e também pré-carrega o esqueleto do detalhe).
+- **`SQLITE_BUSY` com banco local** (#112): duas escritas ao mesmo tempo (ex.: o registro de
+  último acesso durante o cadastro de um concurso) disputavam o lock do arquivo e uma falhava na
+  hora. Pior: a conexão da instrução que falhou ficava presa, fazendo falhar os COMMITs seguintes
+  até o coletor de lixo liberá-la (o cadastro voltava "Não foi possível concluir a operação"). Com
+  `file:`, o app agora faz uma escrita por vez no processo, usa WAL (leituras não disputam com
+  escritas) e espera até 5 s pelo lock de outros processos (`pnpm mcp`, scripts). Turso não muda.
+  Ao restaurar um backup copiando o arquivo, apague também `concurso.db-wal` e `concurso.db-shm`.
+
 ## [2.6.0] - 2026-11-08
 
 ### Adicionado

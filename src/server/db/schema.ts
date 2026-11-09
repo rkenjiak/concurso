@@ -56,11 +56,16 @@ export const usuario = sqliteTable("usuario", {
   papel: text("papel", { enum: PAPEL }).notNull().default("USUARIO"),
   /** SHA-256 (hex) do token do MCP por HTTP; o token em si não é guardado. */
   mcpTokenHash: text("mcp_token_hash").unique(),
+  /** Último acesso real (#108): login, sessão, MCP e feed .ics (throttle de 15 min). */
   ultimoAcessoEm: integer("ultimo_acesso_em", { mode: "timestamp_ms" }),
   /** Bloqueado pelo painel admin (#50): sem acesso por sessão nem por token do MCP. */
   bloqueadoEm: integer("bloqueado_em", { mode: "timestamp_ms" }),
   /** SHA-256 (hex) do token do feed de calendário (.ics, #65); o token em si não é guardado. */
   icsTokenHash: text("ics_token_hash").unique(),
+  /** Último uso do token do MCP (#108), com throttle de 15 min; zerado ao gerar/revogar/bloquear. */
+  mcpTokenUsadoEm: integer("mcp_token_usado_em", { mode: "timestamp_ms" }),
+  /** Último uso do token do feed .ics (#108), com throttle de 15 min; zerado como o do MCP. */
+  icsTokenUsadoEm: integer("ics_token_usado_em", { mode: "timestamp_ms" }),
   /** Feed de calendário: inclui eventos concluídos (#65). */
   icsIncluirConcluidos: integer("ics_incluir_concluidos", { mode: "boolean" })
     .notNull()

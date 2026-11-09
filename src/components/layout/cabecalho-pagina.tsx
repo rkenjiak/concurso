@@ -2,7 +2,8 @@ import type { ReactNode } from "react";
 
 interface CabecalhoPaginaProps {
   titulo: string;
-  descricao?: string;
+  /** Texto curto abaixo do título; aceita links inline (ex.: #104). */
+  descricao?: ReactNode;
   acoes?: ReactNode;
 }
 

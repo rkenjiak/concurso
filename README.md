@@ -70,11 +70,14 @@ dados (inclusive export/import e MCP).
   só entram os e-mails de `ADMIN_EMAILS` e `ALLOWED_EMAILS` (allowlist). Os dados que existiam
   antes do multiusuário pertencem ao **usuário inicial**, que é assumido pelo primeiro login de um
   e-mail de `ADMIN_EMAILS`. Retirar um e-mail da allowlist encerra as sessões dele na hora.
-- **Painel admin** (`/admin`, só admins): lista os usuários, promove/rebaixa admins, bloqueia
-  contas (sem acesso por sessão nem pelos tokens do MCP e do calendário), libera e-mails além dos
-  de `ALLOWED_EMAILS` e registra tudo num log de auditoria. O admin alterna entre "Visão admin" e
-  "Visão usuário" no menu da conta, sem novo login. Os e-mails de `ADMIN_EMAILS` são admins garantidos, e o último
-  admin ativo não pode ser rebaixado nem bloqueado.
+- **Painel admin** (`/admin`, só admins): lista os usuários com o último acesso real e os tokens
+  ativos (MCP e calendário), mostra quem está ativo e por que alguém está sem acesso,
+  promove/rebaixa admins, revoga tokens, bloqueia contas (sem acesso por sessão nem pelos tokens do
+  MCP e do calendário), libera e-mails além dos de `ALLOWED_EMAILS` e registra tudo num log de
+  auditoria. Mostra só metadados e contagens: os dados dos usuários continuam privados. O admin
+  alterna entre "Visão admin" e "Visão usuário" no menu da conta, sem novo login. Os e-mails de
+  `ADMIN_EMAILS` são admins garantidos, e o último admin ativo não pode ser rebaixado nem
+  bloqueado.
 - **Senha única** (`APP_PASSWORD` + `AUTH_SECRET`): para uso local; entra sempre como o usuário
   inicial. Em produção não pode ser combinada com o login Google. Após 5 senhas erradas, novas
   tentativas do mesmo cliente esperam cada vez mais.
@@ -82,7 +85,7 @@ dados (inclusive export/import e MCP).
   Google em `/api/auth/google…`, o manifest e os ícones do PWA e `/api/mcp` e
   `/api/calendario.ics` (que usam token próprio). A sessão fica em um cookie JWT assinado
   (`httpOnly`, `SameSite=Lax`, `Secure` em produção) válido por 30 dias; "Sair" fica no menu da
-  conta e em **Configurações**.
+  conta e em **Configurações → Conta**.
 - Gere o segredo com `openssl rand -base64 32` (ou
   `node -e "console.log(crypto.randomBytes(32).toString('base64'))"`). Trocar o `AUTH_SECRET`
   encerra todas as sessões.
@@ -126,18 +129,27 @@ pnpm db:backup --manter=30   # ou BACKUP_KEEP=30
 ```
 
 Usa `VACUUM INTO` (cópia consistente mesmo com o app aberto). A pasta `backups/` fica fora do Git —
-dados pessoais nunca vão para o repositório. Para restaurar: pare o app e copie o arquivo do backup
-para `data/concurso.db` (ou o caminho de `DATABASE_URL`).
+dados pessoais nunca vão para o repositório. Para restaurar: pare o app, apague
+`data/concurso.db-wal` e `data/concurso.db-shm` (se existirem) e copie o arquivo do backup para
+`data/concurso.db` (ou o caminho de `DATABASE_URL`).
 
-No Docker o banco fica no volume: com o container parado, `docker cp concurso:/app/data/concurso.db .`
-copia o arquivo (e o caminho inverso restaura); ou use o export JSON. No Turso, use o point-in-time
+O banco local usa WAL: escritas recentes podem estar ainda no `concurso.db-wal`, ao lado do
+arquivo principal. Copiar só o `concurso.db` pode perder dados; use `pnpm db:backup` ou copie os
+três arquivos juntos, com o app parado.
+
+No Docker o banco fica no volume. Com o container parado, `docker cp concurso:/app/data/. ./data-backup/`
+copia o conteúdo da pasta (o `/.` evita criar uma subpasta), e `docker cp ./data-backup/. concurso:/app/data/`
+restaura. Para restaurar um único `.db` (ex.: de `pnpm db:backup`), apague antes do volume o
+`concurso.db-wal` e o `concurso.db-shm`, que sobram quando o container é parado: um `-wal` antigo
+ao lado de outro arquivo principal corrompe o banco. Ou use o export JSON. No Turso, use o point-in-time
 restore do serviço e o export JSON periódico.
 
 ## Lembretes: notificações e calendário
 
-**Notificações no app.** O sino (na navegação: cabeçalho no celular, barra lateral no desktop) conta
-os avisos não lidos e leva à central (`/notificacoes`), onde cada aviso pode ser marcado como lido
-ou dispensado. Os avisos são calculados na hora a partir dos eventos pendentes — não há cron, então
+**Notificações no app.** O contador de não lidas fica no item **Notificações** da barra inferior
+(celular) ou no sino da barra lateral (desktop) e leva à central (`/notificacoes`), que lista os
+avisos agrupados pela proximidade do prazo (Hoje e amanhã, Próximos 7 dias, Mais adiante), o mais
+próximo primeiro, e onde cada aviso pode ser marcado como lido ou dispensado. Para o que fazer agora, use o Dashboard. Os avisos são calculados na hora a partir dos eventos pendentes — não há cron, então
 funciona até localmente — e seguem as **regras de notificação** de **Configurações → Notificações**:
 para cada tipo de evento, ligar/desligar e as antecedências em dias (0 = no dia). O padrão: fim das
 inscrições em 7, 1 e 0 dias; isenção e boleto em 2 e 0; provas e demais fases em 7 e 1; recursos em

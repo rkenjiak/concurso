@@ -9,12 +9,12 @@ import {
 import { eventoSchema, VALORES_INICIAIS_EVENTO } from "@/lib/schemas/evento";
 import { type FiltrosConcursos, lerFiltrosConcursos } from "@/lib/schemas/filtros-concursos";
 import { ID_USUARIO_INICIAL as U } from "@/server/db/schema";
-import { criarBancoTeste } from "../db/banco-teste";
+import { criarBancoTeste, criarUsuarioTeste } from "../db/banco-teste";
 import type { Db } from "../db/client";
 import { concurso } from "../db/schema";
 import { criarConcurso } from "../repositories/concursos";
 import { criarEvento } from "../repositories/eventos";
-import { listarConcursos, termosDaBusca } from "./concursos";
+import { concursoDoUsuarioExiste, listarConcursos, termosDaBusca } from "./concursos";
 
 let db: Db;
 let client: Client;
@@ -192,5 +192,14 @@ describe("listarConcursos — ordenação", () => {
       [ids.trf, "2026-12-10"],
       [ids.sefaz, null],
     ]);
+  });
+});
+
+describe("concursoDoUsuarioExiste (#110)", () => {
+  it("só para o dono; ID inexistente é falso", async () => {
+    const outro = await criarUsuarioTeste(db);
+    expect(await concursoDoUsuarioExiste(db, U, ids.trf)).toBe(true);
+    expect(await concursoDoUsuarioExiste(db, outro, ids.trf)).toBe(false);
+    expect(await concursoDoUsuarioExiste(db, U, 999_999)).toBe(false);
   });
 });

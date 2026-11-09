@@ -50,6 +50,13 @@
       "when": 1793753675597,
       "tag": "0006_pendencias_status",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1794250139463,
+      "tag": "0007_uso_tokens",
+      "breakpoints": true
     }
   ]
 }

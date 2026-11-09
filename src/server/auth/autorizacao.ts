@@ -7,6 +7,7 @@
  * (c) já é admin no banco (o papel dá acesso, então rebaixar é a forma de tirar um admin).
  * A mesma regra é conferida a cada requisição, então mudanças valem na hora.
  */
+import type { MotivoSemAcesso, OrigemAcesso } from "@/domain/enums";
 import { ID_USUARIO_INICIAL, type Usuario } from "../db/schema";
 import type { Executor } from "../repositories/tipos";
 import { buscarUsuarioGoogle, emailNaAllowlist, obterUsuario } from "../repositories/usuarios";
@@ -95,4 +96,46 @@ export async function donoDoTokenAutorizado(
   if (u.bloqueadoEm !== null) return false;
   if (u.id === ID_USUARIO_INICIAL && (!config.habilitada || config.senha !== null)) return true;
   return config.habilitada && config.google !== null && contaGoogleAutorizada(db, config, u);
+}
+
+/** Acesso de um usuário hoje (#108): o que lhe dá acesso e, se nada der, o motivo. */
+export interface AcessoHoje {
+  origens: OrigemAcesso[];
+  temAcesso: boolean;
+  motivo: MotivoSemAcesso | null;
+}
+
+/**
+ * Versão síncrona e explicada de {@link donoDoTokenAutorizado} para o painel admin (#108): recebe
+ * se o e-mail está liberado no painel (`emailNoPainel`, vindo de um `LEFT JOIN` na listagem, sem
+ * N+1) e lista cada origem que dá acesso hoje. As origens do Google só valem com o login Google
+ * ligado; a do usuário inicial, com a senha definida ou sem login configurado.
+ */
+export function acessoHoje(
+  config: ConfigAuth,
+  u: Pick<Usuario, "id" | "email" | "papel" | "bloqueadoEm"> & { emailNoPainel: boolean },
+): AcessoHoje {
+  const origens: OrigemAcesso[] = [];
+  if (u.id === ID_USUARIO_INICIAL && (!config.habilitada || config.senha !== null)) {
+    origens.push("USUARIO_INICIAL");
+  }
+  const google = config.habilitada && config.google !== null;
+  if (google && u.email !== null) {
+    const e = normalizarEmail(u.email);
+    if (config.emailsAdmin.has(e)) origens.push("ADMIN_EMAILS");
+    if (config.emailsPermitidos.has(e)) origens.push("ALLOWED_EMAILS");
+    if (u.emailNoPainel) origens.push("PAINEL");
+    if (u.papel === "ADMIN") origens.push("PAPEL_ADMIN");
+  }
+  const motivo: MotivoSemAcesso | null =
+    u.bloqueadoEm !== null
+      ? "BLOQUEADO"
+      : origens.length > 0
+        ? null
+        : !google
+          ? "LOGIN_GOOGLE_DESLIGADO"
+          : u.id === ID_USUARIO_INICIAL && u.email === null
+            ? "SENHA_DESLIGADA"
+            : "FORA_DAS_LISTAS";
+  return { origens, temAcesso: motivo === null, motivo };
 }

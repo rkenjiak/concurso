@@ -18,6 +18,7 @@ import {
   definirPapel,
   type OpcoesAdmin,
   removerEmailPermitido,
+  revogarTokens,
 } from "../repositories/admin";
 import { executar, falhaValidacao, type ResultadoAcao, sucesso } from "./resultado";
 
@@ -81,6 +82,27 @@ export async function definirBloqueioAcao(
       return sucesso(null);
     },
     { acao: "admin.definirBloqueioAcao", usuarioId: sessao.usuario.id },
+  );
+}
+
+/**
+ * Revoga os tokens pessoais (MCP e .ics) do usuário sem bloqueá-lo (#108). Sem tokens ativos, não
+ * muda nada nem audita; a resposta diz se havia o que revogar.
+ */
+export async function revogarTokensAcao(
+  usuarioIdBruto: unknown,
+): Promise<ResultadoAcao<{ revogou: boolean }>> {
+  const sessao = await exigirAdminAcao();
+  if (!sessao.ok) return sessao;
+  const usuarioId = idSchema.safeParse(usuarioIdBruto);
+  if (!usuarioId.success) return falhaValidacao(usuarioId.error);
+  return executar(
+    async () => {
+      const revogou = await revogarTokens(getDb(), sessao.usuario, usuarioId.data);
+      atualizarPainel();
+      return sucesso({ revogou });
+    },
+    { acao: "admin.revogarTokensAcao", usuarioId: sessao.usuario.id },
   );
 }
 

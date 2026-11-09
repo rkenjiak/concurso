@@ -1,4 +1,4 @@
-import { BellOff, Settings } from "lucide-react";
+import { BellOff, SlidersHorizontal } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { connection } from "next/server";
@@ -16,18 +16,32 @@ export const metadata: Metadata = { title: "Notificações" };
 export default async function NotificacoesPage() {
   await connection();
   const { id: usuarioId } = await exigirUsuarioPagina();
-  const notificacoes = await obterNotificacoes(getDb(), usuarioId, hojeSP());
+  const hoje = hojeSP();
+  const notificacoes = await obterNotificacoes(getDb(), usuarioId, hoje);
 
   return (
     <div className="space-y-6">
       <CabecalhoPagina
         titulo="Notificações"
-        descricao="Avisos dos prazos próximos, conforme as regras de notificação."
+        descricao={
+          <>
+            Avisos gerados pelas suas regras para prazos ainda pendentes, agrupados pela proximidade
+            do prazo (hoje e amanhã, próximos 7 dias, mais adiante), o mais próximo primeiro. Para
+            ver o que fazer agora, use o{" "}
+            <Link
+              href="/"
+              className="text-foreground underline underline-offset-4 hover:text-primary"
+            >
+              Dashboard
+            </Link>
+            .
+          </>
+        }
         acoes={
           <Button asChild variant="outline">
             <Link href="/configuracoes#notificacoes">
-              <Settings aria-hidden />
-              Regras
+              <SlidersHorizontal aria-hidden />
+              Configurar avisos
             </Link>
           </Button>
         }
@@ -37,10 +51,10 @@ export default async function NotificacoesPage() {
           {notificacoes.length === 0 ? (
             <div className="space-y-2 py-8 text-center">
               <BellOff className="mx-auto size-8 text-muted-foreground" aria-hidden />
-              <p className="font-medium">Nenhuma notificação</p>
+              <p className="font-medium">Nenhum aviso por enquanto</p>
               <p className="text-muted-foreground text-sm">
-                Os avisos aparecem aqui conforme os prazos se aproximam (ex.: 7 dias antes do fim
-                das inscrições).
+                Quando um prazo pendente chegar à antecedência definida nas suas regras (ex.: 7 dias
+                antes do fim das inscrições), o aviso aparece aqui.
               </p>
             </div>
           ) : (
@@ -51,6 +65,7 @@ export default async function NotificacoesPage() {
                 mensagem: n.mensagem,
                 data: n.data,
                 hora: n.hora,
+                dias: n.dias,
                 lida: n.lida,
                 concurso: {
                   id: n.concurso.id,

@@ -1,6 +1,8 @@
 "use client";
 
-import { LogOut } from "lucide-react";
+import { LogOut, Settings, UserRound } from "lucide-react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useId, useTransition } from "react";
 import { ICONE_TEMA, useTema } from "@/components/tema/seletor-tema";
 import {
@@ -34,7 +36,8 @@ interface MenuContaProps {
   podeSair: boolean;
   /**
    * Cabeçalho do celular: só o avatar, e o tema passa para dentro do menu (#78), liberando espaço
-   * no cabeçalho de ~360 px. No desktop o seletor de tema fica visível na barra lateral.
+   * no cabeçalho de ~360 px. No desktop o seletor de tema fica visível na barra lateral. Na visão
+   * usuário, Configurações também entra aqui (#105): na barra inferior o lugar é de Notificações.
    */
   compacto?: boolean;
   className?: string;
@@ -71,13 +74,15 @@ function ItensTema() {
   );
 }
 
-function iniciais(conta: ContaMenu): string {
-  const base = conta.nome ?? conta.email ?? "?";
-  const partes = base.split(/[\s@.]+/).filter(Boolean);
-  return ((partes[0]?.[0] ?? "?") + (partes[1]?.[0] ?? "")).toUpperCase();
+/** Iniciais do nome (ou do e-mail); `null` sem nenhum dos dois (usuário local). */
+function iniciais(conta: ContaMenu): string | null {
+  const partes = (conta.nome ?? conta.email ?? "").split(/[\s@.]+/).filter(Boolean);
+  if (partes.length === 0) return null;
+  return ((partes[0]?.[0] ?? "") + (partes[1]?.[0] ?? "")).toUpperCase();
 }
 
 function Avatar({ conta }: { conta: ContaMenu }) {
+  const letras = iniciais(conta);
   return conta.avatarUrl ? (
     // biome-ignore lint/performance/noImgElement: foto pequena do Google, sem otimização do Next
     <img
@@ -93,15 +98,15 @@ function Avatar({ conta }: { conta: ContaMenu }) {
       aria-hidden
       className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted font-medium text-muted-foreground text-xs"
     >
-      {iniciais(conta)}
+      {letras ?? <UserRound className="size-4" aria-hidden />}
     </span>
   );
 }
 
 /**
  * Menu da conta (avatar): nome, alternância "Visão usuário" ↔ "Visão admin" (só admins, #50),
- * tema (só no modo compacto, #78) e Sair. A troca de visão não exige novo login. Configurações fica
- * só na navegação principal (#82).
+ * Configurações e tema (só no modo compacto, #105 e #78) e Sair. A troca de visão não exige novo
+ * login. No desktop, Configurações fica só na navegação lateral (#82); no celular, só aqui (#105).
  */
 export function MenuConta({
   conta,
@@ -112,10 +117,12 @@ export function MenuConta({
   className,
 }: MenuContaProps) {
   const [pendente, iniciar] = useTransition();
+  const pathname = usePathname();
   const nome = conta.nome ?? conta.email ?? "Usuário local";
 
   // Sem nenhuma ação (não admin, sem login e sem tema no menu), um menu vazio seria anunciado
-  // sem itens: mostra só avatar e nome.
+  // sem itens: mostra só avatar e nome. O compacto sempre tem menu (tema; Configurações na visão
+  // usuário).
   if (!ehAdmin && !podeSair && !compacto) {
     return (
       <div className={cn("flex min-w-0 items-center gap-2 p-1 text-sm", className)}>
@@ -132,6 +139,8 @@ export function MenuConta({
         disabled={pendente}
         className={cn(
           "flex min-w-0 items-center gap-2 rounded-md p-1 pointer-coarse:p-1.5 text-left text-sm outline-none hover:bg-sidebar-accent/60 focus-visible:ring-3 focus-visible:ring-ring/50",
+          // Só o avatar (28 px) no celular: alvo de toque de 44 px (#105).
+          compacto && "pointer-coarse:p-2",
           className,
         )}
       >
@@ -158,6 +167,20 @@ export function MenuConta({
               <DropdownMenuRadioItem value="usuario">Visão usuário</DropdownMenuRadioItem>
               <DropdownMenuRadioItem value="admin">Visão admin</DropdownMenuRadioItem>
             </DropdownMenuRadioGroup>
+          </>
+        ) : null}
+        {compacto && visao === "usuario" ? (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem asChild>
+              <Link
+                href="/configuracoes"
+                aria-current={pathname === "/configuracoes" ? "page" : undefined}
+              >
+                <Settings aria-hidden />
+                Configurações
+              </Link>
+            </DropdownMenuItem>
           </>
         ) : null}
         {compacto ? <ItensTema /> : null}

@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowRightLeft, Undo2 } from "lucide-react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import { useAvisos } from "@/components/avisos/avisos";
 import { Button } from "@/components/ui/button";
@@ -22,6 +22,7 @@ import { MUDAR_STATUS, PARAM_MUDAR, urlSemParametro } from "@/lib/aba-concurso";
 import { alterarStatus, desfazerUltimoStatus } from "@/server/actions/status";
 import { BotaoConfirmar } from "./botao-confirmar";
 import { ariaCampo, Campo } from "./campo";
+import { useDesfazerStatus } from "./use-desfazer-status";
 
 interface MudarStatusProps {
   concursoId: number;
@@ -37,7 +38,6 @@ interface MudarStatusProps {
  * diálogo ao carregar (link da edição do concurso). Sem transições nem o que desfazer, não aparece.
  */
 export function MudarStatus({ concursoId, atual, transicoes, desfazerPara }: MudarStatusProps) {
-  const router = useRouter();
   const { avisar } = useAvisos();
   const params = useSearchParams();
   const [aberto, setAberto] = useState(() => params.get(PARAM_MUDAR) === MUDAR_STATUS);
@@ -45,6 +45,7 @@ export function MudarStatus({ concursoId, atual, transicoes, desfazerPara }: Mud
   const [observacao, setObservacao] = useState("");
   const [erro, setErro] = useState<string | null>(null);
   const [pendente, iniciar] = useTransition();
+  const desfazer = useDesfazerStatus(iniciar);
   const chave = `status-${concursoId}`;
 
   const semAcoes = transicoes.length === 0 && !desfazerPara;
@@ -70,29 +71,6 @@ export function MudarStatus({ concursoId, atual, transicoes, desfazerPara }: Mud
     }
   }
 
-  /**
-   * Desfaz a mudança `registroId` — só se ainda for a última (o servidor confere); a promessa
-   * termina com a ação (o aviso mostra a pendência).
-   */
-  function desfazer(registroId: number) {
-    return new Promise<void>((resolver) => {
-      iniciar(async () => {
-        const r = await desfazerUltimoStatus(concursoId, { registroId });
-        avisar(
-          r.ok
-            ? {
-                texto: `Mudança desfeita: de volta a “${ROTULO_STATUS[r.data.status]}”.`,
-                tipo: "info",
-                chave,
-              }
-            : { texto: r.erros._form?.[0] ?? "Não foi possível desfazer.", tipo: "erro", chave },
-        );
-        if (!r.ok) router.refresh();
-        resolver();
-      });
-    });
-  }
-
   function salvar(e: React.FormEvent) {
     e.preventDefault();
     if (!para) return;
@@ -104,7 +82,7 @@ export function MudarStatus({ concursoId, atual, transicoes, desfazerPara }: Mud
         avisar({
           texto: `Status → “${ROTULO_STATUS[para]}”.`,
           chave,
-          acao: { rotulo: "Desfazer", executar: () => desfazer(r.data.registroId) },
+          acao: { rotulo: "Desfazer", executar: () => desfazer(concursoId, r.data.registroId) },
         });
       } else {
         setErro(r.erros._form?.[0] ?? r.erros.para?.[0] ?? r.erros.observacao?.[0] ?? "Erro.");

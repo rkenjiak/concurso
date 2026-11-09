@@ -7,6 +7,8 @@ import type {
   Escolaridade,
   Esfera,
   Fase,
+  MotivoSemAcesso,
+  OrigemAcesso,
   Papel,
   SituacaoFase,
   Status,
@@ -160,6 +162,24 @@ export const ROTULO_ACAO_ADMIN: Readonly<Record<AcaoAdmin, string>> = {
   DESBLOQUEAR_USUARIO: "Desbloqueou",
   PERMITIR_EMAIL: "Liberou o acesso de",
   REMOVER_EMAIL: "Retirou da lista de acesso",
+  REVOGAR_TOKENS: "Revogou os tokens (MCP e .ics) de",
+};
+
+export const ROTULO_ORIGEM_ACESSO: Readonly<Record<OrigemAcesso, string>> = {
+  USUARIO_INICIAL: "Usuário inicial (senha ou uso sem login)",
+  ADMIN_EMAILS: "ADMIN_EMAILS",
+  ALLOWED_EMAILS: "ALLOWED_EMAILS",
+  PAINEL: "Liberado no painel",
+  PAPEL_ADMIN: "Papel admin",
+};
+
+export const ROTULO_MOTIVO_SEM_ACESSO: Readonly<Record<MotivoSemAcesso, string>> = {
+  BLOQUEADO: "Bloqueado pelo painel.",
+  LOGIN_GOOGLE_DESLIGADO: "O login Google está desligado: só o usuário inicial entra hoje.",
+  SENHA_DESLIGADA:
+    "Usuário inicial ainda sem conta Google e com o login por senha (APP_PASSWORD) desligado.",
+  FORA_DAS_LISTAS:
+    "O e-mail não está em ADMIN_EMAILS, ALLOWED_EMAILS nem liberado no painel, e não é admin.",
 };
 
 /** Lista `{ valor, rotulo }` na ordem do enum (para `<select>`). */

@@ -8,7 +8,7 @@
  */
 import { createMcpHandler, type McpHttpHandler } from "@modelcontextprotocol/server";
 import { revalidatePath } from "next/cache";
-import { chaveCliente } from "@/server/auth/acesso";
+import { chaveCliente, registrarUsoDoToken } from "@/server/auth/acesso";
 import { donoDoTokenAutorizado } from "@/server/auth/autorizacao";
 import { lerConfigAuth } from "@/server/auth/config";
 import { LimitadorTentativas } from "@/server/auth/limitador";
@@ -82,6 +82,7 @@ async function atender(request: Request): Promise<Response> {
     return texto("Token ausente ou inválido.", 401, { "WWW-Authenticate": 'Bearer realm="mcp"' });
   }
   limitador.registrarSucesso(chave);
+  await registrarUsoDoToken(usuario, "mcp", token);
   return obterHandler().fetch(request, {
     authInfo: {
       token,

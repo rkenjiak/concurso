@@ -7,7 +7,21 @@
  * janela entre a contagem e a escrita). Admins de `ADMIN_EMAILS` são garantidos pela configuração
  * e não podem ser rebaixados nem bloqueados pelo painel.
  */
-import { and, asc, count, desc, eq, exists, isNotNull, isNull, ne, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  exists,
+  gte,
+  isNotNull,
+  isNull,
+  ne,
+  or,
+  type SQL,
+  sql,
+} from "drizzle-orm";
 import { alias } from "drizzle-orm/sqlite-core";
 import type { AcaoAdmin, Papel } from "@/domain/enums";
 import { ErroDominio } from "@/domain/erros";
@@ -19,6 +33,8 @@ import {
   concurso,
   emailPermitido,
   evento,
+  link,
+  resultadoFase,
   type Usuario,
   usuario,
 } from "../db/schema";
@@ -52,6 +68,11 @@ export const MENSAGENS_ADMIN = {
 /** Identificação legível de um usuário (e-mail, nome ou ID). */
 export function rotuloUsuario(u: { id: number; email: string | null; nome: string | null }) {
   return u.email ?? u.nome ?? `Usuário #${u.id}`;
+}
+
+/** Nome para exibir no painel: o nome, ou "Usuário inicial"/"Sem nome" (#108). */
+export function nomeUsuario(u: { nome: string | null; email: string | null }) {
+  return u.nome ?? (u.email === null ? "Usuário inicial" : "Sem nome");
 }
 
 async function auditar(
@@ -89,8 +110,16 @@ function existeOutroAdminAtivo(tx: Executor, id: number) {
   );
 }
 
+/**
+ * `true` se o e-mail está em `ADMIN_EMAILS` (`fixos`, já normalizados). Normaliza o e-mail por
+ * coerência com {@link normalizarEmail}, embora o banco já o guarde normalizado (#108).
+ */
+export function ehEmailAdminFixo(email: string | null, fixos: ReadonlySet<string>): boolean {
+  return email !== null && fixos.has(normalizarEmail(email));
+}
+
 const ehAdminFixo = (alvo: Usuario, opcoes: OpcoesAdmin) =>
-  alvo.email !== null && opcoes.emailsAdminFixos.has(alvo.email);
+  ehEmailAdminFixo(alvo.email, opcoes.emailsAdminFixos);
 
 // --- Leituras ---------------------------------------------------------------------------------
 
@@ -104,26 +133,134 @@ export interface UsuarioAdmin {
   ultimoAcessoEm: Date | null;
   createdAt: Date;
   totalConcursos: number;
+  /** Token do MCP ativo (#108): só a flag, nunca o resumo. */
+  mcpTokenAtivo: boolean;
+  mcpTokenUsadoEm: Date | null;
+  /** Feed .ics ativo (#108). */
+  icsTokenAtivo: boolean;
+  icsTokenUsadoEm: Date | null;
+  /** E-mail liberado no painel (`email_permitido`, #108): entra no cálculo do "sem acesso hoje". */
+  emailNoPainel: boolean;
 }
 
-/** Usuários com o número de concursos de cada um, do mais antigo ao mais novo. */
+/**
+ * Colunas do usuário que o painel pode ver (#108): flags, datas técnicas e o necessário para a
+ * regra de acesso. Os resumos dos tokens só saem daqui convertidos em flag ({@link semSegredos}).
+ */
+const colunasUsuario = {
+  id: usuario.id,
+  email: usuario.email,
+  nome: usuario.nome,
+  avatarUrl: usuario.avatarUrl,
+  papel: usuario.papel,
+  bloqueadoEm: usuario.bloqueadoEm,
+  ultimoAcessoEm: usuario.ultimoAcessoEm,
+  createdAt: usuario.createdAt,
+  mcpTokenHash: usuario.mcpTokenHash,
+  mcpTokenUsadoEm: usuario.mcpTokenUsadoEm,
+  icsTokenHash: usuario.icsTokenHash,
+  icsTokenUsadoEm: usuario.icsTokenUsadoEm,
+  emailNoPainel: emailPermitido.email,
+};
+
+/**
+ * `LEFT JOIN` com a allowlist do painel pela igualdade exata do e-mail (#108). Vale porque os dois
+ * lados são gravados normalizados: `usuario.email` só vem do login Google (`lerPerfil` aplica
+ * `normalizarEmail`) e `email_permitido.email` passa por `normalizarEmail` ao ser liberado — a
+ * mesma regra de `emailNaAllowlist`. Assim o índice da chave primária continua sendo usado.
+ */
+const comAllowlistDoPainel = eq(emailPermitido.email, usuario.email);
+
+/** Troca os resumos dos tokens e o e-mail da allowlist por flags. */
+function semSegredos<
+  T extends { mcpTokenHash: string | null; icsTokenHash: string | null; emailNoPainel: unknown },
+>({ mcpTokenHash, icsTokenHash, emailNoPainel, ...u }: T) {
+  return {
+    ...u,
+    mcpTokenAtivo: mcpTokenHash !== null,
+    icsTokenAtivo: icsTokenHash !== null,
+    emailNoPainel: emailNoPainel !== null,
+  };
+}
+
+/**
+ * Usuários com o número de concursos de cada um e o uso dos tokens (#108), do mais antigo ao mais
+ * novo.
+ */
 export async function listarUsuarios(db: Executor): Promise<UsuarioAdmin[]> {
-  return db
-    .select({
-      id: usuario.id,
-      email: usuario.email,
-      nome: usuario.nome,
-      avatarUrl: usuario.avatarUrl,
-      papel: usuario.papel,
-      bloqueadoEm: usuario.bloqueadoEm,
-      ultimoAcessoEm: usuario.ultimoAcessoEm,
-      createdAt: usuario.createdAt,
-      totalConcursos: count(concurso.id),
-    })
+  const linhas = await db
+    .select({ ...colunasUsuario, totalConcursos: count(concurso.id) })
     .from(usuario)
+    .leftJoin(emailPermitido, comAllowlistDoPainel)
     .leftJoin(concurso, eq(concurso.usuarioId, usuario.id))
     .groupBy(usuario.id)
     .orderBy(asc(usuario.createdAt), asc(usuario.id));
+  return linhas.map(semSegredos);
+}
+
+export interface DetalheUsuarioAdmin extends Omit<UsuarioAdmin, "totalConcursos"> {
+  /** Conta Google vinculada (`google_sub` preenchido); o `sub` em si não sai daqui. */
+  googleVinculado: boolean;
+  /** Só contagens agregadas: nada do conteúdo dos concursos (#108). */
+  contagens: { concursos: number; eventos: number; links: number; resultados: number };
+}
+
+/**
+ * Só confere se o usuário existe (#110): uma leitura pela chave primária, para o layout do detalhe,
+ * que também roda no prefetch dos links da tabela (o detalhe completo faz cinco consultas).
+ */
+export async function usuarioExiste(db: Executor, id: number): Promise<boolean> {
+  const [linha] = await db
+    .select({ id: usuario.id })
+    .from(usuario)
+    .where(eq(usuario.id, id))
+    .limit(1);
+  return linha !== undefined;
+}
+
+/** Detalhe de um usuário para o painel (#108), ou `null` se não existir. */
+export async function obterDetalheUsuario(
+  db: Executor,
+  id: number,
+): Promise<DetalheUsuarioAdmin | null> {
+  const total = async (consulta: Promise<{ n: number }[]>) => (await consulta)[0]?.n ?? 0;
+  const doUsuario = eq(concurso.usuarioId, id);
+  const [[linha], concursos, eventos, links, resultados] = await Promise.all([
+    db
+      .select({ ...colunasUsuario, googleSub: usuario.googleSub })
+      .from(usuario)
+      .leftJoin(emailPermitido, comAllowlistDoPainel)
+      .where(eq(usuario.id, id)),
+    total(db.select({ n: count() }).from(concurso).where(doUsuario)),
+    total(
+      db
+        .select({ n: count() })
+        .from(evento)
+        .innerJoin(concurso, eq(concurso.id, evento.concursoId))
+        .where(doUsuario),
+    ),
+    total(
+      db
+        .select({ n: count() })
+        .from(link)
+        .innerJoin(concurso, eq(concurso.id, link.concursoId))
+        .where(doUsuario),
+    ),
+    total(
+      db
+        .select({ n: count() })
+        .from(resultadoFase)
+        .innerJoin(concurso, eq(concurso.id, resultadoFase.concursoId))
+        .where(doUsuario),
+    ),
+  ]);
+  if (!linha) return null;
+  const { googleSub, ...resto } = linha;
+  return {
+    ...semSegredos(resto),
+    googleVinculado: googleSub !== null,
+    contagens: { concursos, eventos, links, resultados },
+  };
 }
 
 export interface ResumoInstancia {
@@ -133,12 +270,37 @@ export interface ResumoInstancia {
   concursos: number;
   eventos: number;
   emailsPermitidos: number;
+  /** Usuários não bloqueados com acesso nos últimos 7 e 30 dias (#108). */
+  ativos7Dias: number;
+  ativos30Dias: number;
+  /** Usuários não bloqueados com token do MCP / feed .ics ativo (#108). */
+  comTokenMcp: number;
+  comFeedIcs: number;
 }
 
-/** Totais da instância para a visão geral do painel. */
-export async function obterResumo(db: Executor): Promise<ResumoInstancia> {
+const DIA_MS = 24 * 60 * 60 * 1000;
+
+/** Totais da instância para a visão geral do painel (só contagens, nada de conteúdo). */
+export async function obterResumo(
+  db: Executor,
+  agora: Date = new Date(),
+): Promise<ResumoInstancia> {
   const total = async (consulta: Promise<{ n: number }[]>) => (await consulta)[0]?.n ?? 0;
-  const [usuarios, admins, bloqueados, concursos, eventos, emailsPermitidos] = await Promise.all([
+  const contar = (condicao: SQL | undefined) =>
+    total(db.select({ n: count() }).from(usuario).where(condicao));
+  const desde = (dias: number) => new Date(agora.getTime() - dias * DIA_MS);
+  const [
+    usuarios,
+    admins,
+    bloqueados,
+    concursos,
+    eventos,
+    emailsPermitidos,
+    ativos7Dias,
+    ativos30Dias,
+    comTokenMcp,
+    comFeedIcs,
+  ] = await Promise.all([
     total(db.select({ n: count() }).from(usuario)),
     total(
       db
@@ -150,8 +312,23 @@ export async function obterResumo(db: Executor): Promise<ResumoInstancia> {
     total(db.select({ n: count() }).from(concurso)),
     total(db.select({ n: count() }).from(evento)),
     total(db.select({ n: count() }).from(emailPermitido)),
+    contar(and(gte(usuario.ultimoAcessoEm, desde(7)), isNull(usuario.bloqueadoEm))),
+    contar(and(gte(usuario.ultimoAcessoEm, desde(30)), isNull(usuario.bloqueadoEm))),
+    contar(and(isNotNull(usuario.mcpTokenHash), isNull(usuario.bloqueadoEm))),
+    contar(and(isNotNull(usuario.icsTokenHash), isNull(usuario.bloqueadoEm))),
   ]);
-  return { usuarios, admins, bloqueados, concursos, eventos, emailsPermitidos };
+  return {
+    usuarios,
+    admins,
+    bloqueados,
+    concursos,
+    eventos,
+    emailsPermitidos,
+    ativos7Dias,
+    ativos30Dias,
+    comTokenMcp,
+    comFeedIcs,
+  };
 }
 
 export interface EmailPermitidoAdmin {
@@ -229,6 +406,14 @@ export async function definirPapel(
   });
 }
 
+/** Tokens pessoais apagados, com o último uso de cada um (#96, #108). */
+const TOKENS_ZERADOS = {
+  mcpTokenHash: null,
+  icsTokenHash: null,
+  mcpTokenUsadoEm: null,
+  icsTokenUsadoEm: null,
+} as const;
+
 /**
  * Bloqueia ou desbloqueia o usuário. Bloqueado, ele perde o acesso na hora: a sessão é relida do
  * banco a cada requisição e os tokens pessoais (MCP e feed .ics) são apagados (#96) — ao ser
@@ -255,7 +440,7 @@ export async function definirBloqueio(
       const linhas = await tx
         .update(usuario)
         // Revoga também os tokens pessoais (MCP e feed .ics, #96): desbloquear não os devolve.
-        .set({ bloqueadoEm: agora, mcpTokenHash: null, icsTokenHash: null })
+        .set({ bloqueadoEm: agora, ...TOKENS_ZERADOS })
         .where(condicao)
         .returning({ id: usuario.id });
       if (linhas.length === 0) throw new ErroDominio(MENSAGENS_ADMIN.ultimoAdmin);
@@ -263,7 +448,7 @@ export async function definirBloqueio(
       // Limpa os tokens também aqui: quem foi bloqueado antes do #96 ainda os tinha guardados.
       await tx
         .update(usuario)
-        .set({ bloqueadoEm: null, mcpTokenHash: null, icsTokenHash: null })
+        .set({ bloqueadoEm: null, ...TOKENS_ZERADOS })
         .where(eq(usuario.id, alvo.id));
     }
     await auditar(
@@ -274,6 +459,35 @@ export async function definirBloqueio(
       alvo.id,
       agora,
     );
+  });
+}
+
+/**
+ * Revoga os tokens pessoais (MCP e feed .ics) do usuário sem bloqueá-lo (#108), zerando também o
+ * último uso. Sem nenhum token ativo, não faz nada nem audita (como as demais ações sem mudança).
+ * Devolve `true` se revogou algo.
+ */
+export async function revogarTokens(
+  db: Db,
+  autor: AutorAdmin,
+  alvoId: number,
+  agora: Date = new Date(),
+): Promise<boolean> {
+  return db.transaction(async (tx) => {
+    const alvo = await obterAlvo(tx, alvoId);
+    const linhas = await tx
+      .update(usuario)
+      .set(TOKENS_ZERADOS)
+      .where(
+        and(
+          eq(usuario.id, alvo.id),
+          or(isNotNull(usuario.mcpTokenHash), isNotNull(usuario.icsTokenHash)),
+        ),
+      )
+      .returning({ id: usuario.id });
+    if (linhas.length === 0) return false;
+    await auditar(tx, autor, "REVOGAR_TOKENS", rotuloUsuario(alvo), alvo.id, agora);
+    return true;
   });
 }
 

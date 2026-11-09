@@ -887,7 +887,8 @@ Cada item = uma branch `feature/*` a partir de `develop`; cada milestone fecha c
 | **Uso diário** → `v2.4.0` | `feature/atualizar-dados` (#77) · `feature/sino-unico` (#78) · `feature/tema-layout` (#81, #82) · `feature/eventos-dashboard` (#84, #85) · `feature/calendario-navegacao` (#83) | Botão Atualizar, contagem regressiva das provas, pendências de status e navegação rápida no calendário |
 | **Observabilidade** → `v2.5.0` | `feature/logs` (#91) | Logger estruturado, `onRequestError` e eventos de segurança e operação |
 | **UX dos eventos** → `v2.6.0` | `feature/ux-fluxo-eventos` (#100) | Painel do evento, concluir no dashboard, link direto para o evento, voltar à origem e avisos com Desfazer |
-| **M7 — Anexos** → `v2.7.0` | `feature/anexos` | RF02 desejável |
+| **Uso e navegação** → `v2.7.0` | `feature/admin-uso` (#108) · `feature/notfound-404` (#110) · `feature/sqlite-wal` (#112) · `feature/arquitetura-informacao` (#104–#107) | Uso real no painel admin, 404 de verdade, WAL no SQLite local, papel de Notificações, barra do celular e seções de Configurações |
+| **M7 — Anexos** → `v2.8.0` | `feature/anexos` | RF02 desejável |
 
 ---
 

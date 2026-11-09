@@ -4,6 +4,8 @@ import {
   ESCOLARIDADE,
   ESFERA,
   FASE,
+  MOTIVO_SEM_ACESSO,
+  ORIGEM_ACESSO,
   PAPEL,
   SITUACAO_FASE,
   STATUS,
@@ -18,6 +20,8 @@ import {
   ROTULO_ESCOLARIDADE,
   ROTULO_ESFERA,
   ROTULO_FASE,
+  ROTULO_MOTIVO_SEM_ACESSO,
+  ROTULO_ORIGEM_ACESSO,
   ROTULO_PAPEL,
   ROTULO_SITUACAO_FASE,
   ROTULO_STATUS,
@@ -38,6 +42,8 @@ const pares: [string, readonly string[], Readonly<Record<string, string>>][] = [
   ["UF", UF, ROTULO_UF],
   ["Papel", PAPEL, ROTULO_PAPEL],
   ["AcaoAdmin", ACAO_ADMIN, ROTULO_ACAO_ADMIN],
+  ["OrigemAcesso", ORIGEM_ACESSO, ROTULO_ORIGEM_ACESSO],
+  ["MotivoSemAcesso", MOTIVO_SEM_ACESSO, ROTULO_MOTIVO_SEM_ACESSO],
 ];
 
 describe("labels", () => {

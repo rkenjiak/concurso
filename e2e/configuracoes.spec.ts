@@ -18,14 +18,17 @@ async function cardVisivel(page: Page, id: string, titulo: string) {
   await expect(card).toBeInViewport();
   const heading = card.getByRole("heading", { level: 3, name: titulo, exact: true });
   await expect(heading).toBeInViewport();
-  const topoTitulo = (await heading.boundingBox())?.y ?? -1;
-  const fundoCabecalho = await page.evaluate(() => {
-    const cabecalho = [...document.querySelectorAll("header")].find(
-      (el) => getComputedStyle(el).position === "sticky" && el.getBoundingClientRect().height > 0,
-    );
-    return cabecalho?.getBoundingClientRect().bottom ?? 0;
-  });
-  expect(topoTitulo).toBeGreaterThanOrEqual(fundoCabecalho);
+  // A rolagem do hash pode terminar depois de o card entrar na tela: confere a posição até firmar.
+  await expect(async () => {
+    const topoTitulo = (await heading.boundingBox())?.y ?? -1;
+    const fundoCabecalho = await page.evaluate(() => {
+      const cabecalho = [...document.querySelectorAll("header")].find(
+        (el) => getComputedStyle(el).position === "sticky" && el.getBoundingClientRect().height > 0,
+      );
+      return cabecalho?.getBoundingClientRect().bottom ?? 0;
+    });
+    expect(topoTitulo).toBeGreaterThanOrEqual(fundoCabecalho);
+  }).toPass();
 }
 
 test("configurações: seções h2, cards h3 e índice com âncoras (#106)", async ({ page }) => {
@@ -37,10 +40,10 @@ test("configurações: seções h2, cards h3 e índice com âncoras (#106)", asy
   await expect(main.getByRole("heading", { level: 3 })).toHaveText(CARDS.map((c) => c.titulo));
   // Cada card fica dentro da sua seção.
   await expect(
-    page.getByRole("region", { name: "Avisos" }).getByRole("heading", { level: 3 }),
+    page.getByRole("region", { name: "Avisos", exact: true }).getByRole("heading", { level: 3 }),
   ).toHaveText(["Notificações", "Calendário (.ics)"]);
   await expect(
-    page.getByRole("region", { name: "Conta" }).getByRole("heading", { level: 3 }),
+    page.getByRole("region", { name: "Conta", exact: true }).getByRole("heading", { level: 3 }),
   ).toHaveText(["Acesso"]);
 
   const links = indice(page).getByRole("link");
@@ -78,6 +81,10 @@ test.describe("celular (360 px)", () => {
     page,
   }) => {
     await page.goto("/configuracoes");
+    const semRolagemHorizontal = await page.evaluate(
+      () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+    );
+    expect(semRolagemHorizontal).toBe(true);
     const links = indice(page).getByRole("link");
     await expect(links).toHaveCount(CARDS.length);
     for (const link of await links.all()) {

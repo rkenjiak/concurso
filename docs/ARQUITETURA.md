@@ -754,6 +754,24 @@ pnpm dev        # aplica migrações pendentes (predev) e sobe em http://localho
 
 O mesmo código atende ambas: só muda `DATABASE_URL` (`file:./data/concurso.db` vs `libsql://…`).
 
+**Concorrência no SQLite local (#112, `src/server/db/local.ts`).** O `@libsql/client` abre um pool
+de conexões ao arquivo e cada transação fica com uma conexão só dela. Uma instrução que falha com
+`SQLITE_BUSY` fica ativa sem reset (o driver não expõe reset; só o GC a libera), e a conexão dela
+passa a segurar uma transação de leitura sem fim: no journal de rollback, todo COMMIT seguinte
+falha; em WAL, a conexão lê um snapshot velho. Por isso, com `file:` (não `:memory:` nem Turso),
+`criarDb` envolve o client para que escritas não levem `SQLITE_BUSY`:
+- **uma escrita por vez no processo** (fila FIFO): transações (exceto `"read"`), `batch`,
+  `migrate`, `executeMultiple` e todo `execute` que não comece com `SELECT`. A transação segura a
+  vez até `commit`/`rollback`/`close`; quem espera mais de 5 s recebe `SQLITE_BUSY`;
+- **WAL** (`PRAGMA journal_mode = WAL` na primeira operação, persistente no arquivo): leituras
+  não disputam lock com escritas;
+- **busy timeout de 5 s** (`timeout` do client) só para outros processos (`pnpm mcp`, scripts,
+  e2e). Dentro do processo ele não ajudaria: a espera do driver é síncrona e travaria o event
+  loop de que a outra transação precisa para terminar.
+
+Consequência: dentro de `db.transaction(async (tx) => …)`, escreva sempre pelo `tx`; uma escrita
+pelo `db` de fora espera a vez que a própria transação segura e falha após 5 s.
+
 ### 9.3 Backup
 - **Local:** `pnpm db:backup` → `VACUUM INTO 'backups/concurso-AAAAMMDD-HHmm.db'` (cópia consistente);
   manter as últimas N. Pasta `backups/` no `.gitignore` (dados pessoais **nunca** no repositório).

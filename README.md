@@ -129,11 +129,15 @@ pnpm db:backup --manter=30   # ou BACKUP_KEEP=30
 ```
 
 Usa `VACUUM INTO` (cópia consistente mesmo com o app aberto). A pasta `backups/` fica fora do Git —
-dados pessoais nunca vão para o repositório. Para restaurar: pare o app e copie o arquivo do backup
-para `data/concurso.db` (ou o caminho de `DATABASE_URL`).
+dados pessoais nunca vão para o repositório. Para restaurar: pare o app, apague
+`data/concurso.db-wal` e `data/concurso.db-shm` (se existirem) e copie o arquivo do backup para
+`data/concurso.db` (ou o caminho de `DATABASE_URL`).
 
-No Docker o banco fica no volume: com o container parado, `docker cp concurso:/app/data/concurso.db .`
-copia o arquivo (e o caminho inverso restaura); ou use o export JSON. No Turso, use o point-in-time
+O banco local usa WAL: escritas recentes podem estar ainda no `concurso.db-wal`, ao lado do
+arquivo principal. Copiar só o `concurso.db` pode perder dados; use `pnpm db:backup` ou copie os
+três arquivos juntos, com o app parado. No Docker o banco fica no volume: com o container parado,
+`docker cp concurso:/app/data/ ./data-backup/` copia a pasta inteira (e o caminho inverso
+restaura); ou use o export JSON. No Turso, use o point-in-time
 restore do serviço e o export JSON periódico.
 
 ## Lembretes: notificações e calendário

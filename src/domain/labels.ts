@@ -176,6 +176,8 @@ export const ROTULO_ORIGEM_ACESSO: Readonly<Record<OrigemAcesso, string>> = {
 export const ROTULO_MOTIVO_SEM_ACESSO: Readonly<Record<MotivoSemAcesso, string>> = {
   BLOQUEADO: "Bloqueado pelo painel.",
   LOGIN_GOOGLE_DESLIGADO: "O login Google está desligado: só o usuário inicial entra hoje.",
+  SENHA_DESLIGADA:
+    "Usuário inicial ainda sem conta Google e com o login por senha (APP_PASSWORD) desligado.",
   FORA_DAS_LISTAS:
     "O e-mail não está em ADMIN_EMAILS, ALLOWED_EMAILS nem liberado no painel, e não é admin.",
 };

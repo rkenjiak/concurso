@@ -13,6 +13,7 @@ import {
   adicionarEmailPermitido,
   definirBloqueio,
   definirPapel,
+  ehEmailAdminFixo,
   listarAuditoria,
   listarEmailsPermitidos,
   listarUsuarios,
@@ -28,6 +29,7 @@ import { criarLink } from "./links";
 import { criarResultadoFase } from "./resultados";
 import {
   emailNaAllowlist,
+  entrarComGoogle,
   gerarTokenIcs,
   gerarTokenMcp,
   obterUsuario,
@@ -344,6 +346,20 @@ describe("detalhe do usuário (#108)", () => {
       ["ana@x.com", false],
       ["bia@x.com", true],
     ]);
+  });
+
+  it("allowlist e ADMIN_EMAILS casam com o e-mail como o login o grava (normalizado)", async () => {
+    // O painel normaliza ao liberar; o login Google grava o e-mail já normalizado (`lerPerfil`).
+    await adicionarEmailPermitido(db, ana, "  Carla@X.com ", AGORA);
+    const carla = await entrarComGoogle(
+      db,
+      { sub: "g-carla", email: "carla@x.com", nome: null, avatarUrl: null },
+      false,
+      AGORA,
+    );
+    expect((await obterDetalheUsuario(db, carla.id))?.emailNoPainel).toBe(true);
+    expect(ehEmailAdminFixo(" ANA@x.com", new Set(["ana@x.com"]))).toBe(true);
+    expect(ehEmailAdminFixo(null, new Set(["ana@x.com"]))).toBe(false);
   });
 });
 

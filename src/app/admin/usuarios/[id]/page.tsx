@@ -12,14 +12,21 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ROTULO_MOTIVO_SEM_ACESSO, ROTULO_ORIGEM_ACESSO, ROTULO_PAPEL } from "@/domain/labels";
 import { formatarDataHora, formatarDataInstante } from "@/lib/format";
-import { idSchema } from "@/lib/schemas/comum";
 import { exigirAdminPagina } from "@/server/auth/admin";
 import { acessoHoje } from "@/server/auth/autorizacao";
 import { lerConfigAuth } from "@/server/auth/config";
 import { getDb } from "@/server/db/client";
-import { nomeUsuario, obterDetalheUsuario, rotuloUsuario } from "@/server/repositories/admin";
+import {
+  ehEmailAdminFixo,
+  nomeUsuario,
+  obterDetalheUsuario,
+  rotuloUsuario,
+} from "@/server/repositories/admin";
 
 export const metadata: Metadata = { title: "Usuário" };
+
+/** Só dígitos: rejeita "1e3", " 1", "0x1" etc. antes de converter (#108). */
+const ID_VALIDO = /^\d+$/;
 
 function Item({ rotulo, children }: { rotulo: string; children: ReactNode }) {
   return (
@@ -63,9 +70,12 @@ function Token({
 export default async function UsuarioAdminPage({ params }: PageProps<"/admin/usuarios/[id]">) {
   await connection();
   const admin = await exigirAdminPagina();
-  const id = idSchema.safeParse((await params).id);
-  if (!id.success) notFound();
-  const u = await obterDetalheUsuario(getDb(), id.data);
+  const bruto = (await params).id;
+  const id = ID_VALIDO.test(bruto) ? Number(bruto) : Number.NaN;
+  if (!Number.isSafeInteger(id) || id <= 0) notFound();
+  // Como em /concursos/[id], o loading.tsx do painel já enviou o HTTP 200: o 404 chega como
+  // conteúdo (a página "não encontrada"), não como status.
+  const u = await obterDetalheUsuario(getDb(), id);
   if (!u) notFound();
   const config = lerConfigAuth();
   const fixos: ReadonlySet<string> = config.habilitada ? config.emailsAdmin : new Set();
@@ -91,7 +101,7 @@ export default async function UsuarioAdminPage({ params }: PageProps<"/admin/usu
             ehAdmin={u.papel === "ADMIN"}
             bloqueado={u.bloqueadoEm !== null}
             ehVoce={ehVoce}
-            adminFixo={u.email !== null && fixos.has(u.email)}
+            adminFixo={ehEmailAdminFixo(u.email, fixos)}
           />
         }
       />

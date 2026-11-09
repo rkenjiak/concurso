@@ -12,7 +12,12 @@ import { exigirAdminPagina } from "@/server/auth/admin";
 import { acessoHoje } from "@/server/auth/autorizacao";
 import { lerConfigAuth } from "@/server/auth/config";
 import { getDb } from "@/server/db/client";
-import { listarUsuarios, nomeUsuario, rotuloUsuario } from "@/server/repositories/admin";
+import {
+  ehEmailAdminFixo,
+  listarUsuarios,
+  nomeUsuario,
+  rotuloUsuario,
+} from "@/server/repositories/admin";
 
 export const metadata: Metadata = { title: "Usuários" };
 
@@ -109,7 +114,7 @@ export default async function UsuariosAdminPage() {
                         ehAdmin={u.papel === "ADMIN"}
                         bloqueado={u.bloqueadoEm !== null}
                         ehVoce={ehVoce}
-                        adminFixo={u.email !== null && fixos.has(u.email)}
+                        adminFixo={ehEmailAdminFixo(u.email, fixos)}
                       />
                     </td>
                   </tr>

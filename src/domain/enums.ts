@@ -156,6 +156,8 @@ export type OrigemAcesso = (typeof ORIGEM_ACESSO)[number];
 export const MOTIVO_SEM_ACESSO = [
   "BLOQUEADO",
   "LOGIN_GOOGLE_DESLIGADO",
+  /** Usuário inicial sem conta Google e sem `APP_PASSWORD`: não há como entrar. */
+  "SENHA_DESLIGADA",
   "FORA_DAS_LISTAS",
 ] as const;
 export type MotivoSemAcesso = (typeof MOTIVO_SEM_ACESSO)[number];

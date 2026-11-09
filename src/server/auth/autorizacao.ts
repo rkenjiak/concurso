@@ -132,8 +132,10 @@ export function acessoHoje(
       ? "BLOQUEADO"
       : origens.length > 0
         ? null
-        : google
-          ? "FORA_DAS_LISTAS"
-          : "LOGIN_GOOGLE_DESLIGADO";
+        : !google
+          ? "LOGIN_GOOGLE_DESLIGADO"
+          : u.id === ID_USUARIO_INICIAL && u.email === null
+            ? "SENHA_DESLIGADA"
+            : "FORA_DAS_LISTAS";
   return { origens, temAcesso: motivo === null, motivo };
 }

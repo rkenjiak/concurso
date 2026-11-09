@@ -110,8 +110,16 @@ function existeOutroAdminAtivo(tx: Executor, id: number) {
   );
 }
 
+/**
+ * `true` se o e-mail está em `ADMIN_EMAILS` (`fixos`, já normalizados). Normaliza o e-mail por
+ * coerência com {@link normalizarEmail}, embora o banco já o guarde normalizado (#108).
+ */
+export function ehEmailAdminFixo(email: string | null, fixos: ReadonlySet<string>): boolean {
+  return email !== null && fixos.has(normalizarEmail(email));
+}
+
 const ehAdminFixo = (alvo: Usuario, opcoes: OpcoesAdmin) =>
-  alvo.email !== null && opcoes.emailsAdminFixos.has(alvo.email);
+  ehEmailAdminFixo(alvo.email, opcoes.emailsAdminFixos);
 
 // --- Leituras ---------------------------------------------------------------------------------
 
@@ -155,6 +163,14 @@ const colunasUsuario = {
   emailNoPainel: emailPermitido.email,
 };
 
+/**
+ * `LEFT JOIN` com a allowlist do painel pela igualdade exata do e-mail (#108). Vale porque os dois
+ * lados são gravados normalizados: `usuario.email` só vem do login Google (`lerPerfil` aplica
+ * `normalizarEmail`) e `email_permitido.email` passa por `normalizarEmail` ao ser liberado — a
+ * mesma regra de `emailNaAllowlist`. Assim o índice da chave primária continua sendo usado.
+ */
+const comAllowlistDoPainel = eq(emailPermitido.email, usuario.email);
+
 /** Troca os resumos dos tokens e o e-mail da allowlist por flags. */
 function semSegredos<
   T extends { mcpTokenHash: string | null; icsTokenHash: string | null; emailNoPainel: unknown },
@@ -175,7 +191,7 @@ export async function listarUsuarios(db: Executor): Promise<UsuarioAdmin[]> {
   const linhas = await db
     .select({ ...colunasUsuario, totalConcursos: count(concurso.id) })
     .from(usuario)
-    .leftJoin(emailPermitido, eq(emailPermitido.email, usuario.email))
+    .leftJoin(emailPermitido, comAllowlistDoPainel)
     .leftJoin(concurso, eq(concurso.usuarioId, usuario.id))
     .groupBy(usuario.id)
     .orderBy(asc(usuario.createdAt), asc(usuario.id));
@@ -200,7 +216,7 @@ export async function obterDetalheUsuario(
     db
       .select({ ...colunasUsuario, googleSub: usuario.googleSub })
       .from(usuario)
-      .leftJoin(emailPermitido, eq(emailPermitido.email, usuario.email))
+      .leftJoin(emailPermitido, comAllowlistDoPainel)
       .where(eq(usuario.id, id)),
     total(db.select({ n: count() }).from(concurso).where(doUsuario)),
     total(

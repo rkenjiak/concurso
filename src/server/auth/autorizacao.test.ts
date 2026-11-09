@@ -217,8 +217,12 @@ describe("acessoHoje (#108)", () => {
       temAcesso: false,
       motivo: "FORA_DAS_LISTAS",
     });
-    // Com o Google ligado mas sem senha, o usuário inicial só entra se o e-mail der acesso.
+    // Com o Google ligado mas sem senha, o usuário inicial ainda sem conta Google não entra.
     expect(acessoHoje(GOOGLE, u({ id: ID_USUARIO_INICIAL, email: null })).motivo).toBe(
+      "SENHA_DESLIGADA",
+    );
+    // Já com e-mail, vale a regra do Google.
+    expect(acessoHoje(GOOGLE, u({ id: ID_USUARIO_INICIAL, email: "zé@x.com" })).motivo).toBe(
       "FORA_DAS_LISTAS",
     );
   });
@@ -237,9 +241,15 @@ describe("acessoHoje (#108)", () => {
                 bloqueado,
                 emailNoPainel: email === "painel@x.com",
               });
-              expect(acessoHoje(config, alvo).temAcesso, JSON.stringify({ config, alvo })).toBe(
+              const acesso = acessoHoje(config, alvo);
+              expect(acesso.temAcesso, JSON.stringify({ config, alvo })).toBe(
                 await donoDoTokenAutorizado(db, config, alvo),
               );
+              // Todo "sem acesso" tem motivo, e o do usuário inicial sem conta é o específico.
+              expect(acesso.temAcesso).toBe(acesso.motivo === null);
+              if (!acesso.temAcesso && !bloqueado && id === ID_USUARIO_INICIAL && email === null) {
+                expect(acesso.motivo).toBe("SENHA_DESLIGADA");
+              }
             }
           }
         }

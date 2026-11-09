@@ -106,6 +106,7 @@ test("admin: selos MCP/.ics, detalhe do usuário e revogar tokens sem bloquear (
   ).toBeVisible();
   await page.getByRole("button", { name: /^Revogar tokens de/ }).click();
   await page.getByRole("alertdialog").getByRole("button", { name: "Revogar" }).click();
+  await expect(page.getByText(/^Tokens de .+ revogados\.$/)).toBeVisible();
   await expect(page.getByRole("button", { name: /^Revogar tokens de/ })).toHaveCount(0);
   await expect(page.getByText("Inativo")).toHaveCount(2);
   await expect(page.getByText("Com acesso hoje")).toBeVisible();

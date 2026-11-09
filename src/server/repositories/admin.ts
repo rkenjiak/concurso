@@ -205,6 +205,19 @@ export interface DetalheUsuarioAdmin extends Omit<UsuarioAdmin, "totalConcursos"
   contagens: { concursos: number; eventos: number; links: number; resultados: number };
 }
 
+/**
+ * Só confere se o usuário existe (#110): uma leitura pela chave primária, para o layout do detalhe,
+ * que também roda no prefetch dos links da tabela (o detalhe completo faz cinco consultas).
+ */
+export async function usuarioExiste(db: Executor, id: number): Promise<boolean> {
+  const [linha] = await db
+    .select({ id: usuario.id })
+    .from(usuario)
+    .where(eq(usuario.id, id))
+    .limit(1);
+  return linha !== undefined;
+}
+
 /** Detalhe de um usuário para o painel (#108), ou `null` se não existir. */
 export async function obterDetalheUsuario(
   db: Executor,

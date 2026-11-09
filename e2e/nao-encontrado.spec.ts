@@ -32,12 +32,14 @@ test("[id] inexistente ou malformado responde 404 com a página de não encontra
 
 test("concurso de outro usuário responde 404, inclusive na edição", async ({ page }) => {
   const { db, client } = bancoE2e();
+  let outroId: number | undefined;
   try {
     const [outro] = await db
       .insert(usuario)
       .values({ email: `outro-${unico()}@exemplo.com`, nome: "Outro usuário" })
       .returning({ id: usuario.id });
     if (!outro) throw new Error("usuário não inserido");
+    outroId = outro.id;
     const [alheio] = await db
       .insert(concurso)
       .values({
@@ -59,6 +61,11 @@ test("concurso de outro usuário responde 404, inclusive na edição", async ({ 
     expect((await page.goto(`/admin/usuarios/${outro.id}`))?.status()).toBe(200);
     await expect(page.getByRole("heading", { level: 1, name: "Outro usuário" })).toBeVisible();
   } finally {
+    // Não deixa o outro usuário para os demais testes (o banco é compartilhado).
+    if (outroId !== undefined) {
+      await db.delete(concurso).where(eq(concurso.usuarioId, outroId));
+      await db.delete(usuario).where(eq(usuario.id, outroId));
+    }
     client.close();
   }
 });
@@ -77,7 +84,8 @@ test("ID válido responde 200 no detalhe e na edição", async ({ page }) => {
 test("/admin/* para quem não é admin continua 403", async ({ page }) => {
   const { db, client } = bancoE2e();
   try {
-    // Sem login, o usuário é o inicial: rebaixado direto no banco só durante o teste.
+    // Sem login, o usuário é o inicial: rebaixado direto no banco só durante o teste e restaurado
+    // no `finally` (os testes rodam em série, ver `playwright.config.ts`).
     await db.update(usuario).set({ papel: "USUARIO" }).where(eq(usuario.id, ID_USUARIO_INICIAL));
     for (const rota of ["/admin", "/admin/usuarios", `/admin/usuarios/${ID_USUARIO_INICIAL}`]) {
       expect((await page.goto(rota))?.status(), rota).toBe(403);

@@ -440,12 +440,16 @@ o stream começa no fallback, o status HTTP fica fixado em 200 a partir dele: um
   rotas `[id]`; o calendário tem o seu;
 - `concursos/[id]/layout.tsx` e `admin/usuarios/[id]/layout.tsx` conferem o formato do ID e a
   existência (e o dono, no concurso) **acima** do `loading.tsx` do detalhe e chamam `notFound()`
-  → 404. A consulta (`carregar.ts`, com `React.cache`) é a mesma que a página e o
-  `generateMetadata` usam, então sai uma vez por renderização. As páginas carregam de novo como
-  garantia: o layout não é reexecutado ao navegar entre o detalhe e a edição;
+  → 404. A checagem (`carregar.ts`) é uma leitura enxuta pela chave primária, porque agora o
+  prefetch dos links para o detalhe passa pelo layout (vai até o primeiro `loading.tsx`): cada
+  link visível (dashboard, lista, quadro, calendário, tabela de usuários) custa essa leitura, e em
+  troca o esqueleto do detalhe também é pré-carregado. As páginas carregam o dado completo e
+  conferem de novo, como garantia: o layout não é reexecutado ao navegar entre o detalhe e a
+  edição. O `React.cache` deduplica cada leitura na mesma renderização (a do concurso entre
+  `generateMetadata` e a página);
 - o `forbidden()` do painel admin continua 403, porque fica no `admin/layout.tsx`, acima de tudo;
-- custo: o esqueleto do detalhe só aparece depois da checagem (a navegação espera o layout), uma
-  consulta pela chave primária;
+- custo: sem o prefetch pronto, o esqueleto do detalhe só aparece depois da checagem (a navegação
+  espera o layout); numa navegação, uma leitura a mais pela chave primária;
 - ainda aceito: o `redirect` da visão admin no dashboard sai abaixo do esqueleto e vira
   redirecionamento no cliente (as páginas exigem login).
 

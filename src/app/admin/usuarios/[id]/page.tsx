@@ -61,7 +61,7 @@ function Token({
 export default async function UsuarioAdminPage({ params }: PageProps<"/admin/usuarios/[id]">) {
   await connection();
   const admin = await exigirAdminPagina();
-  // O layout já conferiu o ID antes do loading.tsx (404 de verdade, #110); aqui o `cache` reaproveita.
+  // O layout já conferiu o ID antes do loading.tsx (404 de verdade, #110); aqui é a garantia.
   const u = await carregarUsuario((await params).id);
   const config = lerConfigAuth();
   const fixos: ReadonlySet<string> = config.habilitada ? config.emailsAdmin : new Set();

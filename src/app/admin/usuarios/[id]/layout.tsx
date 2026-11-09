@@ -1,4 +1,4 @@
-import { carregarUsuario } from "./carregar";
+import { conferirUsuario } from "./carregar";
 
 /**
  * Confere o usuário antes do `loading.tsx` do detalhe (#110), como o `forbidden()` do
@@ -8,6 +8,6 @@ export default async function UsuarioAdminLayout({
   children,
   params,
 }: LayoutProps<"/admin/usuarios/[id]">) {
-  await carregarUsuario((await params).id);
+  await conferirUsuario((await params).id);
   return children;
 }

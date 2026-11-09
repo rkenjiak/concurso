@@ -2,6 +2,7 @@ import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { type Client, createClient } from "@libsql/client";
 import { drizzle, type LibSQLDatabase } from "drizzle-orm/libsql";
+import { ESPERA_LOCK_MS, ehArquivoLocal, protegerClienteLocal } from "./local";
 import * as schema from "./schema";
 import { tokenDoBanco, urlDoBanco } from "./url";
 
@@ -31,7 +32,11 @@ export function criarDb(opcoes: OpcoesDb = {}): { db: Db; client: Client } {
   const url = opcoes.url ?? urlDoBanco();
   const authToken = opcoes.authToken ?? tokenDoBanco();
   garantirDiretorio(url);
-  const client = createClient({ url, authToken });
+  // Arquivo local: WAL, uma escrita por vez no processo e busy timeout contra outros processos
+  // (#112, veja `local.ts`). `:memory:` tem uma conexão só, e o remoto (Turso) cuida disso.
+  const client = ehArquivoLocal(url)
+    ? protegerClienteLocal(createClient({ url, authToken, timeout: ESPERA_LOCK_MS }))
+    : createClient({ url, authToken });
   const db = drizzle(client, { schema });
   return { db, client };
 }

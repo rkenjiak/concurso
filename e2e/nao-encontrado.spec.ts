@@ -61,6 +61,9 @@ test("concurso de outro usuário responde 404, inclusive na edição", async ({ 
     expect((await page.goto(`/admin/usuarios/${outro.id}`))?.status()).toBe(200);
     await expect(page.getByRole("heading", { level: 1, name: "Outro usuário" })).toBeVisible();
   } finally {
+    // Sai da página antes de escrever no banco por fora: os prefetches dela ainda leem o banco
+    // no servidor (#112).
+    await page.goto("about:blank");
     // Não deixa o outro usuário para os demais testes (o banco é compartilhado).
     if (outroId !== undefined) {
       await db.delete(concurso).where(eq(concurso.usuarioId, outroId));

@@ -610,8 +610,10 @@ Decisões (issue #39):
 - **Último acesso real (#108):** `usuarioAtual` (`auth/acesso.ts`) registra o acesso, e não
   `usuarioDaSessao` (pura) nem o `proxy.ts`; `/api/mcp` e `/api/calendario.ics`, após autorizar,
   registram o acesso e o `*_usado_em` do canal (só para o token atual, conferido pelo resumo). É
-  uma única escrita condicional, sem leitura prévia (`UPDATE … WHERE x IS NULL OR x < agora - 15
-  min`, throttle por usuário e coluna), aguardada (sem `after()`) e protegida por `try/catch` +
+  uma única escrita condicional, sem leitura extra (`UPDATE … WHERE x IS NULL OR x < agora - 15
+  min`, throttle por usuário e coluna), tentada só quando a linha já lida na autorização está fora
+  da janela (no SQLite, até um `UPDATE` sem efeito pega o lock de escrita; o `UPDATE` condicional
+  fica como garantia contra corrida), aguardada (sem `after()`) e protegida por `try/catch` +
   `log.warn("auth.registro_acesso_falhou")`. O `cache()` só deduplica por renderização; Server
   Actions e Route Handlers podem chamar de novo, e o throttle limita. Prefetch conta como acesso.
   Todos os chamadores são dinâmicos, então nada é gravado no build.

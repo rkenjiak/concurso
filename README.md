@@ -71,12 +71,13 @@ dados (inclusive export/import e MCP).
   antes do multiusuário pertencem ao **usuário inicial**, que é assumido pelo primeiro login de um
   e-mail de `ADMIN_EMAILS`. Retirar um e-mail da allowlist encerra as sessões dele na hora.
 - **Painel admin** (`/admin`, só admins): lista os usuários com o último acesso real e os tokens
-  ativos (MCP e calendário), mostra quem está ativo e por que alguém está sem acesso, promove/rebaixa
-  admins, revoga tokens, bloqueia contas (sem acesso por sessão nem pelos tokens do MCP e do
-  calendário), libera e-mails além dos de `ALLOWED_EMAILS` e registra tudo num log de auditoria.
-  Mostra só metadados e contagens: os dados dos usuários continuam privados. O admin alterna entre "Visão admin" e
-  "Visão usuário" no menu da conta, sem novo login. Os e-mails de `ADMIN_EMAILS` são admins garantidos, e o último
-  admin ativo não pode ser rebaixado nem bloqueado.
+  ativos (MCP e calendário), mostra quem está ativo e por que alguém está sem acesso,
+  promove/rebaixa admins, revoga tokens, bloqueia contas (sem acesso por sessão nem pelos tokens do
+  MCP e do calendário), libera e-mails além dos de `ALLOWED_EMAILS` e registra tudo num log de
+  auditoria. Mostra só metadados e contagens: os dados dos usuários continuam privados. O admin
+  alterna entre "Visão admin" e "Visão usuário" no menu da conta, sem novo login. Os e-mails de
+  `ADMIN_EMAILS` são admins garantidos, e o último admin ativo não pode ser rebaixado nem
+  bloqueado.
 - **Senha única** (`APP_PASSWORD` + `AUTH_SECRET`): para uso local; entra sempre como o usuário
   inicial. Em produção não pode ser combinada com o login Google. Após 5 senhas erradas, novas
   tentativas do mesmo cliente esperam cada vez mais.

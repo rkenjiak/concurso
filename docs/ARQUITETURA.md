@@ -102,7 +102,15 @@ obrigatório, garantido por triggers porque a coluna foi adicionada com `ALTER T
 - `auditoria_admin`: `id`, `admin_id` e `alvo_usuario_id` → `usuario.id` (`SET NULL`), `admin` e
   `alvo` (cópias do e-mail/descrição no momento da ação, para o registro sobreviver a mudanças),
   `acao` (`PROMOVER_ADMIN`, `REBAIXAR_ADMIN`, `BLOQUEAR_USUARIO`, `DESBLOQUEAR_USUARIO`,
-  `PERMITIR_EMAIL`, `REMOVER_EMAIL`), `created_at` (índice).
+  `PERMITIR_EMAIL`, `REMOVER_EMAIL`, `REVOGAR_TOKENS` — #108; o enum existe só em TS e a coluna é
+  texto, então novas ações não exigem migração), `created_at` (índice).
+
+**Uso real (#108, migração `0007_uso_tokens`):**
+- `usuario.mcp_token_usado_em` e `usuario.ics_token_usado_em` (epoch ms, nuláveis): último uso de
+  cada token pessoal. Zerados junto com o resumo ao gerar ou revogar o token, ao revogar pelo
+  painel e ao bloquear/desbloquear.
+- `usuario.ultimo_acesso_em` passa a ser o último acesso real (login, páginas e ações com sessão,
+  MCP por HTTP e feed `.ics`), não só o último login. Veja "Último acesso real" em §7.1.
 
 **Lembretes (#65, migração `0005_lembretes`):**
 - `usuario.ics_token_hash` (SHA-256 do token do feed de calendário, único), `ics_incluir_concluidos`
@@ -361,8 +369,9 @@ seguinte, seletor e atalhos), então o filtro se mantém ao trocar de mês.
 | `/configuracoes` | Regras de notificação, calendário (.ics), exportar/importar dados, token do MCP, acesso | MVP |
 | `/notificacoes` | **Central de notificações** (#65): marcar como lida, marcar todas, dispensar | v2.2 |
 | `/login` | Login Google e/ou senha única (só se auth habilitada) | MVP |
-| `/admin` | **Painel admin** (#50, só papel `ADMIN`; 403 para os demais): visão geral com totais de usuários, concursos e eventos e ações recentes | v1.4 |
-| `/admin/usuarios` | Usuários (nome, e-mail, papel, cadastro, último acesso, nº de concursos); promover/rebaixar, bloquear/desbloquear | v1.4 |
+| `/admin` | **Painel admin** (#50, só papel `ADMIN`; 403 para os demais): visão geral com totais de usuários, concursos e eventos, uso (ativos em 7/30 dias, com token do MCP, com feed .ics; #108) e ações recentes | v1.4 |
+| `/admin/usuarios` | Usuários (nome, e-mail, papel, cadastro, último acesso real, selos MCP/.ics e "Sem acesso hoje", nº de concursos); promover/rebaixar, bloquear/desbloquear | v1.4 · #108 |
+| `/admin/usuarios/[id]` | Detalhe (#108): origem do acesso, "sem acesso hoje" e motivo, conta Google vinculada, contagens agregadas (concursos, eventos, links, resultados), tokens MCP/.ics com último uso; **Revogar tokens**. ID inválido ou inexistente → página 404 (o status sai 200 por causa do `loading.tsx` do painel) | #108 |
 | `/admin/acesso` | Allowlist do login Google: e-mails das variáveis (só leitura) e liberados no painel (adicionar/retirar) | v1.4 |
 | `/admin/auditoria` | Log das ações administrativas (últimas 200) | v1.4 |
 | `/concursos?visao=quadro` | Quadro por status (kanban; arrastar ou “Mover para” = transição validada) | v1.1 |
@@ -406,6 +415,7 @@ Os ícones são gerados de `assets/logo.svg` por `pnpm icones` (`scripts/gerar-i
 | `alternarVisaoAcao(visao)` | #50 — "usuario" ou "admin" (só admins); grava o cookie da visão e leva a `/` ou `/admin` |
 | `definirPapelAcao(id, papel)`, `definirBloqueioAcao(id, bloqueado)` | #50 — admin; protege o último admin ativo e os de `ADMIN_EMAILS` |
 | `adicionarEmailPermitidoAcao(email)`, `removerEmailPermitidoAcao(email)` | #50 — admin; allowlist do painel |
+| `revogarTokensAcao(id)` | #108 — admin; revoga os tokens MCP e .ics sem bloquear, auditado (`REVOGAR_TOKENS`); devolve `{ revogou }` (sem tokens ativos, não muda nada nem audita) |
 
 Todas: checagem de sessão (`exigirUsuarioAcao`, ou `exigirAdminAcao` no painel) → validação Zod →
 `executar` (transação no repositório; `ErroDominio` vira mensagem, exceção inesperada vira
@@ -594,8 +604,22 @@ Decisões (issue #39):
   `experimental.authInterrupts`) e as ações, `exigirAdminAcao()` ("Acesso restrito a
   administradores").
 - **Auditoria:** toda alteração do painel grava em `auditoria_admin` na mesma transação.
-- **Privacidade:** o painel mostra só totais e metadados das contas; não há impersonação nem acesso
-  aos concursos de outros usuários.
+- **Privacidade:** o painel mostra só totais e metadados das contas — flags, datas técnicas e
+  contagens agregadas (#108); não há impersonação nem acesso aos concursos de outros usuários. Os
+  resumos dos tokens e o `google_sub` saem das leituras convertidos em flag (testado).
+- **Último acesso real (#108):** `usuarioAtual` (`auth/acesso.ts`) registra o acesso, e não
+  `usuarioDaSessao` (pura) nem o `proxy.ts`; `/api/mcp` e `/api/calendario.ics`, após autorizar,
+  registram o acesso e o `*_usado_em` do canal (só para o token atual, conferido pelo resumo). É
+  uma única escrita condicional, sem leitura prévia (`UPDATE … WHERE x IS NULL OR x < agora - 15
+  min`, throttle por usuário e coluna), aguardada (sem `after()`) e protegida por `try/catch` +
+  `log.warn("auth.registro_acesso_falhou")`. O `cache()` só deduplica por renderização; Server
+  Actions e Route Handlers podem chamar de novo, e o throttle limita. Prefetch conta como acesso.
+  Todos os chamadores são dinâmicos, então nada é gravado no build.
+- **Sem acesso hoje (#108):** `acessoHoje` (`auth/autorizacao.ts`) reproduz `donoDoTokenAutorizado`
+  sem consultas (a allowlist do painel vem de um `LEFT JOIN` na listagem) e explica o resultado:
+  origens (`OrigemAcesso`) e motivo (`MotivoSemAcesso`: bloqueado, login Google desligado, usuário
+  inicial sem conta Google com a senha desligada, e-mail fora das listas). Um teste confere as duas
+  regras em todas as combinações.
 
 **Cabeçalhos de segurança (#95):** `next.config.ts` aplica a todas as rotas os cabeçalhos de
 `src/lib/cabecalhos-seguranca.ts`: CSP, `X-Frame-Options: DENY`, `nosniff`,
@@ -662,7 +686,7 @@ do React). O e2e `seguranca.spec.ts` confere os cabeçalhos e a ausência de vio
 |---|---|---|---|
 | Unitário | Vitest | `domain/*` (transições, prazos, validade, criticidade), `lib/format`, parsers BRL, schemas Zod | meta: cobertura ≥ 90% em `domain/` (medida no CI, sem limite configurado) |
 | Integração | Vitest + libSQL `:memory:` + migrações | repositories/queries (transação de status, tags, filtros, export→import ida e volta); servidor MCP com cliente em memória (`InMemoryTransport`) | casos principais |
-| E2E | Playwright (Chromium) | smoke: criar concurso → evento → aparece no dashboard → mudar status → exportar/importar; login, MCP, PWA e lembretes com auth ativa; painel admin com o usuário inicial (sem auth); busca, quadro, calendário (navegação rápida e filtro de concursos no desktop e em 360 px, #83), cor/ícone, ocultar prazos, tema, lembretes (sino, regras, feed .ics), sino único por tela e tema pelo menu no celular, tema e Configurações sem duplicação (#82), PWA, aba do detalhe na URL e botão Atualizar com limite de 60 s (#77), deep-link e volta à origem, painel do evento com concluir/Desfazer, cabeçalho do concurso, avisos e alterações não salvas (#100) e layout em 360 px; `/api/mcp` com token → concurso visível no app. Dois servidores (com e sem auth) com bancos temporários em `e2e/.tmp` | poucos fluxos |
+| E2E | Playwright (Chromium) | smoke: criar concurso → evento → aparece no dashboard → mudar status → exportar/importar; login, MCP, PWA e lembretes com auth ativa; painel admin com o usuário inicial (sem auth), incluindo selos MCP/.ics, detalhe do usuário e revogar tokens → `/api/mcp` 401 e feed 404 (#108); busca, quadro, calendário (navegação rápida e filtro de concursos no desktop e em 360 px, #83), cor/ícone, ocultar prazos, tema, lembretes (sino, regras, feed .ics), sino único por tela e tema pelo menu no celular, tema e Configurações sem duplicação (#82), PWA, aba do detalhe na URL e botão Atualizar com limite de 60 s (#77), deep-link e volta à origem, painel do evento com concluir/Desfazer, cabeçalho do concurso, avisos e alterações não salvas (#100) e layout em 360 px; `/api/mcp` com token → concurso visível no app. Dois servidores (com e sem auth) com bancos temporários em `e2e/.tmp` | poucos fluxos |
 
 Datas sempre fixadas (`vi.setSystemTime` / `hoje` injetado).
 
@@ -757,6 +781,7 @@ O hook só vê o que **escapa** do código: `executar` (Server Actions e MCP), `
 | `auth.login_falhou` | warn (info se `cancelado`) | `metodo`, `motivo`, `ip`; Google: `email` mascarado e `erro` quando houver. Motivos com senha: `senha_incorreta`, `conta_bloqueada` (só detectado depois que a senha confere). Com Google: `nao_autorizado` (fora da allowlist), `bloqueado`, `erro_google` (troca do código ou `id_token` inválido), `estado_invalido` (state/cookie expirado ou forjado), `cancelado` |
 | `auth.limite_tentativas` | warn | `rota` (`login`, `mcp`, `ics`), `ip`, `esperaMs`: só quando uma falha **inicia** um bloqueio, não a cada tentativa recusada durante a espera |
 | `auth.token_invalido` | warn | `rota` (`mcp`, `ics`), `ip`, `ausente`; token válido de quem perdeu o acesso (#96): também `usuarioId` e `motivo: "sem_acesso"` |
+| `auth.registro_acesso_falhou` | warn | `canal` (`sessao`, `mcp`, `ics`), `usuarioId`, `erro`: falha ao gravar o último acesso/uso (#108); a requisição segue normalmente |
 | `auth.logout` | info | `usuarioId` (lido do cookie assinado, sem consultar o banco; o logout nunca falha por causa do log) |
 | `auth.config_invalida` | error | `erro` (proxy) |
 | `dados.importacao` / `dados.importacao_recusada` / `dados.importacao_erro` | info / info / error | `usuarioId`, contagens do resumo, `motivo` ou `erro` |

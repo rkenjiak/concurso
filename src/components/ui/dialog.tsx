@@ -49,9 +49,9 @@ function DialogOverlay({
  */
 const POSICAO_CONTEUDO = {
   centro:
-    "inset-0 m-auto h-fit w-full max-w-[calc(100%-2rem)] rounded-xl p-4 duration-100 sm:max-w-sm data-open:zoom-in-95 data-closed:zoom-out-95",
+    "inset-0 m-auto h-fit w-full max-w-[calc(100%-2rem)] rounded-xl p-4 duration-100 sm:max-w-sm motion-safe:data-open:zoom-in-95 motion-safe:data-closed:zoom-out-95",
   gaveta:
-    "inset-x-0 bottom-0 max-h-[85dvh] w-full overflow-y-auto rounded-t-xl pt-4 pr-[max(1rem,env(safe-area-inset-right))] pb-[max(1rem,env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] duration-200 max-md:motion-safe:data-open:slide-in-from-bottom max-md:motion-safe:data-closed:slide-out-to-bottom md:inset-0 md:m-auto md:h-fit md:max-h-[90dvh] md:max-w-lg md:rounded-xl md:p-4 md:duration-100 md:data-open:zoom-in-95 md:data-closed:zoom-out-95",
+    "inset-x-0 bottom-0 max-h-[85dvh] w-full overflow-y-auto rounded-t-xl pt-4 pr-[max(1rem,env(safe-area-inset-right))] pb-[max(1rem,env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] duration-200 max-md:motion-safe:data-open:slide-in-from-bottom max-md:motion-safe:data-closed:slide-out-to-bottom md:inset-0 md:m-auto md:h-fit md:max-h-[90dvh] md:max-w-lg md:rounded-xl md:p-4 md:duration-100 md:motion-safe:data-open:zoom-in-95 md:motion-safe:data-closed:zoom-out-95",
 } as const;
 
 function DialogContent({

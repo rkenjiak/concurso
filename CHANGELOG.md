@@ -7,6 +7,34 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 
 ## [Unreleased]
 
+### Adicionado
+
+- **Uso real no painel admin** (#108): a visão geral mostra quantos usuários estiveram ativos em 7
+  e 30 dias e quantos têm token do MCP ou feed `.ics` ativo. A tabela de usuários ganhou os selos
+  **MCP** e **.ics** (token ativo), com o último uso na dica e para leitores de tela, e o selo
+  **Sem acesso hoje**. O MCP local por stdio (`pnpm mcp`) não usa token e não é contado.
+- **Detalhe do usuário** (#108) em `/admin/usuarios/{id}`: origem do acesso (`ADMIN_EMAILS`,
+  `ALLOWED_EMAILS`, liberado no painel, papel admin ou usuário inicial), "Sem acesso hoje" com o
+  motivo (pela mesma regra que vale para os tokens), conta Google vinculada, contagens de
+  concursos, eventos, links e resultados, e os tokens com o último uso. Só flags, datas e
+  contagens: o conteúdo dos concursos continua privado.
+- **Revogar tokens** (#108) sem bloquear: apaga o token do MCP e o link do feed `.ics` do usuário,
+  com confirmação e registro na auditoria ("Revogou os tokens (MCP e .ics) de"). Sem tokens
+  ativos, nada muda nem é auditado.
+
+### Alterado
+
+- Gerar ou revogar um token, bloquear e desbloquear passam a zerar também o último uso do token
+  (#108), para o painel não mostrar "usado há 2 dias" em quem já não tem token.
+
+### Corrigido
+
+- **"Último acesso"** no painel admin (#108) era, na verdade, o último login: com sessões de 30
+  dias e o uso por MCP ou `.ics`, quem usava o app todo dia aparecia com acesso de semanas atrás
+  (e, sem login configurado, o campo nunca mudava). Agora conta páginas, Server Actions, MCP por
+  HTTP e o feed `.ics`, gravado no máximo a cada 15 minutos por usuário, numa única escrita
+  condicional; uma falha ao registrar só gera aviso no log.
+
 ## [2.6.0] - 2026-11-08
 
 ### Adicionado

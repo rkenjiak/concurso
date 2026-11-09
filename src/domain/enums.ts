@@ -133,5 +133,31 @@ export const ACAO_ADMIN = [
   "DESBLOQUEAR_USUARIO",
   "PERMITIR_EMAIL",
   "REMOVER_EMAIL",
+  /** Revoga os tokens pessoais (MCP e .ics) sem bloquear (#108). Só em TS: a coluna é texto. */
+  "REVOGAR_TOKENS",
 ] as const;
 export type AcaoAdmin = (typeof ACAO_ADMIN)[number];
+
+/**
+ * O que dá acesso hoje a um usuário (#108), na mesma regra de `donoDoTokenAutorizado`: o usuário
+ * inicial pela senha (ou sem login configurado); os demais pelo login Google, com o e-mail em
+ * `ADMIN_EMAILS`, `ALLOWED_EMAILS` ou liberado no painel, ou com o papel admin.
+ */
+export const ORIGEM_ACESSO = [
+  "USUARIO_INICIAL",
+  "ADMIN_EMAILS",
+  "ALLOWED_EMAILS",
+  "PAINEL",
+  "PAPEL_ADMIN",
+] as const;
+export type OrigemAcesso = (typeof ORIGEM_ACESSO)[number];
+
+/** Por que um usuário cadastrado está sem acesso hoje (#108). */
+export const MOTIVO_SEM_ACESSO = [
+  "BLOQUEADO",
+  "LOGIN_GOOGLE_DESLIGADO",
+  /** Usuário inicial sem conta Google e sem `APP_PASSWORD`: não há como entrar. */
+  "SENHA_DESLIGADA",
+  "FORA_DAS_LISTAS",
+] as const;
+export type MotivoSemAcesso = (typeof MOTIVO_SEM_ACESSO)[number];

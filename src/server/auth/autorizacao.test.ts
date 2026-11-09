@@ -4,7 +4,12 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { criarBancoTeste, criarUsuarioTeste } from "../db/banco-teste";
 import type { Db } from "../db/client";
 import { emailPermitido, ID_USUARIO_INICIAL, usuario } from "../db/schema";
-import { decidirLoginGoogle, donoDoTokenAutorizado, usuarioDaSessao } from "./autorizacao";
+import {
+  acessoHoje,
+  decidirLoginGoogle,
+  donoDoTokenAutorizado,
+  usuarioDaSessao,
+} from "./autorizacao";
 import type { ConfigAuth } from "./config";
 
 let db: Db;
@@ -155,5 +160,100 @@ describe("donoDoTokenAutorizado (#96)", () => {
     expect(await donoDoTokenAutorizado(db, GOOGLE, inicial)).toBe(false);
     expect(await donoDoTokenAutorizado(db, AMBOS, inicial)).toBe(true);
     expect(await donoDoTokenAutorizado(db, AMBOS, await dono(bia))).toBe(true);
+  });
+});
+
+describe("acessoHoje (#108)", () => {
+  const SEM_LOGIN: ConfigAuth = { habilitada: false };
+  const AMBOS: ConfigAuth = { ...base, senha: "senha", google: GOOGLE_CFG };
+  const u = (
+    dados: Partial<{ id: number; email: string | null; papel: "ADMIN" | "USUARIO" }> & {
+      emailNoPainel?: boolean;
+      bloqueado?: boolean;
+    },
+  ) => ({
+    id: dados.id ?? 99,
+    email: dados.email === undefined ? "zé@x.com" : dados.email,
+    papel: dados.papel ?? ("USUARIO" as const),
+    bloqueadoEm: dados.bloqueado ? new Date() : null,
+    emailNoPainel: dados.emailNoPainel ?? false,
+  });
+
+  it("lista cada origem que dá acesso hoje", () => {
+    expect(acessoHoje(SEM_LOGIN, u({ id: ID_USUARIO_INICIAL })).origens).toEqual([
+      "USUARIO_INICIAL",
+    ]);
+    expect(acessoHoje(SENHA, u({ id: ID_USUARIO_INICIAL })).origens).toEqual(["USUARIO_INICIAL"]);
+    expect(acessoHoje(GOOGLE, u({ email: "ANA@x.com" })).origens).toEqual(["ADMIN_EMAILS"]);
+    expect(acessoHoje(GOOGLE, u({ email: "bia@x.com" })).origens).toEqual(["ALLOWED_EMAILS"]);
+    expect(acessoHoje(GOOGLE, u({ emailNoPainel: true })).origens).toEqual(["PAINEL"]);
+    expect(acessoHoje(GOOGLE, u({ papel: "ADMIN" })).origens).toEqual(["PAPEL_ADMIN"]);
+    expect(
+      acessoHoje(AMBOS, u({ id: ID_USUARIO_INICIAL, email: "ana@x.com", papel: "ADMIN" })),
+    ).toEqual({
+      origens: ["USUARIO_INICIAL", "ADMIN_EMAILS", "PAPEL_ADMIN"],
+      temAcesso: true,
+      motivo: null,
+    });
+  });
+
+  it("sem acesso hoje: bloqueado, login Google desligado ou fora das listas", () => {
+    expect(acessoHoje(GOOGLE, u({ email: "ana@x.com", bloqueado: true }))).toMatchObject({
+      temAcesso: false,
+      motivo: "BLOQUEADO",
+    });
+    // Usuário inicial bloqueado sem login: o bloqueio também vale para o token.
+    expect(acessoHoje(SEM_LOGIN, u({ id: ID_USUARIO_INICIAL, bloqueado: true })).motivo).toBe(
+      "BLOQUEADO",
+    );
+    expect(acessoHoje(SENHA, u({ email: "ana@x.com", papel: "ADMIN" }))).toEqual({
+      origens: [],
+      temAcesso: false,
+      motivo: "LOGIN_GOOGLE_DESLIGADO",
+    });
+    expect(acessoHoje(SEM_LOGIN, u({ emailNoPainel: true })).motivo).toBe("LOGIN_GOOGLE_DESLIGADO");
+    expect(acessoHoje(GOOGLE, u({}))).toEqual({
+      origens: [],
+      temAcesso: false,
+      motivo: "FORA_DAS_LISTAS",
+    });
+    // Com o Google ligado mas sem senha, o usuário inicial ainda sem conta Google não entra.
+    expect(acessoHoje(GOOGLE, u({ id: ID_USUARIO_INICIAL, email: null })).motivo).toBe(
+      "SENHA_DESLIGADA",
+    );
+    // Já com e-mail, vale a regra do Google.
+    expect(acessoHoje(GOOGLE, u({ id: ID_USUARIO_INICIAL, email: "zé@x.com" })).motivo).toBe(
+      "FORA_DAS_LISTAS",
+    );
+  });
+
+  it("concorda com donoDoTokenAutorizado em todas as combinações", async () => {
+    await db.insert(emailPermitido).values({ email: "painel@x.com" });
+    for (const config of [SEM_LOGIN, SENHA, GOOGLE, AMBOS]) {
+      for (const id of [ID_USUARIO_INICIAL, 99]) {
+        for (const email of [null, "ana@x.com", "bia@x.com", "painel@x.com", "zé@x.com"]) {
+          for (const papel of ["ADMIN", "USUARIO"] as const) {
+            for (const bloqueado of [false, true]) {
+              const alvo = u({
+                id,
+                email,
+                papel,
+                bloqueado,
+                emailNoPainel: email === "painel@x.com",
+              });
+              const acesso = acessoHoje(config, alvo);
+              expect(acesso.temAcesso, JSON.stringify({ config, alvo })).toBe(
+                await donoDoTokenAutorizado(db, config, alvo),
+              );
+              // Todo "sem acesso" tem motivo, e o do usuário inicial sem conta é o específico.
+              expect(acesso.temAcesso).toBe(acesso.motivo === null);
+              if (!acesso.temAcesso && !bloqueado && id === ID_USUARIO_INICIAL && email === null) {
+                expect(acesso.motivo).toBe("SENHA_DESLIGADA");
+              }
+            }
+          }
+        }
+      }
+    }
   });
 });

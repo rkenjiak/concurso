@@ -10,8 +10,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { criarBancoTeste, criarUsuarioTeste } from "@/server/db/banco-teste";
 import type { Db } from "@/server/db/client";
 import { emailPermitido, ID_USUARIO_INICIAL, usuario } from "@/server/db/schema";
+import { log } from "@/server/log";
 import { definirBloqueio } from "@/server/repositories/admin";
-import { gerarTokenIcs, gerarTokenMcp } from "@/server/repositories/usuarios";
+import * as usuarios from "@/server/repositories/usuarios";
+import { gerarTokenIcs, gerarTokenMcp, obterUsuario } from "@/server/repositories/usuarios";
 
 const estado = vi.hoisted(() => ({ db: null as unknown as Db, ip: 0 }));
 
@@ -20,8 +22,15 @@ vi.mock("@/server/db/client", async (original) => ({
   getDb: () => estado.db,
 }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+vi.mock("@/server/repositories/usuarios", async (original) => {
+  const real = await original<typeof import("@/server/repositories/usuarios")>();
+  return { ...real, registrarUsoToken: vi.fn(real.registrarUsoToken) };
+});
 // IP diferente a cada requisição: o atraso progressivo das falhas não interfere nos testes.
-vi.mock("@/server/auth/acesso", () => ({ chaveCliente: async () => `ip-${estado.ip++}` }));
+vi.mock("@/server/auth/acesso", async (original) => ({
+  ...(await original<typeof import("@/server/auth/acesso")>()),
+  chaveCliente: async () => `ip-${estado.ip++}`,
+}));
 
 const mcp = await import("./mcp/route");
 const ics = await import("./calendario.ics/route");
@@ -117,6 +126,65 @@ describe("tokens pessoais de quem perdeu o acesso (#96)", () => {
   it("admin de ADMIN_EMAILS continua valendo", async () => {
     const token = await gerarTokenIcs(estado.db, ID_USUARIO_INICIAL);
     expect((await chamarIcs(token)).status).toBe(200);
+  });
+
+  it("registra o último acesso e o uso do token só quando autoriza (#108)", async () => {
+    const tokenMcp = await gerarTokenMcp(estado.db, bia);
+    const tokenIcs = await gerarTokenIcs(estado.db, bia);
+    expect((await chamarMcp(tokenMcp)).status).toBe(200);
+    expect((await chamarIcs(tokenIcs)).status).toBe(200);
+    const usada = await obterUsuario(estado.db, bia);
+    expect(usada?.ultimoAcessoEm).toBeInstanceOf(Date);
+    expect(usada?.mcpTokenUsadoEm).toBeInstanceOf(Date);
+    expect(usada?.icsTokenUsadoEm).toBeInstanceOf(Date);
+
+    // Fora de qualquer allowlist: o token existe, mas é recusado e nada é registrado.
+    const semAcesso = await criarUsuarioTeste(estado.db, "x@x.com");
+    expect((await chamarIcs(await gerarTokenIcs(estado.db, semAcesso))).status).toBe(404);
+    const recusada = await obterUsuario(estado.db, semAcesso);
+    expect(recusada?.ultimoAcessoEm).toBeNull();
+    expect(recusada?.icsTokenUsadoEm).toBeNull();
+  });
+
+  it("com acesso e uso recentes nem tenta escrever; passada a janela, escreve (#108)", async () => {
+    const registrar = vi.mocked(usuarios.registrarUsoToken);
+    const tokenMcp = await gerarTokenMcp(estado.db, bia);
+    const definirUso = (ms: number) => {
+      const em = new Date(Date.now() - ms);
+      return estado.db
+        .update(usuario)
+        .set({ ultimoAcessoEm: em, mcpTokenUsadoEm: em })
+        .where(eq(usuario.id, bia));
+    };
+    registrar.mockClear();
+    await definirUso(60_000);
+    expect((await chamarMcp(tokenMcp)).status).toBe(200);
+    expect(registrar).not.toHaveBeenCalled();
+
+    await definirUso(usuarios.JANELA_REGISTRO_USO_MS + 60_000);
+    expect((await chamarMcp(tokenMcp)).status).toBe(200);
+    expect(registrar).toHaveBeenCalledTimes(1);
+  });
+
+  it("falha ao registrar o uso não vira 500: só avisa no log (#108)", async () => {
+    const aviso = vi.spyOn(log, "warn").mockImplementation(() => {});
+    vi.mocked(usuarios.registrarUsoToken)
+      .mockRejectedValueOnce(new Error("readonly"))
+      .mockRejectedValueOnce(new Error("readonly"));
+    try {
+      expect((await chamarMcp(await gerarTokenMcp(estado.db, bia))).status).toBe(200);
+      expect((await chamarIcs(await gerarTokenIcs(estado.db, bia))).status).toBe(200);
+      expect(aviso).toHaveBeenCalledWith(
+        "auth.registro_acesso_falhou",
+        expect.objectContaining({ canal: "mcp", usuarioId: bia }),
+      );
+      expect(aviso).toHaveBeenCalledWith(
+        "auth.registro_acesso_falhou",
+        expect.objectContaining({ canal: "ics", usuarioId: bia }),
+      );
+    } finally {
+      aviso.mockRestore();
+    }
   });
 
   it("bloquear revoga os tokens; desbloquear não os devolve", async () => {

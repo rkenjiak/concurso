@@ -6,7 +6,7 @@
  * perdeu o acesso (mesma regra da sessão, #96) ou token revogado → 404. Falhas seguidas sofrem atraso progressivo, como o login.
  */
 import type { NextRequest } from "next/server";
-import { chaveCliente } from "@/server/auth/acesso";
+import { chaveCliente, registrarUsoDoToken } from "@/server/auth/acesso";
 import { donoDoTokenAutorizado } from "@/server/auth/autorizacao";
 import { lerConfigAuth } from "@/server/auth/config";
 import { LimitadorTentativas } from "@/server/auth/limitador";
@@ -58,6 +58,7 @@ export async function GET(request: NextRequest): Promise<Response> {
     return texto("Calendário não encontrado. Gere um novo link em Configurações.", 404);
   }
   limitador.registrarSucesso(chave);
+  await registrarUsoDoToken(usuario, "ics", token);
   const ics = await gerarIcsDoUsuario(db, usuario.id, {
     incluirConcluidos: usuario.icsIncluirConcluidos,
     incluirEncerrados: usuario.icsIncluirEncerrados,

@@ -96,8 +96,8 @@ export default async function ConfiguracoesPage() {
               <h3>Notificações</h3>
             </CardTitle>
             <CardDescription>
-              Quais prazos avisam no app (sino) e com quantos dias de antecedência. Para silenciar
-              um concurso, use o botão no detalhe dele.
+              Quais prazos avisam no app (Notificações) e com quantos dias de antecedência. Para
+              silenciar um concurso, use o botão no detalhe dele.
             </CardDescription>
           </CardHeader>
           <CardContent>

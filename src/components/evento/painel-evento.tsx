@@ -15,12 +15,10 @@ import {
   type ComponentProps,
   createContext,
   type ReactNode,
-  startTransition,
   useCallback,
   useContext,
   useEffect,
   useMemo,
-  useOptimistic,
   useRef,
   useState,
 } from "react";
@@ -32,6 +30,7 @@ import { SugestaoStatus } from "@/components/concurso/sugestao-status";
 import { BotaoOcultarPrazo } from "@/components/dashboard/botao-ocultar-prazo";
 import { BadgeSituacao } from "@/components/evento/badge-situacao";
 import { NomeEvento } from "@/components/evento/nome-evento";
+import { useConcluirEvento } from "@/components/evento/use-concluir-evento";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -46,7 +45,6 @@ import type { EventoPainel } from "@/domain/painel-evento";
 import type { PendenciaStatus } from "@/domain/sugestao-status";
 import { formatarData, formatarDataLonga } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { alternarConcluido as alternarConcluidoAcao } from "@/server/actions/eventos";
 
 /** Atributo dos botões que abrem o painel: devolver o foco ao item depois de "Desfazer". */
 const ATRIBUTO_GATILHO = "data-painel-chave";
@@ -76,9 +74,6 @@ interface Aberto {
   ultimo: EventoPainel;
   modo: "detalhes" | "editar";
 }
-
-type Otimistas = ReadonlyMap<string, boolean>;
-const SEM_OTIMISTAS: Otimistas = new Map();
 
 const seletorGatilho = (chave: string) => `[${ATRIBUTO_GATILHO}="${CSS.escape(chave)}"]`;
 
@@ -152,11 +147,7 @@ export function PainelEventoProvider({
   const [pendencia, setPendencia] = useState<{ chave: string; dados: PendenciaStatus } | null>(
     null,
   );
-  const [otimistas, aplicarOtimista] = useOptimistic(
-    SEM_OTIMISTAS,
-    (atual: Otimistas, { chave, concluido }: { chave: string; concluido: boolean }) =>
-      new Map(atual).set(chave, concluido),
-  );
+  const { otimistas, alternar: gravarConclusao } = useConcluirEvento<string>();
   const raizRef = useRef<HTMLDivElement>(null);
   /** Formulário de edição aberto no painel: fechar com alterações pede confirmação (D10). */
   const formularioRef = useRef<ControleSaida>(null);
@@ -210,44 +201,29 @@ export function PainelEventoProvider({
       desfazendo = false,
     ): Promise<boolean> {
       const { chave, evento } = item;
+      // Validade derivada (sem evento cadastrado): não há o que concluir.
       if (!evento) return Promise.resolve(false);
-      return new Promise<boolean>((resolver) => {
-        startTransition(async () => {
-          aplicarOtimista({ chave, concluido });
-          const r = await alternarConcluidoAcao(item.concurso.id, evento.id, concluido);
-          if (!r.ok) {
-            avisar({
-              texto:
-                r.erros._form?.[0] ??
-                `Não foi possível ${concluido ? "concluir" : "reabrir"} “${item.nome}”.`,
-              tipo: "erro",
-            });
-            resolver(false);
-            return;
+      const atualizado = { ...item, concluido, evento: { ...evento, concluido } };
+      return gravarConclusao({
+        id: chave,
+        concursoId: item.concurso.id,
+        eventoId: evento.id,
+        nome: item.nome,
+        concluido,
+        chaveAviso: `concluir-${chave}`,
+        erroComChave: false,
+        desfazendo,
+        desfazer: async () => {
+          if (await alternar(atualizado, false, null, true)) {
+            devolverFoco(() => gatilhoVisivel(chave), raizRef.current);
           }
-          const atualizado = { ...item, concluido, evento: { ...evento, concluido } };
+        },
+        aoGravar: ({ pendencia: pendenciaNova }) => {
           atualizarUltimo(chave, { concluido, evento: atualizado.evento });
           if (!concluido) {
             setPendencia((p) => (p?.chave === chave ? null : p));
-            if (!desfazendo) {
-              avisar({ texto: `“${item.nome}” reaberto.`, chave: `concluir-${chave}` });
-            }
-            resolver(true);
             return;
           }
-          avisar({
-            texto: `“${item.nome}” concluído.`,
-            chave: `concluir-${chave}`,
-            acao: {
-              rotulo: "Desfazer",
-              executar: async () => {
-                if (await alternar(atualizado, false, null, true)) {
-                  devolverFoco(() => gatilhoVisivel(chave), raizRef.current);
-                }
-              },
-            },
-          });
-          const pendenciaNova = r.data.pendencia;
           if (pendenciaNova) setPendencia({ chave, dados: pendenciaNova });
           // Pergunta na hora (D5): abre o painel, se a conclusão veio da linha — mas só se nenhum
           // estiver aberto; se o usuário já abriu outro item, a pergunta espera no painel deste.
@@ -259,11 +235,10 @@ export function PainelEventoProvider({
             // A linha some do dashboard: o foco não pode ficar no botão removido.
             devolverFoco(() => (gatilho.isConnected ? null : raizRef.current), null, gatilho);
           }
-          resolver(true);
-        });
+        },
       });
     },
-    [aplicarOtimista, atualizarUltimo, avisar],
+    [gravarConclusao, atualizarUltimo],
   );
 
   const api = useMemo<ApiPainel>(

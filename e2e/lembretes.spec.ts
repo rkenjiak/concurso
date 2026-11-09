@@ -36,6 +36,14 @@ test("lembretes: notificação no app, feed .ics assinável e revogado (#65)", a
     .getByRole("listitem")
     .filter({ hasText: orgao });
   await expect(item).toContainText("Fim das inscrições é amanhã");
+  // Papel da tela (#104): aviso disparado hoje fica no grupo "Hoje"; o atalho leva às regras.
+  await expect(
+    page.getByRole("region", { name: "Hoje" }).getByRole("listitem").filter({ hasText: orgao }),
+  ).toBeVisible();
+  await expect(page.getByRole("link", { name: "Configurar avisos" })).toHaveAttribute(
+    "href",
+    "/configuracoes#notificacoes",
+  );
   await item.getByRole("button", { name: /^Marcar como lida/ }).click();
   await expect(item).toHaveAttribute("data-lida", "true");
   await page.reload();

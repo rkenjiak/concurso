@@ -2,12 +2,14 @@
 
 import { Check, CheckCheck, Clock, Loader2, X } from "lucide-react";
 import Link from "next/link";
-import { useState, useTransition } from "react";
+import { useId, useState, useTransition } from "react";
 import { MarcadorConcurso } from "@/components/concurso/marcador-concurso";
 import { Button } from "@/components/ui/button";
 import type { CorConcurso } from "@/domain/cores";
 import { hrefPrazo } from "@/domain/navegacao-concurso";
+import { agruparPorDia } from "@/lib/agrupar-por-dia";
 import { formatarData } from "@/lib/format";
+import type { DataISO } from "@/lib/tz";
 import { cn } from "@/lib/utils";
 import {
   dispensarNotificacaoAcao,
@@ -23,6 +25,8 @@ export interface ItemNotificacao {
   mensagem: string;
   data: string;
   hora: string | null;
+  /** Dia em que o aviso foi disparado (`YYYY-MM-DD`): base do agrupamento Hoje/Ontem/Anteriores. */
+  disparadaEm: DataISO;
   lida: boolean;
   concurso: { id: number; orgao: string; cargo: string; cor: CorConcurso; icone: string | null };
 }
@@ -31,9 +35,19 @@ type ResultadoSimples = { ok: true } | { ok: false; erros: { _form?: string[] } 
 
 /**
  * Central de notificações (#65): marcar como lida, dispensar e marcar todas como lidas. Abrir o
- * evento no concurso (#100) marca a notificação como lida.
+ * evento no concurso (#100) marca a notificação como lida. Os avisos vêm agrupados pelo dia em que
+ * foram disparados (#104), relativo ao `hoje` do servidor.
  */
-export function ListaNotificacoes({ itens }: { itens: readonly ItemNotificacao[] }) {
+export function ListaNotificacoes({
+  itens,
+  hoje,
+}: {
+  itens: readonly ItemNotificacao[];
+  /** "Hoje" em São Paulo, calculado no servidor (`hojeSP()`). */
+  hoje: DataISO;
+}) {
+  const idBase = useId();
+  const grupos = agruparPorDia(itens, (n) => n.disparadaEm, hoje);
   const [pendente, iniciar] = useTransition();
   const [emAndamento, setEmAndamento] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
@@ -77,80 +91,98 @@ export function ListaNotificacoes({ itens }: { itens: readonly ItemNotificacao[]
           {erro}
         </p>
       ) : null}
-      <ul className="divide-y rounded-lg border" data-testid="lista-notificacoes">
-        {itens.map((n) => (
-          <li
-            key={n.chave}
-            data-lida={n.lida || undefined}
-            className={cn(
-              "flex items-start gap-2 border-l-4",
-              n.lida ? "border-l-transparent" : "border-l-primary bg-primary/5",
-            )}
-          >
-            <Link
-              href={hrefPrazo(n.concurso.id, n.eventoId === null ? null : { id: n.eventoId }, {
-                de: "notificacoes",
-              })}
-              onClick={() => {
-                if (!n.lida) void marcarNotificacaoLidaAcao(n.chave);
-              }}
-              className="min-w-0 flex-1 space-y-1 p-3 transition-colors hover:bg-accent/50 focus-visible:outline-2 focus-visible:outline-ring"
-            >
-              <p className={cn("font-medium", n.lida && "text-muted-foreground")}>
-                {n.lida ? null : <span className="sr-only">Não lida: </span>}
-                {n.mensagem}
-              </p>
-              <p className="flex items-center gap-1.5 text-muted-foreground text-sm">
-                <MarcadorConcurso cor={n.concurso.cor} icone={n.concurso.icone} />
-                <span className="min-w-0 truncate">
-                  {n.concurso.orgao} — {n.concurso.cargo}
-                </span>
-              </p>
-              <p className="flex flex-wrap gap-x-3 text-muted-foreground text-xs">
-                <span>{formatarData(n.data)}</span>
-                {n.hora ? (
-                  <span className="inline-flex items-center gap-1">
-                    <Clock className="size-3" aria-hidden />
-                    {n.hora}
-                  </span>
-                ) : null}
-              </p>
-            </Link>
-            <div className="flex shrink-0 gap-1 p-2">
-              {n.lida ? null : (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  className="text-muted-foreground"
-                  disabled={pendente}
-                  aria-label={`Marcar como lida: ${n.mensagem}`}
-                  title="Marcar como lida"
-                  onClick={() => executar(n.chave, () => marcarNotificacaoLidaAcao(n.chave))}
-                >
-                  {emAndamento === n.chave ? (
-                    <Loader2 className="animate-spin" aria-hidden />
-                  ) : (
-                    <Check aria-hidden />
-                  )}
-                </Button>
-              )}
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                className="text-muted-foreground"
-                disabled={pendente}
-                aria-label={`Dispensar: ${n.mensagem}`}
-                title="Dispensar"
-                onClick={() => executar(n.chave, () => dispensarNotificacaoAcao(n.chave))}
-              >
-                <X aria-hidden />
-              </Button>
-            </div>
-          </li>
-        ))}
-      </ul>
+      <div className="space-y-4" data-testid="lista-notificacoes">
+        {grupos.map((grupo) => {
+          const idTitulo = `${idBase}-${grupo.chave}`;
+          return (
+            <section key={grupo.chave} aria-labelledby={idTitulo} className="space-y-2">
+              <h2 id={idTitulo} className="font-medium text-muted-foreground text-sm">
+                {grupo.rotulo}
+              </h2>
+              <ul className="divide-y rounded-lg border">
+                {grupo.itens.map((n) => (
+                  <li
+                    key={n.chave}
+                    data-lida={n.lida || undefined}
+                    className={cn(
+                      "flex items-start gap-2 border-l-4",
+                      n.lida ? "border-l-transparent" : "border-l-primary bg-primary/5",
+                    )}
+                  >
+                    <Link
+                      href={hrefPrazo(
+                        n.concurso.id,
+                        n.eventoId === null ? null : { id: n.eventoId },
+                        {
+                          de: "notificacoes",
+                        },
+                      )}
+                      onClick={() => {
+                        if (!n.lida) void marcarNotificacaoLidaAcao(n.chave);
+                      }}
+                      className="min-w-0 flex-1 space-y-1 p-3 transition-colors hover:bg-accent/50 focus-visible:outline-2 focus-visible:outline-ring"
+                    >
+                      <p className={cn("font-medium", n.lida && "text-muted-foreground")}>
+                        {n.lida ? null : <span className="sr-only">Não lida: </span>}
+                        {n.mensagem}
+                      </p>
+                      <p className="flex items-center gap-1.5 text-muted-foreground text-sm">
+                        <MarcadorConcurso cor={n.concurso.cor} icone={n.concurso.icone} />
+                        <span className="min-w-0 truncate">
+                          {n.concurso.orgao} — {n.concurso.cargo}
+                        </span>
+                      </p>
+                      <p className="flex flex-wrap gap-x-3 text-muted-foreground text-xs">
+                        <span>{formatarData(n.data)}</span>
+                        {n.hora ? (
+                          <span className="inline-flex items-center gap-1">
+                            <Clock className="size-3" aria-hidden />
+                            {n.hora}
+                          </span>
+                        ) : null}
+                      </p>
+                    </Link>
+                    <div className="flex shrink-0 gap-1 p-2">
+                      {n.lida ? null : (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-sm"
+                          className="text-muted-foreground pointer-coarse:size-11"
+                          disabled={pendente}
+                          aria-label={`Marcar como lida: ${n.mensagem}`}
+                          title="Marcar como lida"
+                          onClick={() =>
+                            executar(n.chave, () => marcarNotificacaoLidaAcao(n.chave))
+                          }
+                        >
+                          {emAndamento === n.chave ? (
+                            <Loader2 className="animate-spin" aria-hidden />
+                          ) : (
+                            <Check aria-hidden />
+                          )}
+                        </Button>
+                      )}
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        className="text-muted-foreground pointer-coarse:size-11"
+                        disabled={pendente}
+                        aria-label={`Dispensar: ${n.mensagem}`}
+                        title="Dispensar"
+                        onClick={() => executar(n.chave, () => dispensarNotificacaoAcao(n.chave))}
+                      >
+                        <X aria-hidden />
+                      </Button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          );
+        })}
+      </div>
     </div>
   );
 }

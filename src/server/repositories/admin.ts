@@ -18,6 +18,7 @@ import {
   isNotNull,
   isNull,
   ne,
+  or,
   type SQL,
   sql,
 } from "drizzle-orm";
@@ -32,6 +33,8 @@ import {
   concurso,
   emailPermitido,
   evento,
+  link,
+  resultadoFase,
   type Usuario,
   usuario,
 } from "../db/schema";
@@ -65,6 +68,11 @@ export const MENSAGENS_ADMIN = {
 /** Identificação legível de um usuário (e-mail, nome ou ID). */
 export function rotuloUsuario(u: { id: number; email: string | null; nome: string | null }) {
   return u.email ?? u.nome ?? `Usuário #${u.id}`;
+}
+
+/** Nome para exibir no painel: o nome, ou "Usuário inicial"/"Sem nome" (#108). */
+export function nomeUsuario(u: { nome: string | null; email: string | null }) {
+  return u.nome ?? (u.email === null ? "Usuário inicial" : "Sem nome");
 }
 
 async function auditar(
@@ -123,6 +131,40 @@ export interface UsuarioAdmin {
   /** Feed .ics ativo (#108). */
   icsTokenAtivo: boolean;
   icsTokenUsadoEm: Date | null;
+  /** E-mail liberado no painel (`email_permitido`, #108): entra no cálculo do "sem acesso hoje". */
+  emailNoPainel: boolean;
+}
+
+/**
+ * Colunas do usuário que o painel pode ver (#108): flags, datas técnicas e o necessário para a
+ * regra de acesso. Os resumos dos tokens só saem daqui convertidos em flag ({@link semSegredos}).
+ */
+const colunasUsuario = {
+  id: usuario.id,
+  email: usuario.email,
+  nome: usuario.nome,
+  avatarUrl: usuario.avatarUrl,
+  papel: usuario.papel,
+  bloqueadoEm: usuario.bloqueadoEm,
+  ultimoAcessoEm: usuario.ultimoAcessoEm,
+  createdAt: usuario.createdAt,
+  mcpTokenHash: usuario.mcpTokenHash,
+  mcpTokenUsadoEm: usuario.mcpTokenUsadoEm,
+  icsTokenHash: usuario.icsTokenHash,
+  icsTokenUsadoEm: usuario.icsTokenUsadoEm,
+  emailNoPainel: emailPermitido.email,
+};
+
+/** Troca os resumos dos tokens e o e-mail da allowlist por flags. */
+function semSegredos<
+  T extends { mcpTokenHash: string | null; icsTokenHash: string | null; emailNoPainel: unknown },
+>({ mcpTokenHash, icsTokenHash, emailNoPainel, ...u }: T) {
+  return {
+    ...u,
+    mcpTokenAtivo: mcpTokenHash !== null,
+    icsTokenAtivo: icsTokenHash !== null,
+    emailNoPainel: emailNoPainel !== null,
+  };
 }
 
 /**
@@ -131,30 +173,65 @@ export interface UsuarioAdmin {
  */
 export async function listarUsuarios(db: Executor): Promise<UsuarioAdmin[]> {
   const linhas = await db
-    .select({
-      id: usuario.id,
-      email: usuario.email,
-      nome: usuario.nome,
-      avatarUrl: usuario.avatarUrl,
-      papel: usuario.papel,
-      bloqueadoEm: usuario.bloqueadoEm,
-      ultimoAcessoEm: usuario.ultimoAcessoEm,
-      createdAt: usuario.createdAt,
-      totalConcursos: count(concurso.id),
-      mcpTokenHash: usuario.mcpTokenHash,
-      mcpTokenUsadoEm: usuario.mcpTokenUsadoEm,
-      icsTokenHash: usuario.icsTokenHash,
-      icsTokenUsadoEm: usuario.icsTokenUsadoEm,
-    })
+    .select({ ...colunasUsuario, totalConcursos: count(concurso.id) })
     .from(usuario)
+    .leftJoin(emailPermitido, eq(emailPermitido.email, usuario.email))
     .leftJoin(concurso, eq(concurso.usuarioId, usuario.id))
     .groupBy(usuario.id)
     .orderBy(asc(usuario.createdAt), asc(usuario.id));
-  return linhas.map(({ mcpTokenHash, icsTokenHash, ...u }) => ({
-    ...u,
-    mcpTokenAtivo: mcpTokenHash !== null,
-    icsTokenAtivo: icsTokenHash !== null,
-  }));
+  return linhas.map(semSegredos);
+}
+
+export interface DetalheUsuarioAdmin extends Omit<UsuarioAdmin, "totalConcursos"> {
+  /** Conta Google vinculada (`google_sub` preenchido); o `sub` em si não sai daqui. */
+  googleVinculado: boolean;
+  /** Só contagens agregadas: nada do conteúdo dos concursos (#108). */
+  contagens: { concursos: number; eventos: number; links: number; resultados: number };
+}
+
+/** Detalhe de um usuário para o painel (#108), ou `null` se não existir. */
+export async function obterDetalheUsuario(
+  db: Executor,
+  id: number,
+): Promise<DetalheUsuarioAdmin | null> {
+  const total = async (consulta: Promise<{ n: number }[]>) => (await consulta)[0]?.n ?? 0;
+  const doUsuario = eq(concurso.usuarioId, id);
+  const [[linha], concursos, eventos, links, resultados] = await Promise.all([
+    db
+      .select({ ...colunasUsuario, googleSub: usuario.googleSub })
+      .from(usuario)
+      .leftJoin(emailPermitido, eq(emailPermitido.email, usuario.email))
+      .where(eq(usuario.id, id)),
+    total(db.select({ n: count() }).from(concurso).where(doUsuario)),
+    total(
+      db
+        .select({ n: count() })
+        .from(evento)
+        .innerJoin(concurso, eq(concurso.id, evento.concursoId))
+        .where(doUsuario),
+    ),
+    total(
+      db
+        .select({ n: count() })
+        .from(link)
+        .innerJoin(concurso, eq(concurso.id, link.concursoId))
+        .where(doUsuario),
+    ),
+    total(
+      db
+        .select({ n: count() })
+        .from(resultadoFase)
+        .innerJoin(concurso, eq(concurso.id, resultadoFase.concursoId))
+        .where(doUsuario),
+    ),
+  ]);
+  if (!linha) return null;
+  const { googleSub, ...resto } = linha;
+  return {
+    ...semSegredos(resto),
+    googleVinculado: googleSub !== null,
+    contagens: { concursos, eventos, links, resultados },
+  };
 }
 
 export interface ResumoInstancia {
@@ -353,6 +430,35 @@ export async function definirBloqueio(
       alvo.id,
       agora,
     );
+  });
+}
+
+/**
+ * Revoga os tokens pessoais (MCP e feed .ics) do usuário sem bloqueá-lo (#108), zerando também o
+ * último uso. Sem nenhum token ativo, não faz nada nem audita (como as demais ações sem mudança).
+ * Devolve `true` se revogou algo.
+ */
+export async function revogarTokens(
+  db: Db,
+  autor: AutorAdmin,
+  alvoId: number,
+  agora: Date = new Date(),
+): Promise<boolean> {
+  return db.transaction(async (tx) => {
+    const alvo = await obterAlvo(tx, alvoId);
+    const linhas = await tx
+      .update(usuario)
+      .set(TOKENS_ZERADOS)
+      .where(
+        and(
+          eq(usuario.id, alvo.id),
+          or(isNotNull(usuario.mcpTokenHash), isNotNull(usuario.icsTokenHash)),
+        ),
+      )
+      .returning({ id: usuario.id });
+    if (linhas.length === 0) return false;
+    await auditar(tx, autor, "REVOGAR_TOKENS", rotuloUsuario(alvo), alvo.id, agora);
+    return true;
   });
 }
 

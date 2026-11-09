@@ -10,7 +10,12 @@ import type { UsuarioSessao } from "../auth/acesso";
 import { criarBancoTeste, criarUsuarioTeste } from "../db/banco-teste";
 import type { Db } from "../db/client";
 import { ID_USUARIO_INICIAL, usuario } from "../db/schema";
-import { emailNaAllowlist, obterUsuario } from "../repositories/usuarios";
+import {
+  emailNaAllowlist,
+  gerarTokenMcp,
+  obterUsuario,
+  usuarioDoTokenMcp,
+} from "../repositories/usuarios";
 
 const estado = vi.hoisted(() => ({
   db: null as unknown as Db,
@@ -57,6 +62,7 @@ const {
   definirBloqueioAcao,
   definirPapelAcao,
   removerEmailPermitidoAcao,
+  revogarTokensAcao,
 } = await import("./admin");
 const { alternarVisaoAcao } = await import("./visao");
 const { exigirAdminPagina, MENSAGEM_SEM_PERMISSAO, visaoAtual } = await import("../auth/admin");
@@ -96,6 +102,9 @@ describe("não admin", () => {
     expect(await definirBloqueioAcao(ID_USUARIO_INICIAL, true)).toEqual(negado);
     expect(await adicionarEmailPermitidoAcao("x@x.com")).toEqual(negado);
     expect(await removerEmailPermitidoAcao("x@x.com")).toEqual(negado);
+    const tokenAna = await gerarTokenMcp(estado.db, ID_USUARIO_INICIAL);
+    expect(await revogarTokensAcao(ID_USUARIO_INICIAL)).toEqual(negado);
+    expect((await usuarioDoTokenMcp(estado.db, tokenAna))?.id).toBe(ID_USUARIO_INICIAL);
     expect((await obterUsuario(estado.db, bia))?.papel).toBe("USUARIO");
     expect(await emailNaAllowlist(estado.db, "x@x.com")).toBe(false);
   });
@@ -134,6 +143,15 @@ describe("admin", () => {
     expect(await adicionarEmailPermitidoAcao(" Novo@X.com ")).toEqual({ ok: true, data: null });
     expect(await emailNaAllowlist(estado.db, "novo@x.com")).toBe(true);
     expect(await removerEmailPermitidoAcao("novo@x.com")).toEqual({ ok: true, data: null });
+  });
+
+  it("revoga os tokens sem bloquear (#108)", async () => {
+    const token = await gerarTokenMcp(estado.db, bia);
+    expect(await revogarTokensAcao(bia)).toEqual({ ok: true, data: { revogou: true } });
+    expect(await usuarioDoTokenMcp(estado.db, token)).toBeNull();
+    expect((await obterUsuario(estado.db, bia))?.bloqueadoEm).toBeNull();
+    expect(await revogarTokensAcao(bia)).toEqual({ ok: true, data: { revogou: false } });
+    expect((await revogarTokensAcao("x")).ok).toBe(false);
   });
 
   it("valida as entradas", async () => {

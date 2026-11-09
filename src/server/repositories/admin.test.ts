@@ -3,6 +3,9 @@ import { eq } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ErroDominio } from "@/domain/erros";
 import { concursoSchema, VALORES_INICIAIS_CONCURSO } from "@/lib/schemas/concurso";
+import { eventoSchema, VALORES_INICIAIS_EVENTO } from "@/lib/schemas/evento";
+import { linkSchema } from "@/lib/schemas/link";
+import { resultadoFaseSchema, VALORES_INICIAIS_RESULTADO_FASE } from "@/lib/schemas/resultado-fase";
 import { criarBancoTeste, criarUsuarioTeste } from "../db/banco-teste";
 import type { Db } from "../db/client";
 import { ID_USUARIO_INICIAL, usuario } from "../db/schema";
@@ -14,10 +17,15 @@ import {
   listarEmailsPermitidos,
   listarUsuarios,
   MENSAGENS_ADMIN,
+  obterDetalheUsuario,
   obterResumo,
   removerEmailPermitido,
+  revogarTokens,
 } from "./admin";
 import { criarConcurso } from "./concursos";
+import { criarEvento } from "./eventos";
+import { criarLink } from "./links";
+import { criarResultadoFase } from "./resultados";
 import {
   emailNaAllowlist,
   gerarTokenIcs,
@@ -263,5 +271,123 @@ describe("allowlist do painel", () => {
       ["REMOVER_EMAIL", "carla@x.com"],
       ["PERMITIR_EMAIL", "carla@x.com"],
     ]);
+  });
+});
+
+describe("detalhe do usuário (#108)", () => {
+  it("devolve só flags, datas e contagens agregadas; null para ID inexistente", async () => {
+    const concursoId = await criarConcurso(
+      db,
+      bia,
+      concursoSchema.parse({
+        ...VALORES_INICIAIS_CONCURSO,
+        orgao: "Órgão secreto da Bia",
+        cargo: "Cargo secreto",
+        observacoes: "observação secreta",
+      }),
+    );
+    await criarEvento(
+      db,
+      bia,
+      concursoId,
+      eventoSchema.parse({
+        ...VALORES_INICIAIS_EVENTO,
+        tipo: "PROVA_OBJETIVA",
+        data: "2026-12-01",
+      }),
+    );
+    await criarLink(
+      db,
+      bia,
+      concursoId,
+      linkSchema.parse({ tipo: "EDITAL_ABERTURA", rotulo: "", url: "https://ex.com/secreto" }),
+    );
+    await criarResultadoFase(
+      db,
+      bia,
+      concursoId,
+      resultadoFaseSchema.parse({ ...VALORES_INICIAIS_RESULTADO_FASE, nota: "80" }),
+    );
+    // Concurso de outra pessoa não entra nas contagens.
+    await criarConcurso(
+      db,
+      ana.id,
+      concursoSchema.parse({ ...VALORES_INICIAIS_CONCURSO, orgao: "TRF", cargo: "Analista" }),
+    );
+    await db.update(usuario).set({ googleSub: "g-bia" }).where(eq(usuario.id, bia));
+    await adicionarEmailPermitido(db, ana, "bia@x.com", AGORA);
+    const token = await gerarTokenMcp(db, bia);
+
+    const detalhe = await obterDetalheUsuario(db, bia);
+    expect(detalhe).toMatchObject({
+      id: bia,
+      email: "bia@x.com",
+      googleVinculado: true,
+      emailNoPainel: true,
+      mcpTokenAtivo: true,
+      icsTokenAtivo: false,
+      contagens: { concursos: 1, eventos: 1, links: 1, resultados: 1 },
+    });
+    expect(await obterDetalheUsuario(db, 9999)).toBeNull();
+
+    // Isolamento: nenhuma leitura do painel devolve conteúdo de concursos nem segredos.
+    const lido = JSON.stringify([detalhe, await listarUsuarios(db), await obterResumo(db)]);
+    for (const proibido of ["secret", "TRF", "Analista", "ex.com", "g-bia", token]) {
+      expect(lido).not.toContain(proibido);
+    }
+    expect(lido).not.toMatch(/TokenHash|googleSub/);
+  });
+
+  it("listagem marca o e-mail liberado no painel", async () => {
+    await adicionarEmailPermitido(db, ana, "bia@x.com", AGORA);
+    expect((await listarUsuarios(db)).map((u) => [u.email, u.emailNoPainel])).toEqual([
+      ["ana@x.com", false],
+      ["bia@x.com", true],
+    ]);
+  });
+});
+
+describe("revogarTokens (#108)", () => {
+  it("revoga MCP e .ics, zera o último uso, não bloqueia e audita", async () => {
+    const mcp = await gerarTokenMcp(db, bia);
+    const ics = await gerarTokenIcs(db, bia);
+    await registrarUsoToken(db, bia, "mcp", mcp, AGORA);
+    await registrarUsoToken(db, bia, "ics", ics, AGORA);
+
+    expect(await revogarTokens(db, ana, bia, AGORA)).toBe(true);
+    expect(await usuarioDoTokenMcp(db, mcp)).toBeNull();
+    expect(await usuarioDoTokenIcs(db, ics)).toBeNull();
+    const alvo = await obterUsuario(db, bia);
+    expect(alvo).toMatchObject({
+      bloqueadoEm: null,
+      mcpTokenUsadoEm: null,
+      icsTokenUsadoEm: null,
+      // O último acesso não é apagado: só o uso dos tokens.
+      ultimoAcessoEm: AGORA,
+    });
+    const [registro] = await listarAuditoria(db);
+    expect(registro).toMatchObject({
+      acao: "REVOGAR_TOKENS",
+      adminId: ana.id,
+      alvoUsuarioId: bia,
+      alvo: "bia@x.com",
+      createdAt: AGORA,
+    });
+    // Continua podendo gerar outro.
+    expect((await usuarioDoTokenMcp(db, await gerarTokenMcp(db, bia)))?.id).toBe(bia);
+  });
+
+  it("sem tokens ativos não faz nada nem audita; ID inexistente é erro", async () => {
+    expect(await revogarTokens(db, ana, bia, AGORA)).toBe(false);
+    expect(await listarAuditoria(db)).toEqual([]);
+    await expect(revogarTokens(db, ana, 9999, AGORA)).rejects.toThrow(
+      MENSAGENS_ADMIN.usuarioNaoEncontrado,
+    );
+  });
+
+  it("basta um dos tokens ativo", async () => {
+    await gerarTokenIcs(db, bia);
+    expect(await revogarTokens(db, ana, bia, AGORA)).toBe(true);
+    expect((await obterUsuario(db, bia))?.icsTokenHash).toBeNull();
   });
 });

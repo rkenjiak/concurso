@@ -1,31 +1,20 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { connection } from "next/server";
 import { AcoesUsuario } from "@/components/admin/acoes-usuario";
+import { SeloToken } from "@/components/admin/selo-token";
 import { CabecalhoPagina } from "@/components/layout/cabecalho-pagina";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { ROTULO_PAPEL } from "@/domain/labels";
+import { ROTULO_MOTIVO_SEM_ACESSO, ROTULO_PAPEL } from "@/domain/labels";
 import { formatarDataHora, formatarDataInstante } from "@/lib/format";
 import { exigirAdminPagina } from "@/server/auth/admin";
+import { acessoHoje } from "@/server/auth/autorizacao";
 import { lerConfigAuth } from "@/server/auth/config";
 import { getDb } from "@/server/db/client";
-import { listarUsuarios, rotuloUsuario } from "@/server/repositories/admin";
+import { listarUsuarios, nomeUsuario, rotuloUsuario } from "@/server/repositories/admin";
 
 export const metadata: Metadata = { title: "Usuários" };
-
-/**
- * Selo de um token pessoal ativo (#108). O último uso vai no `title` (dica ao passar o mouse) e,
- * para leitores de tela, num texto oculto.
- */
-function SeloToken({ rotulo, usadoEm }: { rotulo: string; usadoEm: Date | null }) {
-  const uso = usadoEm ? `usado por último em ${formatarDataHora(usadoEm)}` : "ainda não usado";
-  return (
-    <Badge variant="outline" title={`${rotulo} ativo, ${uso}`}>
-      {rotulo}
-      <span className="sr-only">: token ativo, {uso}</span>
-    </Badge>
-  );
-}
 
 export default async function UsuariosAdminPage() {
   await connection();
@@ -59,11 +48,17 @@ export default async function UsuariosAdminPage() {
             <tbody>
               {usuarios.map((u) => {
                 const ehVoce = u.id === admin.id;
+                const acesso = acessoHoje(config, u);
                 return (
                   <tr key={u.id} className="border-b align-top last:border-0">
                     <td className="py-3 pr-4">
                       <p className="font-medium">
-                        {u.nome ?? (u.email === null ? "Usuário inicial" : "Sem nome")}
+                        <Link
+                          href={`/admin/usuarios/${u.id}`}
+                          className="underline-offset-4 hover:underline"
+                        >
+                          {nomeUsuario(u)}
+                        </Link>
                         {ehVoce ? (
                           <span className="ml-1 font-normal text-muted-foreground">(você)</span>
                         ) : null}
@@ -76,6 +71,14 @@ export default async function UsuariosAdminPage() {
                           {ROTULO_PAPEL[u.papel]}
                         </Badge>
                         {u.bloqueadoEm ? <Badge variant="destructive">Bloqueado</Badge> : null}
+                        {acesso.motivo !== null && acesso.motivo !== "BLOQUEADO" ? (
+                          <Badge variant="outline" title={ROTULO_MOTIVO_SEM_ACESSO[acesso.motivo]}>
+                            Sem acesso hoje
+                            <span className="sr-only">
+                              : {ROTULO_MOTIVO_SEM_ACESSO[acesso.motivo]}
+                            </span>
+                          </Badge>
+                        ) : null}
                       </div>
                     </td>
                     <td className="whitespace-nowrap py-3 pr-4 tabular-nums">

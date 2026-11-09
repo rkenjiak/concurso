@@ -135,9 +135,13 @@ dados pessoais nunca vão para o repositório. Para restaurar: pare o app, apagu
 
 O banco local usa WAL: escritas recentes podem estar ainda no `concurso.db-wal`, ao lado do
 arquivo principal. Copiar só o `concurso.db` pode perder dados; use `pnpm db:backup` ou copie os
-três arquivos juntos, com o app parado. No Docker o banco fica no volume: com o container parado,
-`docker cp concurso:/app/data/ ./data-backup/` copia a pasta inteira (e o caminho inverso
-restaura); ou use o export JSON. No Turso, use o point-in-time
+três arquivos juntos, com o app parado.
+
+No Docker o banco fica no volume. Com o container parado, `docker cp concurso:/app/data/. ./data-backup/`
+copia o conteúdo da pasta (o `/.` evita criar uma subpasta), e `docker cp ./data-backup/. concurso:/app/data/`
+restaura. Para restaurar um único `.db` (ex.: de `pnpm db:backup`), apague antes do volume o
+`concurso.db-wal` e o `concurso.db-shm`, que sobram quando o container é parado: um `-wal` antigo
+ao lado de outro arquivo principal corrompe o banco. Ou use o export JSON. No Turso, use o point-in-time
 restore do serviço e o export JSON periódico.
 
 ## Lembretes: notificações e calendário

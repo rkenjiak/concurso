@@ -105,6 +105,27 @@ describe("protegerClienteLocal", () => {
     expect((await client.execute("select v from t where id = 1")).rows[0]?.v).toBe("z");
   });
 
+  it("preparo que falha não bloqueia as operações e é tentado de novo depois", async () => {
+    const url = `file:${join(pasta, "preparo.db")}`;
+    let tentativas = 0;
+    const client = protegerClienteLocal(createClient({ url }), {
+      novaTentativaMs: 10,
+      preparar: async () => {
+        tentativas++;
+        if (tentativas === 1) throw new Error("ocupado");
+      },
+    });
+    abertos.push(client);
+    await client.execute("create table t (id integer primary key, v text)");
+    expect(await contar(client)).toBe(0);
+    expect(tentativas).toBe(1);
+    await new Promise((r) => setTimeout(r, 30));
+    await client.execute("insert into t (v) values ('h')");
+    expect(tentativas).toBe(2);
+    await client.execute("insert into t (v) values ('i')");
+    expect(tentativas).toBe(2);
+  });
+
   it("rollback e close também devolvem a vez", async () => {
     const { client } = await banco(200);
     const tx1 = await client.transaction("write");

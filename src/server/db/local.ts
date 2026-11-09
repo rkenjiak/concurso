@@ -129,28 +129,43 @@ function transacaoQueLibera(tx: Transaction, liberar: () => void): Transaction {
   };
 }
 
-/** Liga o WAL (persistente no arquivo). Falha (ex.: arquivo somente leitura) só gera aviso. */
+/** Intervalo até tentar de novo um `preparar` que falhou (ex.: WAL com outro processo lendo). */
+export const NOVA_TENTATIVA_MS = 60_000;
+
+/** Liga o WAL (persistente no arquivo); lança se o modo não mudou (lock de outro processo etc.). */
 async function ligarWal(client: Client): Promise<void> {
-  try {
-    await client.execute("PRAGMA journal_mode = WAL");
-  } catch (erro) {
-    log.warn("db.wal_falhou", { erro });
-  }
+  const resultado = await client.execute("PRAGMA journal_mode = WAL");
+  const modo = String(resultado.rows[0]?.journal_mode ?? "").toLowerCase();
+  if (modo !== "wal") throw new Error(`journal_mode continuou "${modo}"`);
 }
 
 /**
- * Envolve o client de um banco local com as proteções acima. `preparar` roda uma vez, na vez de
- * escrever, antes da primeira operação (padrão: liga o WAL).
+ * Envolve o client de um banco local com as proteções acima. `preparar` roda na vez de escrever,
+ * antes da primeira operação (padrão: liga o WAL). Se falhar, as operações seguem (no journal de
+ * rollback, o WAL é uma melhoria e não um requisito), com um aviso no log, e ele é tentado de novo
+ * na primeira operação depois de `novaTentativaMs`.
  */
 export function protegerClienteLocal(
   base: Client,
-  opcoes: { esperaMs?: number; preparar?: (client: Client) => Promise<void> } = {},
+  opcoes: {
+    esperaMs?: number;
+    novaTentativaMs?: number;
+    preparar?: (client: Client) => Promise<void>;
+  } = {},
 ): Client {
   const fila = new FilaEscrita(opcoes.esperaMs);
   const preparar = opcoes.preparar ?? ligarWal;
+  const novaTentativaMs = opcoes.novaTentativaMs ?? NOVA_TENTATIVA_MS;
   let pronto: Promise<void> | undefined;
   const garantirPronto = () => {
-    pronto ??= fila.na(() => preparar(base));
+    pronto ??= fila
+      .na(() => preparar(base))
+      .catch((erro: unknown) => {
+        log.warn("db.preparo_falhou", { erro });
+        setTimeout(() => {
+          pronto = undefined;
+        }, novaTentativaMs).unref?.();
+      });
     return pronto;
   };
 

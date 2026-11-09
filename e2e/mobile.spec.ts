@@ -142,3 +142,26 @@ test("mobile: navegação inferior e alvos de toque de pelo menos 40 px", async 
     .first();
   expect((await busca.boundingBox())?.height).toBeGreaterThanOrEqual(40);
 });
+
+test("mobile: menu da conta pelo teclado leva a Configurações com Enter (#105)", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const gatilho = page.getByRole("banner").getByRole("button", { name: "Menu da conta" });
+  // Avatar sem nome nem e-mail (usuário local) mostra o ícone de pessoa, não "?".
+  await expect(gatilho).not.toContainText("?");
+
+  await gatilho.focus();
+  await page.keyboard.press("Enter");
+  const configuracoes = page.getByRole("menu").getByRole("menuitem", { name: "Configurações" });
+  await expect(configuracoes).toBeVisible();
+  // O foco entra no primeiro item (Visão usuário, para admins); desce até Configurações.
+  for (let i = 0; i < 5; i++) {
+    if (await configuracoes.evaluate((el) => el === document.activeElement)) break;
+    await page.keyboard.press("ArrowDown");
+  }
+  await expect(configuracoes).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(page).toHaveURL(/\/configuracoes$/);
+  await expect(page.getByRole("heading", { level: 1, name: "Configurações" })).toBeVisible();
+});

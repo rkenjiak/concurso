@@ -1,6 +1,6 @@
 "use client";
 
-import { LogOut, Settings } from "lucide-react";
+import { LogOut, Settings, UserRound } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useId, useTransition } from "react";
@@ -74,13 +74,15 @@ function ItensTema() {
   );
 }
 
-function iniciais(conta: ContaMenu): string {
-  const base = conta.nome ?? conta.email ?? "?";
-  const partes = base.split(/[\s@.]+/).filter(Boolean);
-  return ((partes[0]?.[0] ?? "?") + (partes[1]?.[0] ?? "")).toUpperCase();
+/** Iniciais do nome (ou do e-mail); `null` sem nenhum dos dois (usuário local). */
+function iniciais(conta: ContaMenu): string | null {
+  const partes = (conta.nome ?? conta.email ?? "").split(/[\s@.]+/).filter(Boolean);
+  if (partes.length === 0) return null;
+  return ((partes[0]?.[0] ?? "") + (partes[1]?.[0] ?? "")).toUpperCase();
 }
 
 function Avatar({ conta }: { conta: ContaMenu }) {
+  const letras = iniciais(conta);
   return conta.avatarUrl ? (
     // biome-ignore lint/performance/noImgElement: foto pequena do Google, sem otimização do Next
     <img
@@ -96,7 +98,7 @@ function Avatar({ conta }: { conta: ContaMenu }) {
       aria-hidden
       className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted font-medium text-muted-foreground text-xs"
     >
-      {iniciais(conta)}
+      {letras ?? <UserRound className="size-4" aria-hidden />}
     </span>
   );
 }

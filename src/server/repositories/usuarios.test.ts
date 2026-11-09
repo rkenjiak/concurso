@@ -5,10 +5,15 @@ import type { Db } from "../db/client";
 import { ID_USUARIO_INICIAL, usuario } from "../db/schema";
 import {
   entrarComGoogle,
+  gerarTokenIcs,
   gerarTokenMcp,
+  JANELA_REGISTRO_USO_MS,
   obterUsuario,
   PREFIXO_TOKEN_MCP,
+  registrarAcessoSessao,
+  registrarUsoToken,
   resumoTokenMcp,
+  revogarTokenIcs,
   revogarTokenMcp,
   usuarioDoTokenMcp,
 } from "./usuarios";
@@ -98,5 +103,75 @@ describe("token do MCP", () => {
 
     await revogarTokenMcp(db, ID_USUARIO_INICIAL);
     expect(await usuarioDoTokenMcp(db, novo)).toBeNull();
+  });
+});
+
+describe("registro de uso (#108)", () => {
+  const ID = ID_USUARIO_INICIAL;
+  const depois = (ms: number) => new Date(AGORA.getTime() + ms);
+  const uso = async () => {
+    const u = await obterUsuario(db, ID);
+    return {
+      acesso: u?.ultimoAcessoEm ?? null,
+      mcp: u?.mcpTokenUsadoEm ?? null,
+      ics: u?.icsTokenUsadoEm ?? null,
+    };
+  };
+
+  it("sessão: escreve no primeiro acesso, não dentro da janela e escreve depois dela", async () => {
+    expect(await registrarAcessoSessao(db, ID, AGORA)).toBe(true);
+    expect((await uso()).acesso).toEqual(AGORA);
+    expect(await registrarAcessoSessao(db, ID, depois(JANELA_REGISTRO_USO_MS - 1))).toBe(false);
+    expect((await uso()).acesso).toEqual(AGORA);
+    const fim = depois(JANELA_REGISTRO_USO_MS + 1);
+    expect(await registrarAcessoSessao(db, ID, fim)).toBe(true);
+    expect((await uso()).acesso).toEqual(fim);
+  });
+
+  it("token: atualiza o último acesso e o uso do canal, cada um com o throttle", async () => {
+    const mcp = await gerarTokenMcp(db, ID);
+    const ics = await gerarTokenIcs(db, ID);
+    await registrarAcessoSessao(db, ID, AGORA);
+
+    // Acesso recente pela sessão: só o uso do MCP é gravado.
+    const t1 = depois(60_000);
+    expect(await registrarUsoToken(db, ID, "mcp", mcp, t1)).toBe(true);
+    expect(await uso()).toEqual({ acesso: AGORA, mcp: t1, ics: null });
+
+    // Dentro da janela dos dois: não escreve.
+    expect(await registrarUsoToken(db, ID, "mcp", mcp, depois(120_000))).toBe(false);
+    expect(await uso()).toEqual({ acesso: AGORA, mcp: t1, ics: null });
+
+    // O .ics tem a própria coluna.
+    expect(await registrarUsoToken(db, ID, "ics", ics, t1)).toBe(true);
+    expect(await uso()).toEqual({ acesso: AGORA, mcp: t1, ics: t1 });
+
+    // Passada a janela: atualiza o último acesso e o uso do canal.
+    const t2 = depois(JANELA_REGISTRO_USO_MS + 120_000);
+    expect(await registrarUsoToken(db, ID, "mcp", mcp, t2)).toBe(true);
+    expect(await uso()).toEqual({ acesso: t2, mcp: t2, ics: t1 });
+  });
+
+  it("token: não marca uso com um token que não é o atual", async () => {
+    const antigo = await gerarTokenMcp(db, ID);
+    await gerarTokenMcp(db, ID);
+    expect(await registrarUsoToken(db, ID, "mcp", antigo, AGORA)).toBe(false);
+    expect(await uso()).toEqual({ acesso: null, mcp: null, ics: null });
+  });
+
+  it("gerar ou revogar um token zera o último uso dele", async () => {
+    const mcp = await gerarTokenMcp(db, ID);
+    const ics = await gerarTokenIcs(db, ID);
+    await registrarUsoToken(db, ID, "mcp", mcp, AGORA);
+    await registrarUsoToken(db, ID, "ics", ics, AGORA);
+    const novoMcp = await gerarTokenMcp(db, ID);
+    expect(await uso()).toEqual({ acesso: AGORA, mcp: null, ics: AGORA });
+    await revogarTokenIcs(db, ID);
+    expect(await uso()).toEqual({ acesso: AGORA, mcp: null, ics: null });
+    await registrarUsoToken(db, ID, "mcp", novoMcp, depois(JANELA_REGISTRO_USO_MS + 1));
+    await revogarTokenMcp(db, ID);
+    expect((await uso()).mcp).toBeNull();
+    // O último acesso continua: só o uso do token é zerado.
+    expect((await uso()).acesso).toEqual(depois(JANELA_REGISTRO_USO_MS + 1));
   });
 });

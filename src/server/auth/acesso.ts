@@ -9,6 +9,8 @@ import { cache } from "react";
 import type { Papel } from "@/domain/enums";
 import { type ErrosAcao, falha } from "../actions/resultado";
 import { getDb } from "../db/client";
+import { log } from "../log";
+import { registrarAcessoSessao, registrarUsoToken } from "../repositories/usuarios";
 import { usuarioDaSessao } from "./autorizacao";
 import { lerConfigAuth } from "./config";
 import { COOKIE_SESSAO, lerSessao } from "./sessao";
@@ -27,16 +29,43 @@ export interface UsuarioSessao {
  * Usuário autenticado, ou `null`. Sem login configurado, é sempre o usuário inicial (uso local).
  * A sessão só vale enquanto o método usado continuar permitido e o usuário não estiver bloqueado
  * (regras em `autorizacao.ts`). Memorizado por requisição.
+ *
+ * Registra também o último acesso real (#108): é a única escrita feita durante a renderização, uma
+ * vez por requisição (graças ao `cache()`) e no máximo uma a cada 15 min por usuário (throttle no
+ * próprio `UPDATE`). Fica aqui, e não em `usuarioDaSessao` (pura, usada no callback do Google) nem
+ * no `proxy.ts`. Uma falha (ex.: banco somente leitura) só gera um aviso no log.
  */
 export const usuarioAtual = cache(async (): Promise<UsuarioSessao | null> => {
   const config = lerConfigAuth();
   const sessao = config.habilitada
     ? await lerSessao((await cookies()).get(COOKIE_SESSAO)?.value, config.segredo)
     : null;
-  const u = await usuarioDaSessao(getDb(), config, sessao);
+  const db = getDb();
+  const u = await usuarioDaSessao(db, config, sessao);
   if (!u) return null;
+  try {
+    await registrarAcessoSessao(db, u.id);
+  } catch (erro) {
+    log.warn("auth.registro_acesso_falhou", { canal: "sessao", usuarioId: u.id, erro });
+  }
   return { id: u.id, email: u.email, nome: u.nome, avatarUrl: u.avatarUrl, papel: u.papel };
 });
+
+/**
+ * Registra o uso de um token pessoal já autorizado (`/api/mcp`, `/api/calendario.ics`, #108): o
+ * último acesso e o último uso do token, com o mesmo throttle da sessão. Falhas só geram aviso.
+ */
+export async function registrarUsoDoToken(
+  usuarioId: number,
+  canal: "mcp" | "ics",
+  token: string,
+): Promise<void> {
+  try {
+    await registrarUsoToken(getDb(), usuarioId, canal, token);
+  } catch (erro) {
+    log.warn("auth.registro_acesso_falhou", { canal, usuarioId, erro });
+  }
+}
 
 /** Para páginas: o usuário autenticado; sem sessão, redireciona para o login. */
 export async function exigirUsuarioPagina(): Promise<UsuarioSessao> {

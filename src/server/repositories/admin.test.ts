@@ -23,6 +23,7 @@ import {
   gerarTokenIcs,
   gerarTokenMcp,
   obterUsuario,
+  registrarUsoToken,
   usuarioDoTokenIcs,
   usuarioDoTokenMcp,
 } from "./usuarios";
@@ -66,7 +67,55 @@ describe("leituras do painel", () => {
       concursos: 1,
       eventos: 0,
       emailsPermitidos: 0,
+      ativos7Dias: 0,
+      ativos30Dias: 0,
+      comTokenMcp: 0,
+      comFeedIcs: 0,
     });
+  });
+
+  it("conta ativos em 7 e 30 dias e tokens ativos, e lista o uso sem o resumo (#108)", async () => {
+    const carla = await criarUsuarioTeste(db, "carla@x.com");
+    const dias = (n: number) => new Date(AGORA.getTime() - n * 24 * 60 * 60 * 1000);
+    await db
+      .update(usuario)
+      .set({ ultimoAcessoEm: dias(1) })
+      .where(eq(usuario.id, ana.id));
+    await db
+      .update(usuario)
+      .set({ ultimoAcessoEm: dias(10) })
+      .where(eq(usuario.id, bia));
+    await db
+      .update(usuario)
+      .set({ ultimoAcessoEm: dias(40) })
+      .where(eq(usuario.id, carla));
+    const mcp = await gerarTokenMcp(db, bia);
+    await gerarTokenIcs(db, bia);
+    await gerarTokenIcs(db, carla);
+
+    expect(await obterResumo(db, AGORA)).toMatchObject({ ativos7Dias: 1, ativos30Dias: 2 });
+    // O uso do MCP (há 2 dias) também conta como acesso.
+    await registrarUsoToken(db, bia, "mcp", mcp, dias(2));
+    expect(await obterResumo(db, AGORA)).toMatchObject({
+      ativos7Dias: 2,
+      ativos30Dias: 2,
+      comTokenMcp: 1,
+      comFeedIcs: 2,
+    });
+    const linhaBia = (await listarUsuarios(db)).find((u) => u.id === bia);
+    expect(linhaBia).toMatchObject({
+      ultimoAcessoEm: dias(2),
+      mcpTokenAtivo: true,
+      mcpTokenUsadoEm: dias(2),
+      icsTokenAtivo: true,
+      icsTokenUsadoEm: null,
+    });
+    expect(linhaBia).not.toHaveProperty("mcpTokenHash");
+    expect(linhaBia).not.toHaveProperty("icsTokenHash");
+
+    // Bloqueado não conta como token ativo (o bloqueio apaga os tokens).
+    await definirBloqueio(db, ana, bia, true, SEM_FIXOS, AGORA);
+    expect(await obterResumo(db, AGORA)).toMatchObject({ comTokenMcp: 0, comFeedIcs: 1 });
   });
 });
 
@@ -135,6 +184,25 @@ describe("definirBloqueio", () => {
     await definirBloqueio(db, ana, bia, false, SEM_FIXOS, AGORA);
     expect(await usuarioDoTokenMcp(db, token)).toBeNull();
     expect(await usuarioDoTokenIcs(db, tokenIcs)).toBeNull();
+  });
+
+  it("bloquear e desbloquear zeram o último uso dos tokens (#108)", async () => {
+    const usoTokens = async () => {
+      const u = await obterUsuario(db, bia);
+      return [u?.mcpTokenUsadoEm ?? null, u?.icsTokenUsadoEm ?? null];
+    };
+    await registrarUsoToken(db, bia, "mcp", await gerarTokenMcp(db, bia), AGORA);
+    await registrarUsoToken(db, bia, "ics", await gerarTokenIcs(db, bia), AGORA);
+    expect(await usoTokens()).toEqual([AGORA, AGORA]);
+    await definirBloqueio(db, ana, bia, true, SEM_FIXOS, AGORA);
+    expect(await usoTokens()).toEqual([null, null]);
+    // Estado legado: bloqueado com o uso ainda gravado.
+    await db
+      .update(usuario)
+      .set({ mcpTokenUsadoEm: AGORA, icsTokenUsadoEm: AGORA })
+      .where(eq(usuario.id, bia));
+    await definirBloqueio(db, ana, bia, false, SEM_FIXOS, AGORA);
+    expect(await usoTokens()).toEqual([null, null]);
   });
 
   it("bloqueia e desbloqueia; o bloqueio revoga os tokens do MCP e do .ics (#96)", async () => {

@@ -3,7 +3,7 @@
  * admin (#50).
  */
 import { createHash, randomBytes } from "node:crypto";
-import { and, eq, isNull, or } from "drizzle-orm";
+import { and, type Column, eq, isNull, lt, or, sql } from "drizzle-orm";
 import type { Db } from "../db/client";
 import { emailPermitido, ID_USUARIO_INICIAL, type Usuario, usuario } from "../db/schema";
 import type { Executor } from "./tipos";
@@ -105,6 +105,79 @@ export async function registrarAcesso(db: Db, id: number, agora: Date = new Date
   await db.update(usuario).set({ ultimoAcessoEm: agora }).where(eq(usuario.id, id));
 }
 
+/**
+ * Janela do throttle do registro de uso (#108): dentro dela, novos acessos não escrevem no banco
+ * (uma escrita a cada 15 min por usuário e canal, no máximo).
+ */
+export const JANELA_REGISTRO_USO_MS = 15 * 60 * 1000;
+
+/** `coluna` vazia ou mais antiga que `limite` (ms). */
+const desatualizada = (coluna: Column, limite: number) =>
+  sql`(${coluna} IS NULL OR ${coluna} < ${limite})`;
+
+/** Novo valor de `coluna`: `agora` se estiver desatualizada; senão, mantém o atual. */
+const renovada = (coluna: Column, agora: number, limite: number) =>
+  sql`CASE WHEN ${desatualizada(coluna, limite)} THEN ${agora} ELSE ${coluna} END`;
+
+/**
+ * Registra o último acesso por sessão (#108): uma única escrita condicional, sem leitura prévia, que
+ * só acontece se o registro anterior tiver mais de {@link JANELA_REGISTRO_USO_MS}. Devolve `true`
+ * se escreveu.
+ */
+export async function registrarAcessoSessao(
+  db: Db,
+  id: number,
+  agora: Date = new Date(),
+): Promise<boolean> {
+  const limite = new Date(agora.getTime() - JANELA_REGISTRO_USO_MS);
+  const linhas = await db
+    .update(usuario)
+    .set({ ultimoAcessoEm: agora })
+    .where(
+      and(
+        eq(usuario.id, id),
+        or(isNull(usuario.ultimoAcessoEm), lt(usuario.ultimoAcessoEm, limite)),
+      ),
+    )
+    .returning({ id: usuario.id });
+  return linhas.length > 0;
+}
+
+/**
+ * Registra o uso de um token pessoal (#108): `ultimo_acesso_em` e o `*_usado_em` do canal, cada um
+ * com o throttle de {@link JANELA_REGISTRO_USO_MS}, numa única escrita condicional. Só vale para o
+ * token atual (pelo resumo): uma requisição com o token antigo, concorrente com gerar/revogar, não
+ * marca o novo como usado. Devolve `true` se escreveu.
+ */
+export async function registrarUsoToken(
+  db: Db,
+  id: number,
+  canal: "mcp" | "ics",
+  token: string,
+  agora: Date = new Date(),
+): Promise<boolean> {
+  const ms = agora.getTime();
+  const limite = ms - JANELA_REGISTRO_USO_MS;
+  const hash = canal === "mcp" ? usuario.mcpTokenHash : usuario.icsTokenHash;
+  const usadoEm = canal === "mcp" ? usuario.mcpTokenUsadoEm : usuario.icsTokenUsadoEm;
+  const novoUso = renovada(usadoEm, ms, limite);
+  const linhas = await db
+    .update(usuario)
+    .set({
+      ultimoAcessoEm: renovada(usuario.ultimoAcessoEm, ms, limite),
+      ...(canal === "mcp" ? { mcpTokenUsadoEm: novoUso } : { icsTokenUsadoEm: novoUso }),
+    })
+    .where(
+      and(
+        eq(usuario.id, id),
+        eq(hash, resumoTokenMcp(token)),
+        or(desatualizada(usuario.ultimoAcessoEm, limite), desatualizada(usadoEm, limite)),
+      ),
+    )
+    .returning({ id: usuario.id });
+  return linhas.length > 0;
+}
+
 /** Resumo SHA-256 (hex) de um token (MCP ou feed .ics): só ele é guardado no banco. */
 export function resumoTokenMcp(token: string): string {
   return createHash("sha256").update(token, "utf8").digest("hex");
@@ -121,14 +194,17 @@ export async function gerarTokenMcp(db: Db, usuarioId: number): Promise<string> 
   const token = `${PREFIXO_TOKEN_MCP}${randomBytes(32).toString("base64url")}`;
   await db
     .update(usuario)
-    .set({ mcpTokenHash: resumoTokenMcp(token) })
+    .set({ mcpTokenHash: resumoTokenMcp(token), mcpTokenUsadoEm: null })
     .where(eq(usuario.id, usuarioId));
   return token;
 }
 
-/** Revoga o token do MCP do usuário. */
+/** Revoga o token do MCP do usuário (e zera o último uso, #108). */
 export async function revogarTokenMcp(db: Db, usuarioId: number): Promise<void> {
-  await db.update(usuario).set({ mcpTokenHash: null }).where(eq(usuario.id, usuarioId));
+  await db
+    .update(usuario)
+    .set({ mcpTokenHash: null, mcpTokenUsadoEm: null })
+    .where(eq(usuario.id, usuarioId));
 }
 
 /** Usuário dono do token do MCP, ou `null` (também se ele estiver bloqueado, #50). */
@@ -151,14 +227,17 @@ export async function gerarTokenIcs(db: Db, usuarioId: number): Promise<string> 
   const token = `${PREFIXO_TOKEN_ICS}${randomBytes(32).toString("base64url")}`;
   await db
     .update(usuario)
-    .set({ icsTokenHash: resumoTokenMcp(token) })
+    .set({ icsTokenHash: resumoTokenMcp(token), icsTokenUsadoEm: null })
     .where(eq(usuario.id, usuarioId));
   return token;
 }
 
-/** Revoga o token do feed de calendário. */
+/** Revoga o token do feed de calendário (e zera o último uso, #108). */
 export async function revogarTokenIcs(db: Db, usuarioId: number): Promise<void> {
-  await db.update(usuario).set({ icsTokenHash: null }).where(eq(usuario.id, usuarioId));
+  await db
+    .update(usuario)
+    .set({ icsTokenHash: null, icsTokenUsadoEm: null })
+    .where(eq(usuario.id, usuarioId));
 }
 
 /** Usuário dono do token do feed de calendário, ou `null` (também se estiver bloqueado, #50). */

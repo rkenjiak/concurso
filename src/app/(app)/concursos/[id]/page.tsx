@@ -1,7 +1,6 @@
 import { ArrowLeft, Pencil } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
 import { AbasConcurso } from "@/components/concurso/abas-concurso";
 import { BadgeStatus } from "@/components/concurso/badge-status";
 import { ContagemProva } from "@/components/concurso/contagem-prova";
@@ -25,31 +24,19 @@ import { corDoConcurso } from "@/domain/cores";
 import { ROTULO_ESCOLARIDADE, ROTULO_ESFERA } from "@/domain/labels";
 import { lerOrigem, linkVoltar } from "@/domain/navegacao-concurso";
 import { formatarBRL, formatarDataInstante } from "@/lib/format";
-import { idSchema } from "@/lib/schemas/comum";
 import { hojeSP } from "@/lib/tz";
-import { exigirUsuarioPagina } from "@/server/auth/acesso";
 import { getDb } from "@/server/db/client";
-import { obterConcurso } from "@/server/queries/concursos";
 import { listarEventos } from "@/server/queries/eventos";
 import { obterOpcoesStatus } from "@/server/queries/historico";
 import { listarLinks } from "@/server/queries/links";
 import { listarResultadosFase } from "@/server/queries/resultados";
 import { obterPendenciaConcurso } from "@/server/queries/sugestoes";
-
-async function carregar(params: Promise<{ id: string }>) {
-  const id = idSchema.safeParse((await params).id);
-  if (!id.success) notFound();
-  const { id: usuarioId } = await exigirUsuarioPagina();
-  // Concurso de outro usuário: 404, como se não existisse.
-  const concurso = await obterConcurso(getDb(), usuarioId, id.data);
-  if (!concurso) notFound();
-  return concurso;
-}
+import { carregarConcurso } from "./carregar";
 
 export async function generateMetadata({
   params,
 }: PageProps<"/concursos/[id]">): Promise<Metadata> {
-  const c = await carregar(params);
+  const c = await carregarConcurso((await params).id);
   return { title: c.orgao };
 }
 
@@ -65,7 +52,7 @@ function Item({ rotulo, children }: { rotulo: string; children: React.ReactNode 
 const numero = (n: number | null) => (n == null ? "—" : n.toLocaleString("pt-BR"));
 
 export default async function ConcursoPage({ params, searchParams }: PageProps<"/concursos/[id]">) {
-  const c = await carregar(params);
+  const c = await carregarConcurso((await params).id);
   const [{ historico, opcoes }, links, eventos, resultados] = await Promise.all([
     obterOpcoesStatus(getDb(), c.id, c.status),
     listarLinks(getDb(), c.id),

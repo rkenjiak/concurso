@@ -117,7 +117,7 @@ test("admin: selos MCP/.ics, detalhe do usuário e revogar tokens sem bloquear (
   await page.goto("/admin/auditoria");
   await expect(page.getByRole("row").filter({ hasText: "Revogou os tokens" })).toHaveCount(1);
 
-  // ID inexistente: página 404 (com o loading.tsx do painel, o status HTTP já saiu como 200).
-  await page.goto("/admin/usuarios/999999");
+  // ID inexistente: página e status 404 (conferido no layout, acima do loading.tsx, #110).
+  expect((await page.goto("/admin/usuarios/999999"))?.status()).toBe(404);
   await expect(page.getByText("This page could not be found.")).toBeVisible();
 });

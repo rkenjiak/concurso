@@ -197,7 +197,7 @@ sequenceDiagram
   autonumber
   actor U as Usuário
   participant P as proxy.ts
-  participant Pg as app/(app)/page.tsx<br/>(Server Component)
+  participant Pg as app/(app)/(esqueleto)/page.tsx<br/>(Server Component)
   participant Q as queries/dashboard.ts
   participant D as domain/prazos.ts
   participant DB as SQLite
@@ -816,12 +816,12 @@ mindmap
 | Adicionar um campo ao concurso | `server/db/schema.ts` → `pnpm db:generate` → `lib/schemas/concurso.ts` → `formulario-concurso.tsx` → backup (`lib/schemas/backup.ts`, `queries/exportacao.ts`, `repositories/importacao.ts`) e CSV → `mcp/entradas.ts` |
 | Mudar uma regra de status | `domain/status.ts` + `domain/status.test.ts` |
 | Mudar o que aparece nos prazos | `domain/prazos.ts` (regra) ou `server/queries/dashboard.ts` (dados) |
-| Criar uma nova tela | `src/app/(app)/<rota>/page.tsx` + uma função em `server/queries/` |
+| Criar uma nova tela | `src/app/(app)/(esqueleto)/<rota>/page.tsx` + uma função em `server/queries/`; rota com `[id]` fora do grupo, com `layout.tsx` que chama `notFound()` (ARQUITETURA §5.2, #110) |
 | Criar uma nova ação de gravação | `server/repositories/` (transação) + `server/actions/` (receita da §6) |
 | Expor algo para a LLM | `server/mcp/operacoes.ts` + registrar em `server/mcp/servidor.ts` |
 | Mudar cores/tema | tokens em `src/app/globals.css` (`:root` e `.dark`) |
 | Mudar as regras padrão dos lembretes | `domain/notificacoes.ts` (`REGRAS_PADRAO`) + teste |
-| Proteger uma nova tela de admin | `src/app/admin/<rota>/page.tsx` com `exigirAdminPagina()` |
+| Proteger uma nova tela de admin | `src/app/admin/(esqueleto)/<rota>/page.tsx` com `exigirAdminPagina()` |
 | Trocar o logo/ícones | `assets/logo.svg` → `pnpm icones` |
 
 ---

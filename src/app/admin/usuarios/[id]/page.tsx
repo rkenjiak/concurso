@@ -1,7 +1,6 @@
 import { ArrowLeft } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import type { ReactNode } from "react";
 import { AcoesUsuario } from "@/components/admin/acoes-usuario";
@@ -15,18 +14,10 @@ import { formatarDataHora, formatarDataInstante } from "@/lib/format";
 import { exigirAdminPagina } from "@/server/auth/admin";
 import { acessoHoje } from "@/server/auth/autorizacao";
 import { lerConfigAuth } from "@/server/auth/config";
-import { getDb } from "@/server/db/client";
-import {
-  ehEmailAdminFixo,
-  nomeUsuario,
-  obterDetalheUsuario,
-  rotuloUsuario,
-} from "@/server/repositories/admin";
+import { ehEmailAdminFixo, nomeUsuario, rotuloUsuario } from "@/server/repositories/admin";
+import { carregarUsuario } from "./carregar";
 
 export const metadata: Metadata = { title: "Usuário" };
-
-/** Só dígitos: rejeita "1e3", " 1", "0x1" etc. antes de converter (#108). */
-const ID_VALIDO = /^\d+$/;
 
 function Item({ rotulo, children }: { rotulo: string; children: ReactNode }) {
   return (
@@ -70,13 +61,8 @@ function Token({
 export default async function UsuarioAdminPage({ params }: PageProps<"/admin/usuarios/[id]">) {
   await connection();
   const admin = await exigirAdminPagina();
-  const bruto = (await params).id;
-  const id = ID_VALIDO.test(bruto) ? Number(bruto) : Number.NaN;
-  if (!Number.isSafeInteger(id) || id <= 0) notFound();
-  // Como em /concursos/[id], o loading.tsx do painel já enviou o HTTP 200: o 404 chega como
-  // conteúdo (a página "não encontrada"), não como status.
-  const u = await obterDetalheUsuario(getDb(), id);
-  if (!u) notFound();
+  // O layout já conferiu o ID antes do loading.tsx (404 de verdade, #110); aqui é a garantia.
+  const u = await carregarUsuario((await params).id);
   const config = lerConfigAuth();
   const fixos: ReadonlySet<string> = config.habilitada ? config.emailsAdmin : new Set();
   const acesso = acessoHoje(config, u);

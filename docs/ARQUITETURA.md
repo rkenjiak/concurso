@@ -371,7 +371,7 @@ seguinte, seletor e atalhos), então o filtro se mantém ao trocar de mês.
 | `/login` | Login Google e/ou senha única (só se auth habilitada) | MVP |
 | `/admin` | **Painel admin** (#50, só papel `ADMIN`; 403 para os demais): visão geral com totais de usuários, concursos e eventos, uso (ativos em 7/30 dias, com token do MCP, com feed .ics; #108) e ações recentes | v1.4 |
 | `/admin/usuarios` | Usuários (nome, e-mail, papel, cadastro, último acesso real, selos MCP/.ics e "Sem acesso hoje", nº de concursos); promover/rebaixar, bloquear/desbloquear | v1.4 · #108 |
-| `/admin/usuarios/[id]` | Detalhe (#108): origem do acesso, "sem acesso hoje" e motivo, conta Google vinculada, contagens agregadas (concursos, eventos, links, resultados), tokens MCP/.ics com último uso; **Revogar tokens**. ID inválido ou inexistente → página 404 (o status sai 200 por causa do `loading.tsx` do painel) | #108 |
+| `/admin/usuarios/[id]` | Detalhe (#108): origem do acesso, "sem acesso hoje" e motivo, conta Google vinculada, contagens agregadas (concursos, eventos, links, resultados), tokens MCP/.ics com último uso; **Revogar tokens**. ID inválido ou inexistente → 404 (conferido no `layout.tsx` do `[id]`, #110) | #108 |
 | `/admin/acesso` | Allowlist do login Google: e-mails das variáveis (só leitura) e liberados no painel (adicionar/retirar) | v1.4 |
 | `/admin/auditoria` | Log das ações administrativas (últimas 200) | v1.4 |
 | `/concursos?visao=quadro` | Quadro por status (kanban; arrastar ou “Mover para” = transição validada) | v1.1 |
@@ -431,11 +431,29 @@ nada. Criar, editar e excluir concurso terminam com `redirect()` na própria act
 `executar`, que engoliria o erro de controle): a resposta já traz a página de destino.
 
 As páginas têm `loading.tsx` (#73): o esqueleto é pré-carregado e aparece na hora ao navegar. Como
-o stream começa no fallback, o status HTTP fica fixado em 200 antes de a página rodar: um
-`notFound()` no detalhe de um concurso inexistente (ou de outro usuário) mostra a página de não
-encontrado com `<meta name="robots" content="noindex">`, mas com status 200, e o `redirect` da
-visão admin no dashboard vira redirecionamento no cliente. Aceito: as páginas exigem login. O
-`forbidden()` do painel admin continua 403, porque fica no layout, acima do `loading.tsx`.
+o stream começa no fallback, o status HTTP fica fixado em 200 a partir dele: um `notFound()`,
+`forbidden()` ou `redirect()` **abaixo** de um `loading.tsx` mostra a página certa, mas com status
+200 (ou vira redirecionamento no cliente). Por isso (#110):
+
+- os esqueletos genéricos ficam nos grupos `(app)/(esqueleto)/` e `admin/(esqueleto)/` (dashboard,
+  listas, novo concurso, configurações, notificações e páginas do painel), que **não** envolvem as
+  rotas `[id]`; o calendário tem o seu;
+- `concursos/[id]/layout.tsx` e `admin/usuarios/[id]/layout.tsx` conferem o formato do ID e a
+  existência (e o dono, no concurso) **acima** do `loading.tsx` do detalhe e chamam `notFound()`
+  → 404. A checagem (`carregar.ts`) é uma leitura enxuta pela chave primária, porque agora o
+  prefetch dos links para o detalhe passa pelo layout (vai até o primeiro `loading.tsx`): cada
+  link visível (dashboard, lista, quadro, calendário, tabela de usuários) custa essa leitura, e em
+  troca o esqueleto do detalhe também é pré-carregado. As páginas carregam o dado completo e
+  conferem de novo, como garantia: o layout não é reexecutado ao navegar entre o detalhe e a
+  edição. O `React.cache` deduplica cada leitura na mesma renderização (a do concurso entre
+  `generateMetadata` e a página);
+- o `forbidden()` do painel admin continua 403, porque fica no `admin/layout.tsx`, acima de tudo;
+- custo: sem o prefetch pronto, o esqueleto do detalhe só aparece depois da checagem (a navegação
+  espera o layout); numa navegação, uma leitura a mais pela chave primária;
+- ainda aceito: o `redirect` da visão admin no dashboard sai abaixo do esqueleto e vira
+  redirecionamento no cliente (as páginas exigem login).
+
+Uma rota `[id]` nova deve seguir o mesmo padrão; nada com `loading.tsx` deve ficar acima dela.
 
 ### 5.3 Route Handlers (`src/app/api`)
 
@@ -504,7 +522,7 @@ Decisões (issue #39):
 ├── public/icons/                   # ícones PNG do PWA (gerados por `pnpm icones`)
 ├── scripts/                        # migrate, seed, backup, mcp (stdio), gerar-icones, env
 ├── src/
-│   ├── app/                        # rotas: (app)/ com navegação, admin/, login/, api/, manifest.ts
+│   ├── app/                        # rotas: (app)/ com navegação, admin/, login/, api/, manifest.ts; (esqueleto)/ = páginas com o loading.tsx genérico (#110)
 │   ├── components/
 │   │   ├── ui/                     # shadcn/ui
 │   │   ├── concurso/               # formulários, cards, quadro, badges, sugestão de status
@@ -688,7 +706,7 @@ do React). O e2e `seguranca.spec.ts` confere os cabeçalhos e a ausência de vio
 |---|---|---|---|
 | Unitário | Vitest | `domain/*` (transições, prazos, validade, criticidade), `lib/format`, parsers BRL, schemas Zod | meta: cobertura ≥ 90% em `domain/` (medida no CI, sem limite configurado) |
 | Integração | Vitest + libSQL `:memory:` + migrações | repositories/queries (transação de status, tags, filtros, export→import ida e volta); servidor MCP com cliente em memória (`InMemoryTransport`) | casos principais |
-| E2E | Playwright (Chromium) | smoke: criar concurso → evento → aparece no dashboard → mudar status → exportar/importar; login, MCP, PWA e lembretes com auth ativa; painel admin com o usuário inicial (sem auth), incluindo selos MCP/.ics, detalhe do usuário e revogar tokens → `/api/mcp` 401 e feed 404 (#108); busca, quadro, calendário (navegação rápida e filtro de concursos no desktop e em 360 px, #83), cor/ícone, ocultar prazos, tema, lembretes (sino, regras, feed .ics), sino único por tela e tema pelo menu no celular, tema e Configurações sem duplicação (#82), PWA, aba do detalhe na URL e botão Atualizar com limite de 60 s (#77), deep-link e volta à origem, painel do evento com concluir/Desfazer, cabeçalho do concurso, avisos e alterações não salvas (#100) e layout em 360 px; `/api/mcp` com token → concurso visível no app. Dois servidores (com e sem auth) com bancos temporários em `e2e/.tmp` | poucos fluxos |
+| E2E | Playwright (Chromium) | smoke: criar concurso → evento → aparece no dashboard → mudar status → exportar/importar; login, MCP, PWA e lembretes com auth ativa; painel admin com o usuário inicial (sem auth), incluindo selos MCP/.ics, detalhe do usuário e revogar tokens → `/api/mcp` 401 e feed 404 (#108); status HTTP 404 nas rotas `[id]` (inexistente, malformado, de outro usuário), 403 no painel para não admin e esqueleto nas listagens (#110); busca, quadro, calendário (navegação rápida e filtro de concursos no desktop e em 360 px, #83), cor/ícone, ocultar prazos, tema, lembretes (sino, regras, feed .ics), sino único por tela e tema pelo menu no celular, tema e Configurações sem duplicação (#82), PWA, aba do detalhe na URL e botão Atualizar com limite de 60 s (#77), deep-link e volta à origem, painel do evento com concluir/Desfazer, cabeçalho do concurso, avisos e alterações não salvas (#100) e layout em 360 px; `/api/mcp` com token → concurso visível no app. Dois servidores (com e sem auth) com bancos temporários em `e2e/.tmp` | poucos fluxos |
 
 Datas sempre fixadas (`vi.setSystemTime` / `hoje` injetado).
 

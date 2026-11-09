@@ -136,6 +136,23 @@ export async function listarConcursos(
   return linhas.map((l) => ({ ...l, tags: tags.get(l.id) ?? [] }));
 }
 
+/**
+ * Só confere se o concurso existe e é do usuário (#110): uma leitura pela chave primária, para o
+ * layout do detalhe, que também roda no prefetch dos links.
+ */
+export async function concursoDoUsuarioExiste(
+  db: Db,
+  usuarioId: number,
+  id: number,
+): Promise<boolean> {
+  const [linha] = await db
+    .select({ id: concurso.id })
+    .from(concurso)
+    .where(and(eq(concurso.id, id), eq(concurso.usuarioId, usuarioId)))
+    .limit(1);
+  return linha !== undefined;
+}
+
 export async function obterConcurso(
   db: Db,
   usuarioId: number,

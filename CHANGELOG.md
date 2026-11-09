@@ -34,6 +34,13 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
   (e, sem login configurado, o campo nunca mudava). Agora conta páginas, Server Actions, MCP por
   HTTP e o feed `.ics`, gravado no máximo a cada 15 minutos por usuário, numa única escrita
   condicional; uma falha ao registrar só gera aviso no log.
+- **HTTP 404 de verdade** em `/concursos/{id}`, `/concursos/{id}/editar` e
+  `/admin/usuarios/{id}` (#110): com ID inexistente, malformado ou (no concurso) de outro usuário,
+  a página de não encontrado saía com status 200, porque o `loading.tsx` já tinha começado o
+  stream. A checagem passou para um layout do `[id]`, acima do esqueleto do detalhe, e os
+  esqueletos das demais páginas foram para os grupos `(esqueleto)`, que não envolvem as rotas
+  `[id]`. A checagem é uma leitura enxuta pela chave primária, já que o prefetch dos links para o
+  detalhe agora passa por ela (e também pré-carrega o esqueleto do detalhe).
 
 ## [2.6.0] - 2026-11-08
 

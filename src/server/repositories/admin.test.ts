@@ -22,6 +22,7 @@ import {
   obterResumo,
   removerEmailPermitido,
   revogarTokens,
+  usuarioExiste,
 } from "./admin";
 import { criarConcurso } from "./concursos";
 import { criarEvento } from "./eventos";
@@ -337,6 +338,8 @@ describe("detalhe do usuário (#108)", () => {
       contagens: { concursos: 1, eventos: 1, links: 1, resultados: 1 },
     });
     expect(await obterDetalheUsuario(db, 9999)).toBeNull();
+    expect(await usuarioExiste(db, bia)).toBe(true);
+    expect(await usuarioExiste(db, 9999)).toBe(false);
 
     // Isolamento: nenhuma leitura do painel devolve conteúdo de concursos nem segredos.
     const lido = JSON.stringify([detalhe, await listarUsuarios(db), await obterResumo(db)]);

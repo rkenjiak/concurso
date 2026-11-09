@@ -15,6 +15,7 @@ import {
   resumoTokenMcp,
   revogarTokenIcs,
   revogarTokenMcp,
+  usoDesatualizado,
   usuarioDoTokenMcp,
 } from "./usuarios";
 
@@ -173,5 +174,14 @@ describe("registro de uso (#108)", () => {
     expect((await uso()).mcp).toBeNull();
     // O último acesso continua: só o uso do token é zerado.
     expect((await uso()).acesso).toEqual(depois(JANELA_REGISTRO_USO_MS + 1));
+  });
+});
+
+describe("usoDesatualizado (#108)", () => {
+  it("vale escrever sem registro ou fora da janela; dentro dela, não", () => {
+    const antes = (ms: number) => new Date(AGORA.getTime() - ms);
+    expect(usoDesatualizado(null, AGORA)).toBe(true);
+    expect(usoDesatualizado(antes(JANELA_REGISTRO_USO_MS - 1), AGORA)).toBe(false);
+    expect(usoDesatualizado(antes(JANELA_REGISTRO_USO_MS + 1), AGORA)).toBe(true);
   });
 });

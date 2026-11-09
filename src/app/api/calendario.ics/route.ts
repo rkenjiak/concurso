@@ -58,7 +58,7 @@ export async function GET(request: NextRequest): Promise<Response> {
     return texto("Calendário não encontrado. Gere um novo link em Configurações.", 404);
   }
   limitador.registrarSucesso(chave);
-  await registrarUsoDoToken(usuario.id, "ics", token);
+  await registrarUsoDoToken(usuario, "ics", token);
   const ics = await gerarIcsDoUsuario(db, usuario.id, {
     incluirConcluidos: usuario.icsIncluirConcluidos,
     incluirEncerrados: usuario.icsIncluirEncerrados,

@@ -146,6 +146,26 @@ describe("tokens pessoais de quem perdeu o acesso (#96)", () => {
     expect(recusada?.icsTokenUsadoEm).toBeNull();
   });
 
+  it("com acesso e uso recentes nem tenta escrever; passada a janela, escreve (#108)", async () => {
+    const registrar = vi.mocked(usuarios.registrarUsoToken);
+    const tokenMcp = await gerarTokenMcp(estado.db, bia);
+    const definirUso = (ms: number) => {
+      const em = new Date(Date.now() - ms);
+      return estado.db
+        .update(usuario)
+        .set({ ultimoAcessoEm: em, mcpTokenUsadoEm: em })
+        .where(eq(usuario.id, bia));
+    };
+    registrar.mockClear();
+    await definirUso(60_000);
+    expect((await chamarMcp(tokenMcp)).status).toBe(200);
+    expect(registrar).not.toHaveBeenCalled();
+
+    await definirUso(usuarios.JANELA_REGISTRO_USO_MS + 60_000);
+    expect((await chamarMcp(tokenMcp)).status).toBe(200);
+    expect(registrar).toHaveBeenCalledTimes(1);
+  });
+
   it("falha ao registrar o uso não vira 500: só avisa no log (#108)", async () => {
     const aviso = vi.spyOn(log, "warn").mockImplementation(() => {});
     vi.mocked(usuarios.registrarUsoToken)

@@ -82,7 +82,7 @@ async function atender(request: Request): Promise<Response> {
     return texto("Token ausente ou inválido.", 401, { "WWW-Authenticate": 'Bearer realm="mcp"' });
   }
   limitador.registrarSucesso(chave);
-  await registrarUsoDoToken(usuario.id, "mcp", token);
+  await registrarUsoDoToken(usuario, "mcp", token);
   return obterHandler().fetch(request, {
     authInfo: {
       token,

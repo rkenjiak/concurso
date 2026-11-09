@@ -114,6 +114,15 @@ export async function registrarAcesso(db: Db, id: number, agora: Date = new Date
  */
 export const JANELA_REGISTRO_USO_MS = 15 * 60 * 1000;
 
+/**
+ * `true` se um registro de uso feito em `em` já saiu da janela do throttle (ou não existe): só então
+ * vale tentar a escrita (#108). Serve para pular o `UPDATE` com a linha já lida — no SQLite/libsql,
+ * mesmo um `UPDATE` que não altera nada pega o lock de escrita.
+ */
+export function usoDesatualizado(em: Date | null, agora: Date = new Date()): boolean {
+  return em === null || em.getTime() < agora.getTime() - JANELA_REGISTRO_USO_MS;
+}
+
 /** `coluna` vazia ou mais antiga que `limite` (ms). */
 const desatualizada = (coluna: Column, limite: number) =>
   sql`(${coluna} IS NULL OR ${coluna} < ${limite})`;

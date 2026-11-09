@@ -257,7 +257,7 @@ export interface ResumoInstancia {
   concursos: number;
   eventos: number;
   emailsPermitidos: number;
-  /** Usuários com acesso nos últimos 7 e 30 dias (#108). */
+  /** Usuários não bloqueados com acesso nos últimos 7 e 30 dias (#108). */
   ativos7Dias: number;
   ativos30Dias: number;
   /** Usuários não bloqueados com token do MCP / feed .ics ativo (#108). */
@@ -299,8 +299,8 @@ export async function obterResumo(
     total(db.select({ n: count() }).from(concurso)),
     total(db.select({ n: count() }).from(evento)),
     total(db.select({ n: count() }).from(emailPermitido)),
-    contar(gte(usuario.ultimoAcessoEm, desde(7))),
-    contar(gte(usuario.ultimoAcessoEm, desde(30))),
+    contar(and(gte(usuario.ultimoAcessoEm, desde(7)), isNull(usuario.bloqueadoEm))),
+    contar(and(gte(usuario.ultimoAcessoEm, desde(30)), isNull(usuario.bloqueadoEm))),
     contar(and(isNotNull(usuario.mcpTokenHash), isNull(usuario.bloqueadoEm))),
     contar(and(isNotNull(usuario.icsTokenHash), isNull(usuario.bloqueadoEm))),
   ]);

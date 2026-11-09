@@ -125,7 +125,13 @@ describe("leituras do painel", () => {
 
     // Bloqueado não conta como token ativo (o bloqueio apaga os tokens).
     await definirBloqueio(db, ana, bia, true, SEM_FIXOS, AGORA);
-    expect(await obterResumo(db, AGORA)).toMatchObject({ comTokenMcp: 0, comFeedIcs: 1 });
+    // Bloqueado não conta como ativo, como nos cartões de token.
+    expect(await obterResumo(db, AGORA)).toMatchObject({
+      ativos7Dias: 1,
+      ativos30Dias: 1,
+      comTokenMcp: 0,
+      comFeedIcs: 1,
+    });
   });
 });
 

@@ -30,10 +30,16 @@ export interface UsuarioSessao {
  * A sessão só vale enquanto o método usado continuar permitido e o usuário não estiver bloqueado
  * (regras em `autorizacao.ts`). Memorizado por requisição.
  *
- * Registra também o último acesso real (#108): é a única escrita feita durante a renderização, uma
- * vez por requisição (graças ao `cache()`) e no máximo uma a cada 15 min por usuário (throttle no
- * próprio `UPDATE`). Fica aqui, e não em `usuarioDaSessao` (pura, usada no callback do Google) nem
- * no `proxy.ts`. Uma falha (ex.: banco somente leitura) só gera um aviso no log.
+ * Registra também o último acesso real (#108). Fica aqui, e não em `usuarioDaSessao` (pura, usada
+ * no callback do Google) nem no `proxy.ts`. Notas:
+ * - o `cache()` só deduplica dentro de uma renderização; Server Actions e Route Handlers podem
+ *   chamar esta função mais de uma vez. Quem limita as escritas é o throttle no próprio `UPDATE`
+ *   (no máximo uma a cada 15 min por usuário), então não há memória extra no processo;
+ * - prefetch de rotas dinâmicas também passa por aqui e conta como acesso (aceitável: é o usuário
+ *   navegando no app);
+ * - todos os chamadores são dinâmicos (`connection()`, `searchParams` ou parâmetros de rota), então
+ *   a escrita nunca acontece no build/prerender, mesmo sem login (quando não há `cookies()`);
+ * - uma falha (ex.: banco somente leitura) só gera um aviso no log.
  */
 export const usuarioAtual = cache(async (): Promise<UsuarioSessao | null> => {
   const config = lerConfigAuth();
@@ -54,6 +60,11 @@ export const usuarioAtual = cache(async (): Promise<UsuarioSessao | null> => {
 /**
  * Registra o uso de um token pessoal já autorizado (`/api/mcp`, `/api/calendario.ics`, #108): o
  * último acesso e o último uso do token, com o mesmo throttle da sessão. Falhas só geram aviso.
+ *
+ * É aguardado (e não agendado com `after()`): é um único `UPDATE` pela chave primária que quase
+ * sempre não altera nada (throttle), então o custo no caminho crítico é mínimo; e `after()` exige o
+ * contexto de requisição do Next, o que tornaria a escrita assíncrona e os testes das rotas
+ * dependentes de esperar o fim da resposta.
  */
 export async function registrarUsoDoToken(
   usuarioId: number,

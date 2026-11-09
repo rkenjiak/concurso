@@ -100,7 +100,10 @@ export async function entrarComGoogle(
   });
 }
 
-/** Registra o último acesso (login por senha). */
+/**
+ * Registra o último acesso no login por senha. Sempre grava (sem o throttle de
+ * {@link registrarAcessoSessao}): um login é raro e deve aparecer na hora no painel.
+ */
 export async function registrarAcesso(db: Db, id: number, agora: Date = new Date()): Promise<void> {
   await db.update(usuario).set({ ultimoAcessoEm: agora }).where(eq(usuario.id, id));
 }

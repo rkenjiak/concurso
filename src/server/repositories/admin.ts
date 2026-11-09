@@ -7,7 +7,20 @@
  * janela entre a contagem e a escrita). Admins de `ADMIN_EMAILS` são garantidos pela configuração
  * e não podem ser rebaixados nem bloqueados pelo painel.
  */
-import { and, asc, count, desc, eq, exists, gte, isNotNull, isNull, ne, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  exists,
+  gte,
+  isNotNull,
+  isNull,
+  ne,
+  type SQL,
+  sql,
+} from "drizzle-orm";
 import { alias } from "drizzle-orm/sqlite-core";
 import type { AcaoAdmin, Papel } from "@/domain/enums";
 import { ErroDominio } from "@/domain/erros";
@@ -167,7 +180,7 @@ export async function obterResumo(
   agora: Date = new Date(),
 ): Promise<ResumoInstancia> {
   const total = async (consulta: Promise<{ n: number }[]>) => (await consulta)[0]?.n ?? 0;
-  const contar = (condicao: ReturnType<typeof and>) =>
+  const contar = (condicao: SQL | undefined) =>
     total(db.select({ n: count() }).from(usuario).where(condicao));
   const desde = (dias: number) => new Date(agora.getTime() - dias * DIA_MS);
   const [

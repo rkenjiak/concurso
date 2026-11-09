@@ -10,7 +10,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { criarBancoTeste, criarUsuarioTeste } from "@/server/db/banco-teste";
 import type { Db } from "@/server/db/client";
 import { emailPermitido, ID_USUARIO_INICIAL, usuario } from "@/server/db/schema";
+import { log } from "@/server/log";
 import { definirBloqueio } from "@/server/repositories/admin";
+import * as usuarios from "@/server/repositories/usuarios";
 import { gerarTokenIcs, gerarTokenMcp, obterUsuario } from "@/server/repositories/usuarios";
 
 const estado = vi.hoisted(() => ({ db: null as unknown as Db, ip: 0 }));
@@ -20,6 +22,10 @@ vi.mock("@/server/db/client", async (original) => ({
   getDb: () => estado.db,
 }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+vi.mock("@/server/repositories/usuarios", async (original) => {
+  const real = await original<typeof import("@/server/repositories/usuarios")>();
+  return { ...real, registrarUsoToken: vi.fn(real.registrarUsoToken) };
+});
 // IP diferente a cada requisição: o atraso progressivo das falhas não interfere nos testes.
 vi.mock("@/server/auth/acesso", async (original) => ({
   ...(await original<typeof import("@/server/auth/acesso")>()),
@@ -138,6 +144,27 @@ describe("tokens pessoais de quem perdeu o acesso (#96)", () => {
     const recusada = await obterUsuario(estado.db, semAcesso);
     expect(recusada?.ultimoAcessoEm).toBeNull();
     expect(recusada?.icsTokenUsadoEm).toBeNull();
+  });
+
+  it("falha ao registrar o uso não vira 500: só avisa no log (#108)", async () => {
+    const aviso = vi.spyOn(log, "warn").mockImplementation(() => {});
+    vi.mocked(usuarios.registrarUsoToken)
+      .mockRejectedValueOnce(new Error("readonly"))
+      .mockRejectedValueOnce(new Error("readonly"));
+    try {
+      expect((await chamarMcp(await gerarTokenMcp(estado.db, bia))).status).toBe(200);
+      expect((await chamarIcs(await gerarTokenIcs(estado.db, bia))).status).toBe(200);
+      expect(aviso).toHaveBeenCalledWith(
+        "auth.registro_acesso_falhou",
+        expect.objectContaining({ canal: "mcp", usuarioId: bia }),
+      );
+      expect(aviso).toHaveBeenCalledWith(
+        "auth.registro_acesso_falhou",
+        expect.objectContaining({ canal: "ics", usuarioId: bia }),
+      );
+    } finally {
+      aviso.mockRestore();
+    }
   });
 
   it("bloquear revoga os tokens; desbloquear não os devolve", async () => {

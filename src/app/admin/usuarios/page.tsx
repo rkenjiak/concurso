@@ -13,6 +13,20 @@ import { listarUsuarios, rotuloUsuario } from "@/server/repositories/admin";
 
 export const metadata: Metadata = { title: "Usuários" };
 
+/**
+ * Selo de um token pessoal ativo (#108). O último uso vai no `title` (dica ao passar o mouse) e,
+ * para leitores de tela, num texto oculto.
+ */
+function SeloToken({ rotulo, usadoEm }: { rotulo: string; usadoEm: Date | null }) {
+  const uso = usadoEm ? `usado por último em ${formatarDataHora(usadoEm)}` : "ainda não usado";
+  return (
+    <Badge variant="outline" title={`${rotulo} ativo, ${uso}`}>
+      {rotulo}
+      <span className="sr-only">: token ativo, {uso}</span>
+    </Badge>
+  );
+}
+
 export default async function UsuariosAdminPage() {
   await connection();
   const admin = await exigirAdminPagina();
@@ -35,6 +49,7 @@ export default async function UsuariosAdminPage() {
                 <th className="py-2 pr-4 font-medium">Papel</th>
                 <th className="py-2 pr-4 font-medium">Cadastro</th>
                 <th className="py-2 pr-4 font-medium">Último acesso</th>
+                <th className="py-2 pr-4 font-medium">Tokens</th>
                 <th className="py-2 pr-4 text-right font-medium">Concursos</th>
                 <th className="py-2 text-right font-medium">
                   <span className="sr-only">Ações</span>
@@ -69,6 +84,20 @@ export default async function UsuariosAdminPage() {
                     <td className="whitespace-nowrap py-3 pr-4 tabular-nums">
                       {formatarDataHora(u.ultimoAcessoEm)}
                     </td>
+                    <td className="py-3 pr-4">
+                      {u.mcpTokenAtivo || u.icsTokenAtivo ? (
+                        <div className="flex flex-wrap gap-1">
+                          {u.mcpTokenAtivo ? (
+                            <SeloToken rotulo="MCP" usadoEm={u.mcpTokenUsadoEm} />
+                          ) : null}
+                          {u.icsTokenAtivo ? (
+                            <SeloToken rotulo=".ics" usadoEm={u.icsTokenUsadoEm} />
+                          ) : null}
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </td>
                     <td className="py-3 pr-4 text-right tabular-nums">{u.totalConcursos}</td>
                     <td className="py-3 text-right">
                       <AcoesUsuario
@@ -87,6 +116,10 @@ export default async function UsuariosAdminPage() {
           </table>
         </CardContent>
       </Card>
+      <p className="text-muted-foreground text-xs">
+        Último acesso conta páginas, MCP por HTTP e feed .ics (registrado a cada 15 min, no máximo).
+        O MCP local por stdio (<code>pnpm mcp</code>) não usa token e não é contado.
+      </p>
     </div>
   );
 }

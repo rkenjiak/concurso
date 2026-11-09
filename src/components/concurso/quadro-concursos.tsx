@@ -13,9 +13,10 @@ import { DESCRICAO_STATUS, ROTULO_STATUS } from "@/domain/labels";
 import { type ColunaQuadro, montarQuadro } from "@/domain/quadro";
 import { formatarData } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { alterarStatus, desfazerUltimoStatus } from "@/server/actions/status";
+import { alterarStatus } from "@/server/actions/status";
 import { ListaTags } from "./lista-tags";
 import { MarcadorConcurso } from "./marcador-concurso";
+import { useDesfazerStatus } from "./use-desfazer-status";
 
 /** Dados de um cartão do quadro (serializáveis, vindos do servidor). */
 export interface CartaoQuadro {
@@ -44,6 +45,7 @@ const TIPO_ARRASTE = "application/x-concurso-id";
 export function QuadroConcursos({ cartoes }: { cartoes: CartaoQuadro[] }) {
   const router = useRouter();
   const [pendente, iniciar] = useTransition();
+  const desfazer = useDesfazerStatus(iniciar);
   const { avisar } = useAvisos();
   const [arrastando, setArrastando] = useState<CartaoQuadro | null>(null);
   const [agrupadasAbertas, setAgrupadasAbertas] = useState(false);
@@ -74,33 +76,6 @@ export function QuadroConcursos({ cartoes }: { cartoes: CartaoQuadro[] }) {
         // Falhou: nada foi revalidado; busca o estado atual (outra aba pode ter mudado o status).
         router.refresh();
       }
-    });
-  }
-
-  /**
-   * Desfaz a mudança `registroId` — só se ainda for a última (o servidor confere); a promessa
-   * termina com a ação (o aviso mostra a pendência).
-   */
-  function desfazer(concursoId: number, registroId: number) {
-    return new Promise<void>((resolver) => {
-      iniciar(async () => {
-        const r = await desfazerUltimoStatus(concursoId, { registroId });
-        avisar(
-          r.ok
-            ? {
-                texto: `Mudança desfeita: de volta a “${ROTULO_STATUS[r.data.status]}”.`,
-                tipo: "info",
-                chave: `status-${concursoId}`,
-              }
-            : {
-                texto: r.erros._form?.[0] ?? "Não foi possível desfazer.",
-                tipo: "erro",
-                chave: `status-${concursoId}`,
-              },
-        );
-        if (!r.ok) router.refresh();
-        resolver();
-      });
     });
   }
 

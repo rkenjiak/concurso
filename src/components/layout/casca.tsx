@@ -19,7 +19,10 @@ interface CascaProps {
   faixa?: ReactNode;
   /** Selo ao lado da marca. */
   selo?: ReactNode;
-  /** Notificações não lidas (#65); ausente = sem sino (visão admin). */
+  /**
+   * Notificações não lidas (#65): contador do sino (desktop) e do item Notificações da barra
+   * inferior (celular, #105). Ausente = sem sino (visão admin).
+   */
   naoLidas?: number;
   children: ReactNode;
 }
@@ -66,13 +69,13 @@ export function Casca({
           {/* Áreas seguras (#66): no app instalado, o cabeçalho não fica sob o notch/barra. */}
           <header className="sticky top-0 z-30 flex h-[calc(3.5rem+env(safe-area-inset-top))] items-center gap-2 border-b bg-background/95 pt-[env(safe-area-inset-top)] pr-[max(1rem,env(safe-area-inset-right))] pl-[max(1rem,env(safe-area-inset-left))] backdrop-blur md:hidden">
             {/* Com selo (visão admin), o nome não cabe ao lado dos controles em ~360 px: fica só o
-                ícone (o nome segue para leitores de tela). O tema fica dentro do menu da conta
-                (#78), o que deixa espaço para mais um ícone ao lado do sino. */}
+                ícone (o nome segue para leitores de tela). O tema e Configurações ficam dentro do
+                menu da conta (#78, #105), e as notificações, na barra inferior (#105): um só ponto
+                de entrada por layout. */}
             <Marca nomeClassName={selo ? "max-[399px]:sr-only" : undefined} />
             {selo}
             <div className="ml-auto flex items-center gap-2">
               {visao === "usuario" ? <BotaoAtualizar /> : null}
-              {naoLidas !== undefined ? <SinoNotificacoes naoLidas={naoLidas} /> : null}
               <MenuConta {...menu} compacto />
             </div>
           </header>
@@ -82,7 +85,7 @@ export function Casca({
           </main>
         </div>
       </div>
-      <NavegacaoInferior secao={secao} />
+      <NavegacaoInferior secao={secao} naoLidas={naoLidas} />
       {/* `useSearchParams` fora de um limite de Suspense tiraria as páginas da pré-renderização. */}
       <Suspense fallback={null}>
         <AvisoDaUrl />

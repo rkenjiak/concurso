@@ -85,7 +85,7 @@ dados (inclusive export/import e MCP).
   Google em `/api/auth/google…`, o manifest e os ícones do PWA e `/api/mcp` e
   `/api/calendario.ics` (que usam token próprio). A sessão fica em um cookie JWT assinado
   (`httpOnly`, `SameSite=Lax`, `Secure` em produção) válido por 30 dias; "Sair" fica no menu da
-  conta e em **Configurações**.
+  conta e em **Configurações → Conta**.
 - Gere o segredo com `openssl rand -base64 32` (ou
   `node -e "console.log(crypto.randomBytes(32).toString('base64'))"`). Trocar o `AUTH_SECRET`
   encerra todas as sessões.
@@ -146,9 +146,10 @@ restore do serviço e o export JSON periódico.
 
 ## Lembretes: notificações e calendário
 
-**Notificações no app.** O sino (na navegação: cabeçalho no celular, barra lateral no desktop) conta
-os avisos não lidos e leva à central (`/notificacoes`), onde cada aviso pode ser marcado como lido
-ou dispensado. Os avisos são calculados na hora a partir dos eventos pendentes — não há cron, então
+**Notificações no app.** O contador de não lidas fica no item **Notificações** da barra inferior
+(celular) ou no sino da barra lateral (desktop) e leva à central (`/notificacoes`), que lista os
+avisos agrupados pela proximidade do prazo (Hoje e amanhã, Próximos 7 dias, Mais adiante), o mais
+próximo primeiro, e onde cada aviso pode ser marcado como lido ou dispensado. Para o que fazer agora, use o Dashboard. Os avisos são calculados na hora a partir dos eventos pendentes — não há cron, então
 funciona até localmente — e seguem as **regras de notificação** de **Configurações → Notificações**:
 para cada tipo de evento, ligar/desligar e as antecedências em dias (0 = no dia). O padrão: fim das
 inscrições em 7, 1 e 0 dias; isenção e boleto em 2 e 0; provas e demais fases em 7 e 1; recursos em

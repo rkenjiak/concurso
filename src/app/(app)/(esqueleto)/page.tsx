@@ -165,7 +165,8 @@ export default async function DashboardPage({ searchParams }: PageProps<"/">) {
       <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <Card>
           <CardHeader>
-            {/* Sem sino próprio (#78): o global (cabeçalho/barra lateral) é o único ponto de entrada. */}
+            {/* Sem sino próprio (#78): o ponto de entrada é o global (sino na lateral no desktop,
+                Notificações na barra inferior no celular, #105). */}
             <CardTitle>Próximos prazos</CardTitle>
             <CardDescription>
               Eventos pendentes de concursos em andamento: vencidos, hoje e próximos{" "}

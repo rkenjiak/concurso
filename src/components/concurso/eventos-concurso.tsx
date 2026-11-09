@@ -3,20 +3,12 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CalendarDays, CalendarPlus, Clock, MapPin, Pencil, Plus, Trash2 } from "lucide-react";
 import { useSearchParams } from "next/navigation";
-import {
-  type Ref,
-  startTransition,
-  useEffect,
-  useImperativeHandle,
-  useOptimistic,
-  useRef,
-  useState,
-  useTransition,
-} from "react";
+import { type Ref, useEffect, useImperativeHandle, useRef, useState, useTransition } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { useAvisos } from "@/components/avisos/avisos";
 import { classesDestaque, useDestaqueAlvo } from "@/components/evento/destaque";
 import { NomeEvento } from "@/components/evento/nome-evento";
+import { useConcluirEvento } from "@/components/evento/use-concluir-evento";
 import { useFocoNoErro } from "@/components/formulario/use-foco-no-erro";
 import { useProtecaoSaida } from "@/components/formulario/use-protecao-saida";
 import { Badge } from "@/components/ui/badge";
@@ -46,7 +38,7 @@ import {
   VALORES_INICIAIS_EVENTO,
 } from "@/lib/schemas/evento";
 import { cn } from "@/lib/utils";
-import { alternarConcluido, excluirEvento, salvarEvento } from "@/server/actions/eventos";
+import { excluirEvento, salvarEvento } from "@/server/actions/eventos";
 import { BotaoConfirmar } from "./botao-confirmar";
 import { ariaCampo, Campo } from "./campo";
 
@@ -67,9 +59,6 @@ interface EventosConcursoProps {
   eventos: readonly EventoItem[];
 }
 
-type Otimistas = ReadonlyMap<number, boolean>;
-const SEM_OTIMISTAS: Otimistas = new Map();
-
 /**
  * Lista e gerencia as datas e eventos do concurso (RF04). `?evento=<id>` (#100, D2) destaca o
  * evento: rola até ele, dá foco e marca `aria-current` enquanto o parâmetro existir. Id que não é
@@ -82,11 +71,7 @@ export function EventosConcurso({ concursoId, eventos }: EventosConcursoProps) {
   const { avisar } = useAvisos();
   const [editando, setEditando] = useState<EventoItem | "novo" | null>(null);
   const formularioRef = useRef<ControleSaida>(null);
-  const [otimistas, aplicarOtimista] = useOptimistic(
-    SEM_OTIMISTAS,
-    (atual: Otimistas, { id, concluido }: { id: number; concluido: boolean }) =>
-      new Map(atual).set(id, concluido),
-  );
+  const { otimistas, alternar: alternarConcluido } = useConcluirEvento<number>();
   const paramEvento = useSearchParams().get(PARAM_EVENTO);
   const idPedido = lerIdEvento(paramEvento);
   const alvoId = idPedido !== null && eventos.some((e) => e.id === idPedido) ? idPedido : null;
@@ -99,41 +84,23 @@ export function EventosConcurso({ concursoId, eventos }: EventosConcursoProps) {
   }, [paramEvento, alvoId]);
 
   /** Conclui ou reabre; a promessa termina com a gravação (o "Desfazer" do aviso a aguarda). */
-  function alternar(e: EventoItem, concluido: boolean, desfazendo = false): Promise<void> {
-    const nome = nomePrazo(e);
-    const chave = `concluir-evento-${e.id}`;
-    return new Promise<void>((resolver) => {
-      startTransition(async () => {
-        aplicarOtimista({ id: e.id, concluido });
-        const r = await alternarConcluido(concursoId, e.id, concluido);
-        if (!r.ok) {
-          avisar({
-            texto:
-              r.erros._form?.[0] ??
-              `Não foi possível ${concluido ? "concluir" : "reabrir"} “${nome}”.`,
-            tipo: "erro",
-            chave,
-          });
-        } else if (concluido) {
-          avisar({
-            texto: `“${nome}” concluído.`,
-            chave,
-            acao: {
-              rotulo: "Desfazer",
-              executar: async () => {
-                await alternar(e, false, true);
-                // O foco estava no aviso, que vai fechar: volta à caixa do evento.
-                if (document.activeElement?.closest("[data-avisos]")) {
-                  document.getElementById(`evento-${e.id}-concluido`)?.focus();
-                }
-              },
-            },
-          });
-        } else if (!desfazendo) {
-          avisar({ texto: `“${nome}” reaberto.`, chave });
+  function alternar(e: EventoItem, concluido: boolean, desfazendo = false): Promise<boolean> {
+    return alternarConcluido({
+      id: e.id,
+      concursoId,
+      eventoId: e.id,
+      nome: nomePrazo(e),
+      concluido,
+      chaveAviso: `concluir-evento-${e.id}`,
+      erroComChave: true,
+      desfazendo,
+      desfazer: async () => {
+        await alternar(e, false, true);
+        // O foco estava no aviso, que vai fechar: volta à caixa do evento.
+        if (document.activeElement?.closest("[data-avisos]")) {
+          document.getElementById(`evento-${e.id}-concluido`)?.focus();
         }
-        resolver();
-      });
+      },
     });
   }
 

@@ -36,6 +36,20 @@ test("lembretes: notificação no app, feed .ics assinável e revogado (#65)", a
     .getByRole("listitem")
     .filter({ hasText: orgao });
   await expect(item).toContainText("Fim das inscrições é amanhã");
+  // Papel da tela (#104): prazo de amanhã fica no grupo "Hoje e amanhã" (heading + lista, sem
+  // landmark por grupo); o atalho leva às regras.
+  const grupo = page
+    .getByTestId("lista-notificacoes")
+    .locator("div")
+    .filter({
+      has: page.getByRole("heading", { name: "Hoje e amanhã", level: 2 }),
+    });
+  await expect(grupo.getByRole("listitem").filter({ hasText: orgao })).toBeVisible();
+  await expect(page.getByTestId("lista-notificacoes").getByRole("region")).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Configurar avisos" })).toHaveAttribute(
+    "href",
+    "/configuracoes#notificacoes",
+  );
   await item.getByRole("button", { name: /^Marcar como lida/ }).click();
   await expect(item).toHaveAttribute("data-lida", "true");
   await page.reload();

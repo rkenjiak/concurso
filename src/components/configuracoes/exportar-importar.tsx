@@ -88,7 +88,7 @@ export function ExportarImportar() {
   return (
     <div className="space-y-6">
       <section className="space-y-3">
-        <h3 className="font-medium">Exportar</h3>
+        <h4 className="font-medium">Exportar</h4>
         <p className="text-muted-foreground text-sm">
           O backup JSON contém todos os seus dados (concursos, tags, links, eventos, histórico e
           resultados) e pode ser importado depois. O CSV traz só os concursos, para abrir em
@@ -111,7 +111,7 @@ export function ExportarImportar() {
       </section>
 
       <section className="space-y-3">
-        <h3 className="font-medium">Importar backup</h3>
+        <h4 className="font-medium">Importar backup</h4>
         <p className="text-muted-foreground text-sm">
           Restaura um backup JSON exportado por este app.{" "}
           <strong className="text-foreground">Todos os dados atuais são substituídos.</strong>{" "}

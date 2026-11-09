@@ -41,6 +41,13 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
   esqueletos das demais páginas foram para os grupos `(esqueleto)`, que não envolvem as rotas
   `[id]`. A checagem é uma leitura enxuta pela chave primária, já que o prefetch dos links para o
   detalhe agora passa por ela (e também pré-carrega o esqueleto do detalhe).
+- **`SQLITE_BUSY` com banco local** (#112): duas escritas ao mesmo tempo (ex.: o registro de
+  último acesso durante o cadastro de um concurso) disputavam o lock do arquivo e uma falhava na
+  hora. Pior: a conexão da instrução que falhou ficava presa, fazendo falhar os COMMITs seguintes
+  até o coletor de lixo liberá-la (o cadastro voltava "Não foi possível concluir a operação"). Com
+  `file:`, o app agora faz uma escrita por vez no processo, usa WAL (leituras não disputam com
+  escritas) e espera até 5 s pelo lock de outros processos (`pnpm mcp`, scripts). Turso não muda.
+  Ao restaurar um backup copiando o arquivo, apague também `concurso.db-wal` e `concurso.db-shm`.
 
 ## [2.6.0] - 2026-11-08
 

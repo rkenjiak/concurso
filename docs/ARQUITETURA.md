@@ -16,7 +16,7 @@
 | Runtime | **Node.js 24 LTS** | LTS atual; suportado por Vercel/Docker. |
 | Framework (front + back) | **Next.js (App Router) + React** | Um único projeto/processo: páginas via Server Components, mutações via Server Actions. Sem API separada para manter. |
 | UI | **Tailwind CSS + shadcn/ui** (Radix) | Componentes acessíveis e responsivos copiados para o repo (sem dependência de lib de UI pesada). |
-| Banco | **SQLite via libSQL** (`@libsql/client`) | Arquivo único local (`data/concurso.db`), backup trivial; o mesmo driver aponta para **Turso** se hospedado em serverless. |
+| Banco | **SQLite via libSQL** (`@libsql/client`) | Arquivo local (`data/concurso.db`, em WAL: com `-wal`/`-shm` ao lado), backup com `pnpm db:backup`; o mesmo driver aponta para **Turso** se hospedado em serverless. |
 | ORM / migrações | **Drizzle ORM + drizzle-kit** | Leve, SQL-like, tipagem inferida do schema, migrações versionadas em SQL. |
 | Validação | **Zod** | Um schema por formulário/ação, reaproveitado no cliente (react-hook-form) e no servidor. |
 | Formulários | **react-hook-form** + `@hookform/resolvers/zod` | Formulários grandes (RF01) com pouca re-renderização. |
@@ -753,6 +753,35 @@ pnpm dev        # aplica migrações pendentes (predev) e sobe em http://localho
 | Docker (imagem `standalone`, `Dockerfile` na raiz) em VPS/Fly.io com volume para `data/`; migrações ao iniciar (`MIGRATE_ON_START=true`) | ~US$ 2–5/mês | Se quiser anexos em disco local ou evitar serviço de banco externo. |
 
 O mesmo código atende ambas: só muda `DATABASE_URL` (`file:./data/concurso.db` vs `libsql://…`).
+
+**Concorrência no SQLite local (#112, `src/server/db/local.ts`).** O `@libsql/client` abre um pool
+de conexões ao arquivo e cada transação fica com uma conexão só dela. Uma instrução que falha com
+`SQLITE_BUSY` fica ativa sem reset (o driver não expõe reset; só o GC a libera), e a conexão dela
+passa a segurar uma transação de leitura sem fim: no journal de rollback, todo COMMIT seguinte
+falha; em WAL, a conexão lê um snapshot velho. Por isso, com `file:` (não `:memory:` nem Turso),
+`criarDb` envolve o client para que escritas não levem `SQLITE_BUSY`:
+- **uma escrita por vez no processo** (fila FIFO): transações (exceto `"read"`), `batch`,
+  `migrate`, `executeMultiple` e todo `execute` que não comece com `SELECT`. A transação segura a
+  vez até `commit`/`rollback`/`close`; quem espera mais de 5 s recebe `SQLITE_BUSY`;
+- **WAL** (`PRAGMA journal_mode = WAL` na primeira operação, persistente no arquivo): leituras
+  não disputam lock com escritas;
+- **busy timeout de 5 s** (`timeout` do client) só para outros processos (`pnpm mcp`, scripts,
+  e2e). Dentro do processo ele não ajudaria: a espera do driver é síncrona e travaria o event
+  loop de que a outra transação precisa para terminar.
+
+Consequências e limites:
+- dentro de `db.transaction(async (tx) => …)`, escreva sempre pelo `tx`; uma escrita pelo `db` de
+  fora espera a vez que a própria transação segura e falha após 5 s;
+- os 5 s contam a espera na fila, não a duração da transação: enquanto uma transação longa (ex.:
+  a importação, que substitui tudo) segura a vez, escritas concorrentes podem falhar com
+  `SQLITE_BUSY`. Esse erro é da fila e não prende conexão;
+- a fila é por client: dois `criarDb` no mesmo arquivo e no mesmo processo (só em testes e
+  scripts) voltam a disputar o lock. O app usa um só (`getDb`);
+- a fila evita o caso comum, mas não cura uma conexão presa: um `SQLITE_BUSY` vindo do driver
+  (outro processo segurando o lock por mais de 5 s, ou `SQLITE_BUSY_SNAPSHOT` num `batch` que lê
+  antes de escrever) ainda pode prendê-la até o GC;
+- se o WAL não puder ser ligado (ex.: outro processo lendo no journal de rollback), o app segue
+  com um aviso `db.preparo_falhou` e tenta de novo após 60 s.
 
 ### 9.3 Backup
 - **Local:** `pnpm db:backup` → `VACUUM INTO 'backups/concurso-AAAAMMDD-HHmm.db'` (cópia consistente);

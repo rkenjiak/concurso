@@ -6,6 +6,7 @@ import { existsSync, mkdirSync, readdirSync, rmSync } from "node:fs";
 import { join, resolve } from "node:path";
 import type { Client } from "@libsql/client";
 import { carimboSP } from "../../lib/tz";
+import { ehArquivoLocal } from "./local";
 
 export const PASTA_BACKUPS = "backups";
 export const MANTER_BACKUPS_PADRAO = 10;
@@ -14,9 +15,7 @@ const PREFIXO = "concurso-";
 const RE_BACKUP = /^concurso-\d{8}-\d{4}(?:-\d+)?\.db$/;
 
 /** `true` se a URL aponta para um arquivo SQLite local (onde `VACUUM INTO` faz sentido). */
-export function ehBancoLocal(url: string): boolean {
-  return url.startsWith("file:") && !url.includes(":memory:");
-}
+export const ehBancoLocal = ehArquivoLocal;
 
 /** Caminho livre para o backup do instante (sufixo `-2`, `-3`… se já existir no mesmo minuto). */
 export function caminhoBackup(pasta: string, agora: Date): string {

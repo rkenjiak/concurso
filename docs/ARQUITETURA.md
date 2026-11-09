@@ -385,7 +385,8 @@ contador; o nome acessível traz o número), e o cabeçalho tem só marca, Atual
 o sino fica na lateral e Configurações na navegação. Um só ponto de entrada de notificações e um
 só lugar para Configurações e para o tema por layout, sem duplicação (#82, #105).
 Em telas de toque (`pointer: coarse`), botões,
-campos, abas e seletores crescem para 36–40 px, sem mudar o desktop. Tabelas largas rolam dentro do próprio contêiner (`relative
+campos, abas e seletores crescem para 36–40 px, sem mudar o desktop; a navegação (barra inferior,
+menu da conta, índice de Configurações) e os botões da central de notificações chegam a 44 px. Tabelas largas rolam dentro do próprio contêiner (`relative
 overflow-x-auto`, para o `sr-only` não escapar). Links externos com
 `target="_blank" rel="noopener noreferrer"`.
 

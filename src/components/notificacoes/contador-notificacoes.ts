@@ -8,7 +8,10 @@ export function textoContadorNotificacoes(naoLidas: number): string {
   return naoLidas > 99 ? "99+" : String(naoLidas);
 }
 
-/** Nome acessível do ponto de entrada: sempre com o número real (o selo pode mostrar "99+"). */
+/**
+ * Nome acessível do ponto de entrada: com não lidas, traz o número real (o selo pode mostrar
+ * "99+"); sem nenhuma, diz "nenhuma não lida".
+ */
 export function rotuloNotificacoes(naoLidas: number): string {
   if (naoLidas === 0) return "Notificações (nenhuma não lida)";
   return `Notificações (${naoLidas} não ${naoLidas === 1 ? "lida" : "lidas"})`;

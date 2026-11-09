@@ -40,8 +40,8 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
   Configurações passou para o menu da conta (avatar) e o sino saiu do cabeçalho do celular, para
   manter um só ponto de entrada de notificações por layout (#78). O desktop não muda.
 - Limpeza sem mudança de comportamento (#107): `useConcluirEvento` e `useDesfazerStatus` têm uma
-  fonte única, e o zoom do `alert-dialog` só anima sem `prefers-reduced-motion`, como os outros
-  diálogos.
+  fonte única, e o zoom do `alert-dialog` só anima quando o sistema não pede movimento reduzido
+  (`prefers-reduced-motion`); o fade continua.
 
 - Gerar ou revogar um token, bloquear e desbloquear passam a zerar também o último uso do token
   (#108), para o painel não mostrar "usado há 2 dias" em quem já não tem token.

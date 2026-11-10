@@ -150,7 +150,8 @@ function conferirLote(itens: readonly unknown[]): void {
 
 /**
  * Marca como `EXPORTADO` (com quem e quando) e devolve os itens, na ordem da caixa de entrada.
- * Exportar de novo um item já exportado ou descartado é permitido: ele passa a `EXPORTADO`.
+ * Exportar de novo um item já exportado é permitido (regera o texto). Descartados ficam de fora:
+ * não voltam a `EXPORTADO` nem entram no conteúdo (restaure-os antes).
  */
 export async function exportarFeedbacks(
   db: Db,
@@ -164,7 +165,7 @@ export async function exportarFeedbacks(
     const itens = await tx
       .update(feedback)
       .set({ status: "EXPORTADO", tratadoPor: autor.id, tratadoEm: agora })
-      .where(inArray(feedback.id, [...ids]))
+      .where(and(inArray(feedback.id, [...ids]), ne(feedback.status, "DESCARTADO")))
       .returning();
     if (itens.length > 0) {
       await auditar(tx, autor, "EXPORTAR_FEEDBACK", quantidadeFeedbacks(itens.length), null, agora);

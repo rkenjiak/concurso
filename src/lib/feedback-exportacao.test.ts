@@ -49,6 +49,31 @@ describe("tituloFeedback", () => {
   });
 });
 
+describe("menções e referências do GitHub", () => {
+  const Z = "\u200b";
+  const mensagem = "Fala @rkenjiak, veja #12 e org/repo#3 e ## título";
+
+  it("ganham um espaço de largura zero depois de @ e # na citação e no título", () => {
+    const corpo = corpoFeedback({ ...base, mensagem });
+    expect(corpo).toContain(
+      `> Fala @${Z}rkenjiak, veja #${Z}12 e org/repo#${Z}3 e #${Z}#${Z} título`,
+    );
+    const citacao = corpo.split("\n").filter((l) => l.startsWith(">"));
+    expect(citacao.join("\n")).not.toMatch(/[@#][\w#]/);
+    expect(corpo.startsWith("## Feedback de usuário\n")).toBe(true);
+    expect(tituloFeedback({ ...base, mensagem })).toBe(
+      `[Bug] Fala @${Z}rkenjiak, veja #${Z}12 e org/repo#${Z}3 e #${Z}#${Z} título`,
+    );
+  });
+
+  it("valem também nos comandos gh e no Markdown agrupado", () => {
+    expect(comandoGh({ ...base, mensagem })).toContain(`@${Z}rkenjiak`);
+    expect(markdownAgrupado([{ ...base, mensagem }])).not.toContain("@rkenjiak");
+    // O e-mail do usuário (opcional) não é menção e fica como está.
+    expect(corpoFeedback(base, { incluirEmail: true })).toContain("ana@exemplo.com");
+  });
+});
+
 describe("corpoFeedback", () => {
   it("segue o modelo da issue, sem e-mail por padrão", () => {
     expect(corpoFeedback(base)).toBe(
@@ -60,7 +85,7 @@ describe("corpoFeedback", () => {
         "- **Página:** `/concursos/[id]`",
         "- **Versão:** 2.7.0 (a1b2c3d) · **Navegador:** Mozilla/5.0 (Android)",
         "- **Recebido em:** 09/11/2026 14:32",
-        "- **Ref.:** feedback #123",
+        "- **Ref.:** feedback nº 123",
       ].join("\n"),
     );
   });
@@ -70,8 +95,8 @@ describe("corpoFeedback", () => {
   });
 
   it("cita todas as linhas da mensagem, inclusive as vazias", () => {
-    const corpo = corpoFeedback({ ...base, mensagem: "um\n\n## não é título\r\ndois" });
-    expect(corpo).toContain("> um\n>\n> ## não é título\n> dois");
+    const corpo = corpoFeedback({ ...base, mensagem: "um\n\n- não é lista\r\ndois" });
+    expect(corpo).toContain("> um\n>\n> - não é lista\n> dois");
   });
 });
 
@@ -99,7 +124,8 @@ describe("formatos", () => {
     expect(md.startsWith("**Título:** Feedback de usuários (2)")).toBe(true);
     expect(md).toContain("### 1. [Bug] O botão");
     expect(md).toContain("### 2. [Outro] Gostei do calendário.\n> Gostei do calendário.");
-    expect(md).toContain("feedback #124");
+    expect(md).toContain("feedback nº 124");
+    expect(md).not.toMatch(/#\d/);
   });
 
   it("JSON: array com os campos; e-mail só se pedido", () => {
@@ -163,6 +189,7 @@ describe("comandos gh", () => {
   it.skipIf(bash.status !== 0)("no bash, título e corpo chegam ao gh sem expansão", () => {
     const itens = [
       { ...base, mensagem: MALICIOSA },
+      { ...base, id: 8, mensagem: "oi @rkenjiak #1 FEEDBACK_8\nFEEDBACK_8" },
       { ...base, id: 9, tipo: "SUGESTAO" as const, mensagem: "it's `date` $(id)" },
     ];
     const script = [

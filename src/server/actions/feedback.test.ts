@@ -280,6 +280,24 @@ describe("ações do admin", () => {
     ]);
   });
 
+  it("exportar não tira itens de DESCARTADO (nem os inclui no conteúdo)", async () => {
+    await descartarFeedbacksAcao([ids[0]]);
+    const r = await exportarFeedbacksAcao(ids, "JSON", false);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.data.exportados).toBe(2);
+    expect(JSON.parse(r.data.conteudo).map((f: { id: number }) => f.id)).not.toContain(ids[0]);
+    expect((await linhas()).map((f) => f.status)).toEqual(["DESCARTADO", "EXPORTADO", "EXPORTADO"]);
+    expect((await auditoria()).at(-1)).toMatchObject({
+      acao: "EXPORTAR_FEEDBACK",
+      alvo: "2 feedbacks",
+    });
+    // Só descartados: nada muda nem é auditado.
+    const so = await exportarFeedbacksAcao([ids[0]], "JSON", false);
+    expect(so.ok && so.data.exportados).toBe(0);
+    expect(await auditoria()).toHaveLength(2);
+  });
+
   it("feedback continua com a cópia do e-mail se o usuário for excluído", async () => {
     await estado.db.delete(usuario).where(eq(usuario.id, bia));
     const [f] = await linhas();

@@ -1,7 +1,7 @@
 "use client";
 
 import { Archive, Download, RotateCcw, Trash2, X } from "lucide-react";
-import { type MouseEvent, useEffect, useRef, useState, useTransition } from "react";
+import { type MouseEvent, useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { DialogoConfirmar } from "@/components/concurso/botao-confirmar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -63,30 +63,32 @@ export function CaixaFeedback({ itens, status }: CaixaFeedbackProps) {
   const ancora = useRef<number | null>(null);
   const shiftTeclado = useRef(false);
   const intervalo = useRef(false);
+  // Só anuncia "Nenhum selecionado" depois de alguma seleção (não ao abrir a página).
+  const houveSelecao = useRef(false);
 
   const ids = itens.map((i) => i.id);
   // Só conta o que ainda está na lista (após filtrar, paginar ou concluir uma ação).
   const selecionados = somenteVisiveis(selecao, ids);
   const quantidade = selecionados.size;
+  if (quantidade > 0) houveSelecao.current = true;
   const descartados = status === "DESCARTADO";
   const itensSelecionados = itens.filter((i) => selecionados.has(i.id));
 
-  function limpar() {
+  const limpar = useCallback(() => {
     setSelecao(new Set());
     ancora.current = null;
-  }
+  }, []);
 
   // Esc limpa a seleção (os diálogos tratam o próprio Esc).
   useEffect(() => {
     if (quantidade === 0 || exportando || excluindo) return;
     const aoTeclar = (e: KeyboardEvent) => {
       if (e.key !== "Escape" || e.defaultPrevented) return;
-      setSelecao(new Set());
-      ancora.current = null;
+      limpar();
     };
     document.addEventListener("keydown", aoTeclar);
     return () => document.removeEventListener("keydown", aoTeclar);
-  }, [quantidade, exportando, excluindo]);
+  }, [quantidade, exportando, excluindo, limpar]);
 
   function descartar() {
     const lote = [...selecionados];
@@ -164,7 +166,11 @@ export function CaixaFeedback({ itens, status }: CaixaFeedbackProps) {
   return (
     <div className="space-y-3">
       <p aria-live="polite" className="sr-only">
-        {quantidade > 0 ? `${plural(quantidade, "selecionado", "selecionados")}` : ""}
+        {quantidade > 0
+          ? plural(quantidade, "selecionado", "selecionados")
+          : houveSelecao.current
+            ? "Nenhum selecionado"
+            : ""}
       </p>
       <div className="relative overflow-x-auto">
         <table className="w-full text-sm">

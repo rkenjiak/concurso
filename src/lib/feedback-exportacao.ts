@@ -8,6 +8,10 @@
  * Nos comandos `gh`, a mensagem nunca é interpolada no shell: o corpo vai num heredoc com
  * delimitador entre aspas (`<<'FEEDBACK_12'`), que desliga `$()`, crases e variáveis, e o
  * delimitador muda se alguma linha do corpo for igual a ele. O título vai entre aspas simples.
+ *
+ * Menções e referências do GitHub na mensagem e no título (`@usuario`, `#12`, `org/repo#12`) são
+ * neutralizadas com um espaço de largura zero depois de `@` e `#`: a issue não notifica ninguém nem
+ * cria links cruzados por causa do texto do usuário. A referência ao feedback é `feedback nº 123`.
  */
 import type { StatusFeedback, TipoFeedback } from "@/domain/enums";
 import { LABEL_GITHUB_FEEDBACK, semCaracteresDeControle } from "@/domain/feedback";
@@ -42,17 +46,25 @@ function limparTexto(texto: string): string {
   return semCaracteresDeControle(texto.replace(/\r\n?/g, "\n"), "", "\n\t");
 }
 
-/** `[Bug] primeiros 60 caracteres…` (uma linha, espaços colapsados). */
+/** Espaço de largura zero (U+200B), invisível na issue. */
+export const ESPACO_ZERO = "\u200b";
+
+/** Neutraliza menções (`@usuario`) e referências (`#12`, `org/repo#12`) do GitHub. */
+export function semMencoes(texto: string): string {
+  return texto.replace(/[@#]/g, (c) => `${c}${ESPACO_ZERO}`);
+}
+
+/** `[Bug] primeiros 60 caracteres…` (uma linha, espaços colapsados, sem menções). */
 export function tituloFeedback(f: Pick<FeedbackExportavel, "tipo" | "mensagem">): string {
   const linha = limparTexto(f.mensagem).replace(/\s+/g, " ").trim();
   const resumo =
     linha.length > TAMANHO_TITULO ? `${linha.slice(0, TAMANHO_TITULO).trimEnd()}…` : linha;
-  return `[${ROTULO_TIPO_FEEDBACK[f.tipo]}] ${resumo}`;
+  return `[${ROTULO_TIPO_FEEDBACK[f.tipo]}] ${semMencoes(resumo)}`;
 }
 
-/** Mensagem como citação Markdown (`> ` em cada linha, inclusive as vazias). */
+/** Mensagem como citação Markdown (`> ` em cada linha, inclusive as vazias), sem menções. */
 function citar(mensagem: string): string {
-  return limparTexto(mensagem)
+  return semMencoes(limparTexto(mensagem))
     .trim()
     .split("\n")
     .map((l) => (l.trim() === "" ? ">" : `> ${l}`))
@@ -74,7 +86,7 @@ function metadados(f: FeedbackExportavel, opcoes: OpcoesExportacao): string[] {
     `- **Recebido em:** ${formatarDataHora(f.createdAt)}`,
   ];
   if (opcoes.incluirEmail) linhas.push(`- **Usuário:** ${inline(f.usuario)}`);
-  linhas.push(`- **Ref.:** feedback #${f.id}`);
+  linhas.push(`- **Ref.:** feedback nº ${f.id}`);
   return linhas;
 }
 

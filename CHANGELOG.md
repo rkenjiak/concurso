@@ -31,8 +31,10 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
   de ações fixa só com seleção, `Esc` para limpar e a quantidade anunciada a leitores de tela.
 - **Exportar feedback para issues** (#117): prévia e cópia em Markdown (uma issue por feedback ou
   uma agrupando todos), download em JSON e comandos `gh issue create` com o corpo num heredoc
-  literal (nada da mensagem é expandido pelo shell). Sem o e-mail do usuário por padrão; os itens
-  passam a **Exportado**.
+  literal (nada da mensagem é expandido pelo shell). Sem o e-mail do usuário por padrão; menções
+  e referências do GitHub (`@usuario`, `#12`) na mensagem e no título são neutralizadas, e a
+  referência ao feedback é `feedback nº 123`. Os itens passam a **Exportado**; descartados ficam de
+  fora.
 - **Descartar, restaurar e excluir feedback** (#117): descartar não apaga e tem **Desfazer**; em
   Descartados, restaurar volta a **Novo** e excluir apaga de vez, com confirmação. Cada ação em
   lote (até 200 itens) gera um único registro na auditoria, com a quantidade ("5 feedbacks").

@@ -119,7 +119,13 @@ export function DialogoExportarFeedback({
         incluirEmail,
       );
       if (!r.ok) {
-        setErro(r.erros._form?.[0] ?? "Não foi possível exportar.");
+        const motivo = r.erros._form?.[0] ?? "Não foi possível exportar.";
+        // A cópia já aconteceu (precisa do gesto do clique): deixa claro que o status não mudou.
+        setErro(
+          ehJson
+            ? `${motivo} Nada foi baixado e os itens não foram marcados como exportados.`
+            : `${motivo} O conteúdo foi copiado, mas os itens NÃO foram marcados como exportados.`,
+        );
         return;
       }
       if (ehJson) baixar(r.data.conteudo);

@@ -23,6 +23,7 @@ import { listarTags } from "./queries/tags";
 import * as concursos from "./repositories/concursos";
 import { definirPrazoOculto } from "./repositories/dashboard";
 import * as eventos from "./repositories/eventos";
+import { criarFeedback, listarFeedbacks } from "./repositories/feedback";
 import * as links from "./repositories/links";
 import * as resultados from "./repositories/resultados";
 import * as status from "./repositories/status";
@@ -103,6 +104,24 @@ describe("leituras", () => {
     expect(backup.dados.statusHistorico).toHaveLength(1);
     expect(backup.dados.concursos[0]).not.toHaveProperty("usuarioId");
     expect(await exportarConcursosCsv(db, bia)).not.toContain("Ana");
+  });
+
+  it("feedback (#117) não aparece em nenhuma leitura do usuário, nem para quem enviou", async () => {
+    const segredo = "Feedback confidencial da Bia sobre o app";
+    await criarFeedback(
+      db,
+      { id: bia, email: "bia@exemplo.com", nome: null },
+      { tipo: "BUG", mensagem: segredo, pagina: "/" },
+      { versaoApp: "2.7.0", commitApp: "dev", userAgent: null },
+    );
+    for (const dono of [bia, ANA]) {
+      expect(JSON.stringify(await exportarDados(db, dono))).not.toContain(segredo);
+      expect(await exportarConcursosCsv(db, dono)).not.toContain(segredo);
+      expect(JSON.stringify(await obterDashboard(db, dono, HOJE))).not.toContain(segredo);
+      expect(JSON.stringify(await op.listar(db, dono))).not.toContain(segredo);
+    }
+    // Só a caixa de entrada do painel (que exige o papel ADMIN, ver actions/feedback.test.ts) lê.
+    expect((await listarFeedbacks(db)).itens.map((f) => f.mensagem)).toEqual([segredo]);
   });
 });
 

@@ -273,15 +273,15 @@ export function CaixaFeedback({ itens, status }: CaixaFeedbackProps) {
               </>
             ) : (
               <>
+                {exportaveis.length === 0 ? (
+                  <span className="self-center text-muted-foreground text-xs">
+                    Descartados não são exportados: restaure-os antes.
+                  </span>
+                ) : null}
                 <Button
                   size="sm"
                   onClick={() => setExportando(true)}
                   disabled={pendente || exportaveis.length === 0}
-                  title={
-                    exportaveis.length === 0
-                      ? "Descartados não são exportados: restaure-os antes."
-                      : undefined
-                  }
                 >
                   <Download aria-hidden />
                   Exportar

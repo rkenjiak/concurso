@@ -15,8 +15,10 @@ import {
 import { Label } from "@/components/ui/label";
 import { quantidadeFeedbacks } from "@/domain/feedback";
 import {
+  conteudoExportado,
   exportarFeedbacksComo,
   type FeedbackExportavel,
+  MENSAGEM_NADA_EXPORTADO,
   nomeArquivoFeedbacks,
 } from "@/lib/feedback-exportacao";
 import type { FormatoExportacaoFeedback } from "@/lib/schemas/feedback";
@@ -151,8 +153,10 @@ export function DialogoExportarFeedback({
         ? null
         : copiarQuandoPronto(
             acao.then((r) => {
-              if (!r.ok) throw new Error("exportação recusada");
-              return r.data.conteudo;
+              // Sem itens exportados, a cópia falha e a área de transferência fica como estava.
+              const texto = r.ok ? conteudoExportado(r.data) : null;
+              if (texto === null) throw new Error("nada exportado");
+              return texto;
             }),
           );
       copia?.catch(() => {});
@@ -162,7 +166,12 @@ export function DialogoExportarFeedback({
         setErro(`${motivo} Nada foi copiado e os itens não foram marcados como exportados.`);
         return;
       }
-      const { conteudo, exportados } = r.data;
+      const { exportados } = r.data;
+      const conteudo = conteudoExportado(r.data);
+      if (conteudo === null) {
+        setErro(MENSAGEM_NADA_EXPORTADO);
+        return;
+      }
       aoExportar();
       if (comoJson) {
         baixar(conteudo);

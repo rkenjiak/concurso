@@ -228,6 +228,21 @@ export function exportarFeedbacksComo(
   }
 }
 
+export const MENSAGEM_NADA_EXPORTADO =
+  "Nenhum item foi exportado (já descartados?). Nada foi copiado nem baixado.";
+
+/**
+ * O que copiar ou baixar depois da ação de exportar: o conteúdo do servidor, ou `null` quando
+ * nenhum item mudou (todos descartados nesse meio-tempo) — aí não se copia um texto vazio nem se
+ * baixa um JSON vazio.
+ */
+export function conteudoExportado(resultado: {
+  conteudo: string;
+  exportados: number;
+}): string | null {
+  return resultado.exportados > 0 ? resultado.conteudo : null;
+}
+
 /** Nome do arquivo baixado no formato JSON. */
 export function nomeArquivoFeedbacks(agora: Date): string {
   return `feedbacks-${agora.toISOString().slice(0, 10)}.json`;

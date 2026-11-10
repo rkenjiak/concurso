@@ -75,18 +75,18 @@ dados (inclusive export/import e MCP).
   ativos (MCP e calendário), mostra quem está ativo e por que alguém está sem acesso,
   promove/rebaixa admins, revoga tokens, bloqueia contas (sem acesso por sessão nem pelos tokens do
   MCP e do calendário), libera e-mails além dos de `ALLOWED_EMAILS`, trata o feedback dos usuários
-  (ver [Feedback](#feedback)) e registra tudo num log de auditoria. Mostra só metadados e contagens: os dados dos usuários continuam privados. O admin
-  alterna entre "Visão admin" e "Visão usuário" no menu da conta, sem novo login. Os e-mails de
-  `ADMIN_EMAILS` são admins garantidos, e o último admin ativo não pode ser rebaixado nem
-  bloqueado.
+  (ver [Feedback](#feedback)) e registra tudo num log de auditoria. Mostra só metadados e
+  contagens: os dados dos usuários continuam privados. O admin alterna entre "Visão admin" e
+  "Visão usuário" no menu da conta, sem novo login. Os e-mails de `ADMIN_EMAILS` são admins
+  garantidos, e o último admin ativo não pode ser rebaixado nem bloqueado.
 - **Senha única** (`APP_PASSWORD` + `AUTH_SECRET`): para uso local; entra sempre como o usuário
   inicial. Em produção não pode ser combinada com o login Google. Após 5 senhas erradas, novas
   tentativas do mesmo cliente esperam cada vez mais.
 - Com login, todas as páginas e APIs exigem sessão, exceto `/login`, `/api/health`,
-  `/api/versao`, o fluxo do Google em `/api/auth/google…`, o manifest e os ícones do PWA e `/api/mcp` e
-  `/api/calendario.ics` (que usam token próprio). A sessão fica em um cookie JWT assinado
-  (`httpOnly`, `SameSite=Lax`, `Secure` em produção) válido por 30 dias; "Sair" fica no menu da
-  conta e em **Configurações → Conta**.
+  `/api/versao`, o fluxo do Google em `/api/auth/google…`, o manifest e os ícones do PWA e
+  `/api/mcp` e `/api/calendario.ics` (que usam token próprio). A sessão fica em um cookie JWT
+  assinado (`httpOnly`, `SameSite=Lax`, `Secure` em produção) válido por 30 dias; "Sair" fica no
+  menu da conta e em **Configurações → Conta**.
 - Gere o segredo com `openssl rand -base64 32` (ou
   `node -e "console.log(crypto.randomBytes(32).toString('base64'))"`). Trocar o `AUTH_SECRET`
   encerra todas as sessões.
@@ -160,13 +160,14 @@ O admin trata tudo em **`/admin/feedback`** (item Feedback da navegação, com o
 - seleção em massa: checkbox por linha, no cabeçalho (todos os visíveis) e Shift+clique ou
   Shift+Espaço para marcar um intervalo; com seleção, uma barra fixa traz **Exportar**,
   **Descartar** e **Limpar seleção** (`Esc` também limpa);
-- **Exportar** mostra a prévia e copia (ou baixa) o conteúdo gerado pelo servidor, em quatro formatos: Markdown com uma issue por
-  feedback, Markdown com uma issue agrupando todos, JSON e comandos `gh issue create` (cole num
-  terminal bash ou zsh com o [GitHub CLI](https://cli.github.com) autenticado; o corpo vai num
-  heredoc literal, então nada da mensagem é executado). O e-mail do usuário só entra se você marcar
-  a opção (que volta a desmarcada a cada exportação), porque as issues são públicas. Se o navegador
-  não deixar copiar, o conteúdo aparece no diálogo com um botão **Copiar**. Menções e referências do GitHub no texto do usuário
-  (`@usuario`, `#12`) são neutralizadas para não notificar ninguém. Os itens passam a
+- **Exportar** mostra a prévia e copia (ou baixa) o conteúdo gerado pelo servidor, em quatro
+  formatos: Markdown com uma issue por feedback, Markdown com uma issue agrupando todos, JSON e
+  comandos `gh issue create` (cole num terminal bash ou zsh com o
+  [GitHub CLI](https://cli.github.com) autenticado; o corpo vai num heredoc literal, então nada da
+  mensagem é executado). O e-mail do usuário só entra se você marcar a opção (que volta a
+  desmarcada a cada exportação), porque as issues são públicas. Se o navegador não deixar copiar,
+  o conteúdo aparece no diálogo com um botão **Copiar**. Menções e referências do GitHub no texto
+  do usuário (`@usuario`, `#12`) são neutralizadas para não notificar ninguém. Os itens passam a
   **Exportado** (descartados ficam de fora: restaure-os antes);
 - **Descartar** não apaga e tem **Desfazer** (que só desfaz aquele descarte: se alguém mexeu nos
   itens depois, eles ficam como estão); em Descartados dá para restaurar ou excluir de vez.

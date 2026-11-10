@@ -1,13 +1,14 @@
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   aspasShell,
   codigoInline,
   comandoGh,
   comandosGh,
+  conteudoExportado,
   corpoFeedback,
   delimitadorHeredoc,
   type FeedbackExportavel,
@@ -186,6 +187,14 @@ describe("corpoFeedback", () => {
   });
 });
 
+describe("conteudoExportado", () => {
+  it("nada exportado (todos descartados no meio-tempo) não vira cópia nem download", () => {
+    expect(conteudoExportado({ conteudo: "# 0 issues", exportados: 0 })).toBeNull();
+    expect(conteudoExportado({ conteudo: "[]", exportados: 0 })).toBeNull();
+    expect(conteudoExportado({ conteudo: "x", exportados: 2 })).toBe("x");
+  });
+});
+
 describe("formatos", () => {
   const outro: FeedbackExportavel = {
     ...base,
@@ -314,7 +323,13 @@ describe("comandos gh", () => {
       expect(saida).toContain("${HOME}");
       expect(saida.replaceAll("printf EXPANDIU", "")).not.toContain("EXPANDIU");
       expect(saida).not.toContain(" 42 ");
+      // HOME não expandiu: nem o caminho do Windows nem a forma POSIX do Git Bash (/c/...).
+      const posix = pasta
+        .replace(/\\/g, "/")
+        .replace(/^([A-Za-z]):/, (_, d) => `/${d.toLowerCase()}`);
       expect(saida).not.toContain(pasta);
+      expect(saida).not.toContain(posix);
+      expect(saida).not.toContain(basename(pasta));
       expect(saida).not.toMatch(/uid=\d/);
       expect(existsSync(join(pasta, "SENTINELA"))).toBe(false);
     } finally {

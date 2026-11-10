@@ -33,9 +33,12 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
   uma agrupando todos), download em JSON e comandos `gh issue create` com o corpo num heredoc
   literal (nada da mensagem é expandido pelo shell). Sem o e-mail do usuário por padrão; menções
   e referências do GitHub (`@usuario`, `#12`) na mensagem e no título são neutralizadas, e a
-  referência ao feedback é `feedback nº 123`. Os itens passam a **Exportado**; descartados ficam de
-  fora.
-- **Descartar, restaurar e excluir feedback** (#117): descartar não apaga e tem **Desfazer**; em
+  referência ao feedback é `feedback nº 123`; navegador, e-mail e página vão como código inline.
+  O que é copiado (ou baixado) é o conteúdo que o servidor gerou para os itens que de fato passaram
+  a **Exportado** (descartados ficam de fora); sem a área de transferência, o diálogo mostra o
+  conteúdo com um botão **Copiar**. A opção de incluir o e-mail volta a desmarcada a cada vez.
+- **Descartar, restaurar e excluir feedback** (#117): descartar não apaga e tem **Desfazer**, que
+  só desfaz aquele descarte (não reverte o que outro admin fez depois); em
   Descartados, restaurar volta a **Novo** e excluir apaga de vez, com confirmação. Cada ação em
   lote (até 200 itens) gera um único registro na auditoria, com a quantidade ("5 feedbacks").
 

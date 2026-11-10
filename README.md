@@ -160,14 +160,16 @@ O admin trata tudo em **`/admin/feedback`** (item Feedback da navegação, com o
 - seleção em massa: checkbox por linha, no cabeçalho (todos os visíveis) e Shift+clique ou
   Shift+Espaço para marcar um intervalo; com seleção, uma barra fixa traz **Exportar**,
   **Descartar** e **Limpar seleção** (`Esc` também limpa);
-- **Exportar** mostra a prévia e copia (ou baixa) em quatro formatos: Markdown com uma issue por
+- **Exportar** mostra a prévia e copia (ou baixa) o conteúdo gerado pelo servidor, em quatro formatos: Markdown com uma issue por
   feedback, Markdown com uma issue agrupando todos, JSON e comandos `gh issue create` (cole num
   terminal bash ou zsh com o [GitHub CLI](https://cli.github.com) autenticado; o corpo vai num
   heredoc literal, então nada da mensagem é executado). O e-mail do usuário só entra se você marcar
-  a opção, porque as issues são públicas. Menções e referências do GitHub no texto do usuário
+  a opção (que volta a desmarcada a cada exportação), porque as issues são públicas. Se o navegador
+  não deixar copiar, o conteúdo aparece no diálogo com um botão **Copiar**. Menções e referências do GitHub no texto do usuário
   (`@usuario`, `#12`) são neutralizadas para não notificar ninguém. Os itens passam a
   **Exportado** (descartados ficam de fora: restaure-os antes);
-- **Descartar** não apaga e tem **Desfazer**; em Descartados dá para restaurar ou excluir de vez.
+- **Descartar** não apaga e tem **Desfazer** (que só desfaz aquele descarte: se alguém mexeu nos
+  itens depois, eles ficam como estão); em Descartados dá para restaurar ou excluir de vez.
 
 Cada ação em lote (até 200 itens) gera um único registro em `/admin/auditoria`, com a quantidade.
 

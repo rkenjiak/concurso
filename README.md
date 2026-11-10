@@ -313,7 +313,9 @@ O commit vem, nesta ordem, de `VERCEL_GIT_COMMIT_SHA` (injetada pela Vercel no b
 `GIT_COMMIT_SHA` (Docker; o `.git` não entra na imagem) ou do `git rev-parse HEAD` (build local);
 sem nenhum, `dev`. O ambiente é o `VERCEL_ENV` (`production`, `preview` ou `development`) ou, fora
 da Vercel, `production` no `pnpm build`/`pnpm start` e `development` no `pnpm dev`. Na Vercel não
-é preciso configurar nada. Os valores ficam fixos na build: mudar variáveis depois não os altera.
+é preciso configurar nada, desde que *Settings → Environment Variables → Automatically expose
+System Environment Variables* esteja ligado (o padrão): sem isso, `VERCEL_GIT_COMMIT_SHA` e
+`VERCEL_ENV` não chegam ao build, e o commit aparece como `dev` (e o ambiente como `production`). Os valores ficam fixos na build: mudar variáveis depois não os altera.
 
 ### Logs
 

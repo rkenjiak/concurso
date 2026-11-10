@@ -12,7 +12,8 @@
  * processo preenche os `APP_*` antes (MCP por stdio: `definirVersaoNoAmbiente`; Vitest: config).
  */
 
-export type Ambiente = "production" | "preview" | "development";
+export const AMBIENTES = ["production", "preview", "development"] as const;
+export type Ambiente = (typeof AMBIENTES)[number];
 
 export interface VersaoApp {
   versao: string;
@@ -29,9 +30,11 @@ export const COMMIT_DESCONHECIDO = "dev";
 // Acesso direto (`process.env.APP_X`), sem desestruturar: é o que o Next substitui no build.
 export const versao: string = process.env.APP_VERSAO || VERSAO_DESCONHECIDA;
 export const commit: string = process.env.APP_COMMIT || COMMIT_DESCONHECIDO;
-export const ambiente: Ambiente =
-  (process.env.APP_AMBIENTE as Ambiente | undefined) ||
-  (process.env.NODE_ENV === "production" ? "production" : "development");
+export const ambiente: Ambiente = AMBIENTES.includes(process.env.APP_AMBIENTE as Ambiente)
+  ? (process.env.APP_AMBIENTE as Ambiente)
+  : process.env.NODE_ENV === "production"
+    ? "production"
+    : "development";
 export const dataBuild: string | null = process.env.APP_DATA_BUILD || null;
 
 /** Tudo junto (admin, feedback). */

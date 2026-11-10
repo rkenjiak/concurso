@@ -131,6 +131,13 @@ describe("valores lidos por versao.ts", () => {
     });
   });
 
+  it("APP_AMBIENTE inválido cai no NODE_ENV", async () => {
+    expect((await carregar({ APP_AMBIENTE: "staging" })).ambiente).toBe("development");
+    vi.stubEnv("NODE_ENV", "production");
+    expect((await carregar({ APP_AMBIENTE: "Preview " })).ambiente).toBe("production");
+    expect((await carregar({ APP_AMBIENTE: "preview" })).ambiente).toBe("preview");
+  });
+
   it("definirVersaoNoAmbiente preenche só o que falta (MCP por stdio)", () => {
     const env: Record<string, string | undefined> = { APP_COMMIT: "1234567", GIT_COMMIT_SHA: SHA };
     definirVersaoNoAmbiente(env);

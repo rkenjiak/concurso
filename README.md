@@ -59,6 +59,7 @@ Copie `.env.example` para `.env.local` e ajuste. Nada é obrigatório para rodar
 | `BACKUP_KEEP` | `10` | Quantos backups o `pnpm db:backup` mantém |
 | `LOG_LEVEL` | `info` (produção), `debug` (dev) | Nível mínimo dos logs: `debug`, `info`, `warn`, `error` ou `silent` |
 | `LOG_FORMAT` | `json` (produção), `texto` (dev) | Formato dos logs: uma linha JSON por evento ou texto legível |
+| `GIT_COMMIT_SHA` | — | **Só no build** (build arg do Docker): commit da build exibido com a versão. Ver [Versão do app](#versão-do-app) |
 
 ## Autenticação
 
@@ -81,8 +82,8 @@ dados (inclusive export/import e MCP).
 - **Senha única** (`APP_PASSWORD` + `AUTH_SECRET`): para uso local; entra sempre como o usuário
   inicial. Em produção não pode ser combinada com o login Google. Após 5 senhas erradas, novas
   tentativas do mesmo cliente esperam cada vez mais.
-- Com login, todas as páginas e APIs exigem sessão, exceto `/login`, `/api/health`, o fluxo do
-  Google em `/api/auth/google…`, o manifest e os ícones do PWA e `/api/mcp` e
+- Com login, todas as páginas e APIs exigem sessão, exceto `/login`, `/api/health`,
+  `/api/versao`, o fluxo do Google em `/api/auth/google…`, o manifest e os ícones do PWA e `/api/mcp` e
   `/api/calendario.ics` (que usam token próprio). A sessão fica em um cookie JWT assinado
   (`httpOnly`, `SameSite=Lax`, `Secure` em produção) válido por 30 dias; "Sair" fica no menu da
   conta e em **Configurações → Conta**.
@@ -114,7 +115,8 @@ cada deploy) não conseguem fazer login com Google. Use um domínio fixo de prod
 ## Backup e restauração
 
 **Export/import JSON (qualquer banco).** Em **Configurações**: "Baixar backup (JSON)" gera um
-arquivo versionado com todos os seus dados (concursos, tags, links, eventos, histórico,
+arquivo versionado (`schemaVersion`; o campo `versaoApp` só informa a versão do app que exportou)
+com todos os seus dados (concursos, tags, links, eventos, histórico,
 resultados, regras de notificação e o que já foi lido); "Baixar concursos (CSV)" gera uma
 planilha (separador `;`, abre direto no Excel/LibreOffice). "Importar…" restaura um
 backup JSON **substituindo todos os seus dados** (com confirmação; tudo ou nada) — os de outros
@@ -272,7 +274,7 @@ O `Dockerfile` gera uma imagem `standalone` (Node 24, usuário sem privilégios)
 um volume em `/app/data`; as migrações rodam ao iniciar (`MIGRATE_ON_START=true`).
 
 ```bash
-docker build -t concurso .
+docker build --build-arg GIT_COMMIT_SHA="$(git rev-parse HEAD)" -t concurso .
 docker run -d --name concurso -p 3000:3000 \
   -v concurso-dados:/app/data \
   -e APP_PASSWORD='sua-senha' \
@@ -284,7 +286,34 @@ Coloque um proxy com HTTPS na frente (Caddy, Traefik, Fly.io…). A imagem tem `
 `/api/health`. Sem `APP_PASSWORD` nem login Google o container recusa iniciar (salvo
 `ALLOW_NO_AUTH=true`). Para o login com Google no container, troque `APP_PASSWORD` pelas variáveis
 do Google (e `APP_URL`, se o proxy não repassar o host original). Para usar o Turso, passe
-`DATABASE_URL`/`DATABASE_AUTH_TOKEN`.
+`DATABASE_URL`/`DATABASE_AUTH_TOKEN`. O build arg `GIT_COMMIT_SHA` identifica a build (ver
+[Versão do app](#versão-do-app)); sem ele, o commit aparece como `dev`.
+
+### Versão do app
+
+A versão vem do `package.json` (atualizada em cada `release/X.Y.Z`) e é fixada no build, junto com
+o commit, o ambiente e a data do build. Aparece:
+
+- no rodapé do **menu da conta**: `v2.7.0` em produção; em preview e dev, também o commit e o
+  ambiente (`v2.7.0 · a1b2c3d · preview`), porque várias builds compartilham a mesma versão;
+- em **Configurações → Sobre** (`/configuracoes#sobre`), com links para "O que há de novo" (a
+  GitHub Release da versão) e para o `CHANGELOG.md`;
+- na **visão geral do admin** (`/admin`): versão, commit, ambiente e data do build;
+- em `GET /api/versao`, público e sem dados sensíveis, para conferir o deploy:
+
+  ```bash
+  curl https://concursos.exemplo.com/api/versao
+  # {"versao":"2.7.0","commit":"a1b2c3d","ambiente":"production"}
+  ```
+
+- no servidor MCP (`serverInfo.version`), no campo `versaoApp` do backup JSON e nas linhas de erro
+  dos logs (`versaoApp` e `commit`).
+
+O commit vem, nesta ordem, de `VERCEL_GIT_COMMIT_SHA` (injetada pela Vercel no build), do build arg
+`GIT_COMMIT_SHA` (Docker; o `.git` não entra na imagem) ou do `git rev-parse HEAD` (build local);
+sem nenhum, `dev`. O ambiente é o `VERCEL_ENV` (`production`, `preview` ou `development`) ou, fora
+da Vercel, `production` no `pnpm build`/`pnpm start` e `development` no `pnpm dev`. Na Vercel não
+é preciso configurar nada. Os valores ficam fixos na build: mudar variáveis depois não os altera.
 
 ### Logs
 

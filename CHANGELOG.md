@@ -7,6 +7,28 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 
 ## [Unreleased]
 
+### Adicionado
+
+- **Versão do app no site** (#118): o rodapé do menu da conta mostra `v2.7.0` (em preview e dev,
+  também o commit e o ambiente: `v2.7.0 · a1b2c3d · preview`); **Configurações → Sobre**
+  (`#sobre`) mostra a versão com links para "O que há de novo" (a GitHub Release da versão) e para
+  o CHANGELOG; a visão geral do admin ganhou o card **Versão no ar** com versão, commit, ambiente e
+  data do build.
+- **`GET /api/versao`** (#118): público (também com login) e sem dados sensíveis, responde só
+  `{ versao, commit, ambiente }`, para conferir o deploy por `curl` ou monitoramento.
+- **Commit da build no Docker** (#118): build arg `GIT_COMMIT_SHA`
+  (`docker build --build-arg GIT_COMMIT_SHA="$(git rev-parse HEAD)" …`). Na Vercel vem de
+  `VERCEL_GIT_COMMIT_SHA`, sem configurar nada; sem nenhum dos dois, o commit aparece como `dev`.
+
+### Alterado
+
+- **Fonte única da versão** (#118): `src/lib/versao.ts` lê versão, commit, ambiente e data do
+  build, fixados no `next build` pelo `env` do `next.config.ts` (só esses quatro valores chegam ao
+  bundle do cliente). O servidor MCP passou a usá-lo em vez de importar o `package.json`.
+- O backup JSON inclui `versaoApp` (#118), só informativo: a compatibilidade continua sendo
+  checada por `schemaVersion`, que não mudou, e backups sem o campo continuam sendo importados.
+- As linhas de erro dos logs levam `versaoApp` e `commit` (#118), para cruzar erros com deploys.
+
 ## [2.7.0] - 2026-11-09
 
 ### Adicionado

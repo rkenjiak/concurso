@@ -526,7 +526,7 @@ cookie (sem banco), e `auth/acesso.ts` em cada página, action e handler, que re
 flowchart TD
   REQ["Requisição"] --> H{"algum login<br/>configurado?"}
   H -->|não| LIVRE["✅ passa<br/>(uso local, usuário inicial)"]
-  H -->|sim| PUB{"rota pública?<br/>/login · /api/health · /api/auth/google…<br/>/api/mcp · /api/calendario.ics<br/>manifest e ícones do PWA"}
+  H -->|sim| PUB{"rota pública?<br/>/login · /api/health · /api/versao · /api/auth/google…<br/>/api/mcp · /api/calendario.ics<br/>manifest e ícones do PWA"}
   PUB -->|sim| LIVRE2["✅ passa<br/>(MCP e feed se autenticam por token)"]
   PUB -->|não| COOK{"cookie JWT<br/>com assinatura válida?"}
   COOK -->|sim| OK["✅ passa"]

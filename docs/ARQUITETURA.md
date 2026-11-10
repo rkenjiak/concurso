@@ -464,6 +464,7 @@ Uma rota `[id]` nova deve seguir o mesmo padrão; nada com `loading.tsx` deve fi
 | `GET /api/export?formato=json\|csv\|ics` | RF09 — `json` (padrão) = backup completo do usuário; `csv` = só os concursos (separador `;`, BOM UTF-8, proteção contra fórmulas); `ics` = RF08, todos os concursos ou `&concurso=<id>` |
 | `POST /api/import` | RF09 — `multipart/form-data` com `arquivo` e `confirmacao=SUBSTITUIR_TUDO`; substitui todos os dados do usuário numa transação (até 20 MB; valida com Zod e `schemaVersion`; IDs renumerados) |
 | `GET /api/health` | health check do deploy |
+| `GET /api/versao` | #118 — `{ versao, commit, ambiente }` da build no ar, para conferir o deploy por `curl` ou monitoramento; público e sem mais nada (a data do build fica só no admin) |
 | `POST/GET/DELETE /api/mcp` | RF10 — servidor MCP (Streamable HTTP); exige `Authorization: Bearer <token pessoal>` |
 | `GET /api/auth/google` e `/api/auth/google/callback` | #49 — login com Google (OIDC, código + PKCE) |
 | `GET /api/calendario.ics?token=…` | RF08 (#65) — feed assinável; pública no `proxy.ts`, autenticada pelo token do feed (`cics_…`, SHA-256 em `usuario.ics_token_hash`); token inválido/revogado, usuário bloqueado ou sem acesso (#96) → 404; atraso progressivo como o MCP |
@@ -555,7 +556,7 @@ Decisões (issue #39):
 │   │   ├── log.ts                  # logger estruturado (§9.4)
 │   │   ├── erro-requisicao.ts      # onRequestError → log (§9.4)
 │   │   └── inicializacao.ts        # checagem do ambiente e migrações ao iniciar
-│   ├── lib/                        # format, tz, normalize, csv, tema, pwa, tags, aba-concurso, atualizar, agrupar-por-prazo, schemas Zod
+│   ├── lib/                        # format, tz, normalize, csv, tema, pwa, tags, aba-concurso, atualizar, agrupar-por-prazo, versao (+ versao-build), schemas Zod
 │   ├── instrumentation.ts          # inicialização ao subir o servidor e onRequestError (§9.4)
 │   └── proxy.ts
 ├── biome.json  drizzle.config.ts  next.config.ts  vitest.config.ts  playwright.config.ts
@@ -585,7 +586,7 @@ Decisões (issue #39):
   após falhas. Em produção não pode coexistir com o Google.
 - **Sessão:** cookie **JWT assinado** (`jose`, HS256 com `AUTH_SECRET` ≥ 32 bytes) com o ID do
   usuário e o método de login; `httpOnly`, `Secure` em produção, `SameSite=Lax`, 30 dias. `proxy.ts` confere só
-  a assinatura (sem banco) e protege tudo exceto `/login`, `/api/health`, `/api/auth/google…`,
+  a assinatura (sem banco) e protege tudo exceto `/login`, `/api/health`, `/api/versao`, `/api/auth/google…`,
   `/api/mcp`, `/api/calendario.ics` e o manifest e os ícones do PWA (`lib/pwa.ts`); páginas, Server
   Actions e Route Handlers obtêm o usuário em `auth/acesso.ts`
   (`exigirUsuarioPagina/Acao/Rota`), que relê o usuário no banco.
@@ -708,7 +709,7 @@ do React). O e2e `seguranca.spec.ts` confere os cabeçalhos e a ausência de vio
 |---|---|---|---|
 | Unitário | Vitest | `domain/*` (transições, prazos, validade, criticidade), `lib/format`, parsers BRL, schemas Zod | meta: cobertura ≥ 90% em `domain/` (medida no CI, sem limite configurado) |
 | Integração | Vitest + libSQL `:memory:` + migrações | repositories/queries (transação de status, tags, filtros, export→import ida e volta); servidor MCP com cliente em memória (`InMemoryTransport`) | casos principais |
-| E2E | Playwright (Chromium) | smoke: criar concurso → evento → aparece no dashboard → mudar status → exportar/importar; login, MCP, PWA e lembretes com auth ativa; painel admin com o usuário inicial (sem auth), incluindo selos MCP/.ics, detalhe do usuário e revogar tokens → `/api/mcp` 401 e feed 404 (#108); status HTTP 404 nas rotas `[id]` (inexistente, malformado, de outro usuário), 403 no painel para não admin e esqueleto nas listagens (#110); busca, quadro, calendário (navegação rápida e filtro de concursos no desktop e em 360 px, #83), cor/ícone, ocultar prazos, tema, lembretes (sino, regras, feed .ics), um só ponto de entrada de notificações por layout (barra inferior no celular, sino no desktop) e tema e Configurações pelo menu no celular, sem duplicação (#82, #105); seções, índice e âncoras de Configurações (#106); grupos pela proximidade do prazo em Notificações (#104), menu da conta pelo teclado no celular (#105), PWA, aba do detalhe na URL e botão Atualizar com limite de 60 s (#77), deep-link e volta à origem, painel do evento com concluir/Desfazer, cabeçalho do concurso, avisos e alterações não salvas (#100) e layout em 360 px; `/api/mcp` com token → concurso visível no app. Dois servidores (com e sem auth) com bancos temporários em `e2e/.tmp` | poucos fluxos |
+| E2E | Playwright (Chromium) | smoke: criar concurso → evento → aparece no dashboard → mudar status → exportar/importar; login, MCP, PWA e lembretes com auth ativa; painel admin com o usuário inicial (sem auth), incluindo selos MCP/.ics, detalhe do usuário e revogar tokens → `/api/mcp` 401 e feed 404 (#108); status HTTP 404 nas rotas `[id]` (inexistente, malformado, de outro usuário), 403 no painel para não admin e esqueleto nas listagens (#110); busca, quadro, calendário (navegação rápida e filtro de concursos no desktop e em 360 px, #83), cor/ícone, ocultar prazos, tema, lembretes (sino, regras, feed .ics), um só ponto de entrada de notificações por layout (barra inferior no celular, sino no desktop) e tema e Configurações pelo menu no celular, sem duplicação (#82, #105); seções, índice e âncoras de Configurações (#106); versão do app no menu da conta, em Configurações → Sobre, no admin e em `/api/versao`, pública mesmo com login (#118); grupos pela proximidade do prazo em Notificações (#104), menu da conta pelo teclado no celular (#105), PWA, aba do detalhe na URL e botão Atualizar com limite de 60 s (#77), deep-link e volta à origem, painel do evento com concluir/Desfazer, cabeçalho do concurso, avisos e alterações não salvas (#100) e layout em 360 px; `/api/mcp` com token → concurso visível no app. Dois servidores (com e sem auth) com bancos temporários em `e2e/.tmp` | poucos fluxos |
 
 Datas sempre fixadas (`vi.setSystemTime` / `hoje` injetado).
 
@@ -720,7 +721,8 @@ jobs:
   check:  pnpm install --frozen-lockfile → biome ci → pnpm typecheck → vitest run --coverage → pnpm build
   e2e:    (needs: check) pnpm e2e (Playwright/Chromium, navegadores em cache)
   docker: (needs: check) docker build + smoke test: sem login o container sai com código 1;
-          com APP_PASSWORD responde /api/health e recusa /api/export e /api/mcp sem credencial (401)
+          com APP_PASSWORD responde /api/health e /api/versao (com o commit do build arg
+          GIT_COMMIT_SHA) e recusa /api/export e /api/mcp sem credencial (401)
   branch-policy: em PRs para master, falha se head ≠ release/* ou hotfix/*
 ```
 - **Proteção de branches**: `master` e `develop` exigem PR + CI verde; sem push direto.
@@ -735,7 +737,29 @@ jobs:
   *Keep a Changelog*; PR para `master` → tag `vX.Y.Z` → PR da mesma `release/*` de volta para `develop`.
 - `hotfix/*` incrementa PATCH. Mensagens de commit no estilo *Conventional Commits* (recomendado,
   não obrigatório por ferramenta).
-- Mudança de schema = nova migração Drizzle; o JSON de export carrega `schemaVersion`.
+- Mudança de schema = nova migração Drizzle; o JSON de export carrega `schemaVersion` (é ele que
+  decide a compatibilidade) e, só como informação, `versaoApp`.
+
+### 8.4 Versão no código e na build (#118)
+- **Fonte da versão:** o `version` do `package.json`, bumpado na `release/X.Y.Z`. O **commit**
+  (SHA curto) identifica a build, porque várias builds (previews, `develop`) compartilham a mesma
+  versão.
+- **Ponto único de leitura:** `src/lib/versao.ts` (`versao`, `commit`, `ambiente`, `dataBuild`,
+  `VERSAO_APP`, `rotuloVersao`, links da release e do CHANGELOG). Serve ao servidor e ao cliente e
+  não importa o `package.json` (iria inteiro para o bundle do cliente): lê `process.env.APP_*`.
+- **Fixado no build:** `src/lib/versao-build.ts` (só Node) calcula os `APP_*` e o `next.config.ts`
+  os passa em `env`, que o Next substitui no código do servidor e do cliente durante o
+  `next build`. Commit: `VERCEL_GIT_COMMIT_SHA` → build arg `GIT_COMMIT_SHA` (Docker; o `.git` não
+  entra no contexto) → `git rev-parse HEAD` → `dev`. Ambiente: `VERCEL_ENV`, senão `NODE_ENV`
+  (`production` no `next build`, `development` no `next dev`). Mudar variáveis depois do build não
+  muda os valores.
+- **Fora do Next:** o MCP por stdio chama `definirVersaoNoAmbiente()` antes de carregar o app, e o
+  Vitest preenche os `APP_*` no `vitest.config.ts` (commit `dev`, ambiente `development`).
+- **Onde aparece:** rodapé do menu da conta (`vX.Y.Z` em produção; em preview e dev também
+  `· commit · ambiente`), Configurações → Sobre (`#sobre`, link para a GitHub Release
+  `v<versao>` e para o CHANGELOG), card "Versão no ar" na visão geral do admin (com a data do
+  build), `GET /api/versao` (só `{ versao, commit, ambiente }`), `serverInfo.version` do MCP,
+  `versaoApp` do backup JSON e as linhas `error` dos logs (`versaoApp`, `commit`, §9.4).
 
 ---
 
@@ -808,6 +832,9 @@ log.warn("auth.login_falhou", { metodo: "senha", motivo: "senha_incorreta", ip }
 |---|---|---|
 | `LOG_LEVEL` | `info` em produção, `debug` em dev, `silent` em teste | nível mínimo: `debug`, `info`, `warn`, `error` ou `silent`. `log.fatal` (erro que encerra o processo na inicialização) sai sempre |
 | `LOG_FORMAT` | `json` em produção, `texto` fora dela | `json` (uma linha JSON `{ ts, nivel, evento, ...campos }`) ou `texto` legível, com a stack nas linhas seguintes |
+
+Linhas de nível `error` (incluindo `log.fatal`) levam também `versaoApp` e `commit` da build
+(#118, §8.4), para cruzar um erro com o deploy que o causou.
 
 **Erros de servidor.** `onRequestError` (`src/instrumentation.ts` → `server/erro-requisicao.ts`)
 registra `requisicao.erro` com método, caminho (só o pathname, mais os **nomes** dos parâmetros

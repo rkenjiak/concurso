@@ -74,8 +74,8 @@ dados (inclusive export/import e MCP).
 - **Painel admin** (`/admin`, só admins): lista os usuários com o último acesso real e os tokens
   ativos (MCP e calendário), mostra quem está ativo e por que alguém está sem acesso,
   promove/rebaixa admins, revoga tokens, bloqueia contas (sem acesso por sessão nem pelos tokens do
-  MCP e do calendário), libera e-mails além dos de `ALLOWED_EMAILS` e registra tudo num log de
-  auditoria. Mostra só metadados e contagens: os dados dos usuários continuam privados. O admin
+  MCP e do calendário), libera e-mails além dos de `ALLOWED_EMAILS`, trata o feedback dos usuários
+  (ver [Feedback](#feedback)) e registra tudo num log de auditoria. Mostra só metadados e contagens: os dados dos usuários continuam privados. O admin
   alterna entre "Visão admin" e "Visão usuário" no menu da conta, sem novo login. Os e-mails de
   `ADMIN_EMAILS` são admins garantidos, e o último admin ativo não pode ser rebaixado nem
   bloqueado.
@@ -145,6 +145,29 @@ restaura. Para restaurar um único `.db` (ex.: de `pnpm db:backup`), apague ante
 `concurso.db-wal` e o `concurso.db-shm`, que sobram quando o container é parado: um `-wal` antigo
 ao lado de outro arquivo principal corrompe o banco. Ou use o export JSON. No Turso, use o point-in-time
 restore do serviço e o export JSON periódico.
+
+## Feedback
+
+Qualquer usuário logado envia um feedback pelo **menu da conta → Enviar feedback** (também no
+celular): tipo (Bug, Sugestão ou Outro) e uma mensagem de 10 a 2000 caracteres. O app anexa a
+página atual (só o caminho, sem filtros nem buscas, e com os IDs trocados por `[id]`), a versão e o
+commit da build e o navegador. O feedback é sempre de quem está logado, e cada usuário envia até 10
+por hora.
+
+O admin trata tudo em **`/admin/feedback`** (item Feedback da navegação, com o número de novos):
+
+- abas Novos, Exportados, Descartados e Todos, filtro por tipo e busca na mensagem;
+- seleção em massa: checkbox por linha, no cabeçalho (todos os visíveis) e Shift+clique ou
+  Shift+Espaço para marcar um intervalo; com seleção, uma barra fixa traz **Exportar**,
+  **Descartar** e **Limpar seleção** (`Esc` também limpa);
+- **Exportar** mostra a prévia e copia (ou baixa) em quatro formatos: Markdown com uma issue por
+  feedback, Markdown com uma issue agrupando todos, JSON e comandos `gh issue create` (cole num
+  terminal bash ou zsh com o [GitHub CLI](https://cli.github.com) autenticado; o corpo vai num
+  heredoc literal, então nada da mensagem é executado). O e-mail do usuário só entra se você marcar
+  a opção, porque as issues são públicas. Os itens passam a **Exportado**;
+- **Descartar** não apaga e tem **Desfazer**; em Descartados dá para restaurar ou excluir de vez.
+
+Cada ação em lote (até 200 itens) gera um único registro em `/admin/auditoria`, com a quantidade.
 
 ## Lembretes: notificações e calendário
 

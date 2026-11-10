@@ -19,6 +19,23 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 - **Commit da build no Docker** (#118): build arg `GIT_COMMIT_SHA`
   (`docker build --build-arg GIT_COMMIT_SHA="$(git rev-parse HEAD)" …`). Na Vercel vem de
   `VERCEL_GIT_COMMIT_SHA`, sem configurar nada; sem nenhum dos dois, o commit aparece como `dev`.
+- **Enviar feedback** (#117) pelo menu da conta, no desktop e no celular: tipo (Bug, Sugestão,
+  Outro) e mensagem de 10 a 2000 caracteres, com contador. O app anexa a página atual (sem query
+  string e com os IDs trocados por `[id]`), a versão e o commit da build (`src/lib/versao.ts`) e o
+  navegador. O feedback é sempre de quem está logado, inclusive para um admin na visão usuário, e
+  cada usuário envia até 10 por hora.
+- **Caixa de entrada de feedback** (#117) em `/admin/feedback`, com o número de novos no item
+  **Feedback** da navegação e um card na visão geral: abas Novos, Exportados, Descartados e Todos,
+  filtro por tipo, busca na mensagem e paginação. Seleção em massa com checkbox por linha e no
+  cabeçalho (indeterminado quando parcial), Shift+clique ou Shift+Espaço para o intervalo, barra
+  de ações fixa só com seleção, `Esc` para limpar e a quantidade anunciada a leitores de tela.
+- **Exportar feedback para issues** (#117): prévia e cópia em Markdown (uma issue por feedback ou
+  uma agrupando todos), download em JSON e comandos `gh issue create` com o corpo num heredoc
+  literal (nada da mensagem é expandido pelo shell). Sem o e-mail do usuário por padrão; os itens
+  passam a **Exportado**.
+- **Descartar, restaurar e excluir feedback** (#117): descartar não apaga e tem **Desfazer**; em
+  Descartados, restaurar volta a **Novo** e excluir apaga de vez, com confirmação. Cada ação em
+  lote (até 200 itens) gera um único registro na auditoria, com a quantidade ("5 feedbacks").
 
 ### Alterado
 
@@ -28,6 +45,8 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 - O backup JSON inclui `versaoApp` (#118), só informativo: a compatibilidade continua sendo
   checada por `schemaVersion`, que não mudou, e backups sem o campo continuam sendo importados.
 - As linhas de erro dos logs levam `versaoApp` e `commit` (#118), para cruzar erros com deploys.
+- O menu da conta sempre abre, mesmo sem login nem papel de admin, porque sempre tem "Enviar
+  feedback" (#117). Na visão admin, a barra inferior do celular passou a ter cinco itens.
 
 ## [2.7.0] - 2026-11-09
 

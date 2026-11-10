@@ -7,6 +7,7 @@ import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, describe, expect, it } from "vitest";
+import { version } from "../package.json";
 
 const raiz = fileURLToPath(new URL("..", import.meta.url));
 // Banco temporário em e2e/.tmp (ignorado pelo git), por caminho relativo à raiz como o app usa.
@@ -35,6 +36,8 @@ describe("pnpm mcp (stdio)", () => {
         DATABASE_AUTH_TOKEN: "",
         NODE_ENV: "development",
         LOG_LEVEL: "debug",
+        // Sem o valor do Vitest: o próprio `scripts/mcp.ts` lê a versão do package.json (#118).
+        APP_VERSAO: "",
       },
     });
     let stdout = "";
@@ -71,6 +74,10 @@ describe("pnpm mcp (stdio)", () => {
       },
     });
     await aguardar(1);
+    // Versão do app (#118), lida de `src/lib/versao.ts`.
+    expect(respostas.get(1)).toMatchObject({
+      result: { serverInfo: { name: "concurso", version } },
+    });
     enviar({ jsonrpc: "2.0", method: "notifications/initialized" });
     enviar({
       jsonrpc: "2.0",

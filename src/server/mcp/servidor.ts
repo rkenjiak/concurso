@@ -11,7 +11,7 @@ import { z } from "zod";
 import { ESFERA, STATUS, UF } from "@/domain/enums";
 import { JANELA_PADRAO_DIAS } from "@/domain/prazos";
 import { MAX_BUSCA } from "@/lib/schemas/filtros-concursos";
-import { version } from "../../../package.json";
+import { versao } from "@/lib/versao";
 import type { ResultadoAcao } from "../actions/resultado";
 import type { Db } from "../db/client";
 import { log } from "../log";
@@ -97,7 +97,7 @@ function registrarChamadasNoLog(servidor: McpServer, usuarioId: number): void {
 
 export function criarServidorMcp({ db, usuarioId, aoAlterar }: OpcoesServidorMcp): McpServer {
   const servidor = new McpServer(
-    { name: "concurso", title: "Concursos", version },
+    { name: "concurso", title: "Concursos", version: versao },
     { instructions: INSTRUCOES },
   );
   registrarChamadasNoLog(servidor, usuarioId);

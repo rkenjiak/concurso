@@ -1,5 +1,6 @@
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
+import { valoresBuild } from "./src/lib/versao-build";
 
 // Os testes rodam sempre em UTC para garantir que o código não depende do
 // fuso da máquina (ARQUITETURA.md §7.2). Definido antes de os workers subirem.
@@ -14,7 +15,8 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["src/**/*.test.ts", "src/**/*.test.tsx", "scripts/**/*.test.ts"],
-    env: { TZ: "UTC" },
+    // Versão como o `next build` a fixaria (#118), sem o git: commit `dev`, ambiente `development`.
+    env: { TZ: "UTC", ...valoresBuild({ NODE_ENV: "test" }, () => null, new Date()) },
     coverage: {
       provider: "v8",
       include: ["src/**/*.ts", "src/**/*.tsx"],

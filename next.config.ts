@@ -1,9 +1,14 @@
 import type { NextConfig } from "next";
 import { cabecalhosSeguranca } from "./src/lib/cabecalhos-seguranca";
+import { commitGit, valoresBuild } from "./src/lib/versao-build";
 
 const nextConfig: NextConfig = {
   // Não anuncia o framework nos headers de resposta.
   poweredByHeader: false,
+  // Versão, commit, ambiente e data do build (#118), fixados no bundle (servidor e cliente) como
+  // `process.env.APP_*` e lidos por `src/lib/versao.ts`. Commit: `VERCEL_GIT_COMMIT_SHA` → build
+  // arg `GIT_COMMIT_SHA` → git → `dev`.
+  env: valoresBuild(process.env, commitGit, new Date()),
   // Driver libSQL usa binários nativos: carregado pelo Node em vez de empacotado.
   serverExternalPackages: ["@libsql/client", "libsql"],
   // Saída enxuta para a imagem Docker (`NEXT_OUTPUT=standalone`, ver Dockerfile). Fora dela, o

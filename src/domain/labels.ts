@@ -12,7 +12,9 @@ import type {
   Papel,
   SituacaoFase,
   Status,
+  StatusFeedback,
   TipoEvento,
+  TipoFeedback,
   TipoLink,
   Uf,
 } from "./enums";
@@ -163,6 +165,22 @@ export const ROTULO_ACAO_ADMIN: Readonly<Record<AcaoAdmin, string>> = {
   PERMITIR_EMAIL: "Liberou o acesso de",
   REMOVER_EMAIL: "Retirou da lista de acesso",
   REVOGAR_TOKENS: "Revogou os tokens (MCP e .ics) de",
+  EXPORTAR_FEEDBACK: "Exportou",
+  DESCARTAR_FEEDBACK: "Descartou",
+  RESTAURAR_FEEDBACK: "Restaurou",
+  EXCLUIR_FEEDBACK: "Excluiu definitivamente",
+};
+
+export const ROTULO_TIPO_FEEDBACK: Readonly<Record<TipoFeedback, string>> = {
+  BUG: "Bug",
+  SUGESTAO: "Sugestão",
+  OUTRO: "Outro",
+};
+
+export const ROTULO_STATUS_FEEDBACK: Readonly<Record<StatusFeedback, string>> = {
+  NOVO: "Novo",
+  EXPORTADO: "Exportado",
+  DESCARTADO: "Descartado",
 };
 
 export const ROTULO_ORIGEM_ACESSO: Readonly<Record<OrigemAcesso, string>> = {

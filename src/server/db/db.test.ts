@@ -58,6 +58,7 @@ describe("migrações", () => {
       "concurso_tag",
       "email_permitido",
       "evento",
+      "feedback",
       "link",
       "notificacao_estado",
       "pendencia_status_dispensa",

@@ -24,6 +24,8 @@ interface CascaProps {
    * inferior (celular, #105). Ausente = sem sino (visão admin).
    */
   naoLidas?: number;
+  /** Feedbacks novos (#117): contador do item Feedback na navegação admin. */
+  novosFeedback?: number;
   children: ReactNode;
 }
 
@@ -39,6 +41,7 @@ export function Casca({
   faixa,
   selo,
   naoLidas,
+  novosFeedback,
   children,
 }: CascaProps) {
   const secao = visao === "admin" ? "admin" : "app";
@@ -58,7 +61,7 @@ export function Casca({
               />
             ) : null}
           </div>
-          <NavegacaoLateral secao={secao} />
+          <NavegacaoLateral secao={secao} novosFeedback={novosFeedback} />
           <div className="mt-auto flex flex-col gap-3">
             <MenuConta {...menu} />
             <SeletorTema className="self-start" />
@@ -85,7 +88,7 @@ export function Casca({
           </main>
         </div>
       </div>
-      <NavegacaoInferior secao={secao} naoLidas={naoLidas} />
+      <NavegacaoInferior secao={secao} naoLidas={naoLidas} novosFeedback={novosFeedback} />
       {/* `useSearchParams` fora de um limite de Suspense tiraria as páginas da pré-renderização. */}
       <Suspense fallback={null}>
         <AvisoDaUrl />

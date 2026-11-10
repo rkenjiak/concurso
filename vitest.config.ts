@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
 
@@ -14,7 +15,14 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["src/**/*.test.ts", "src/**/*.test.tsx", "scripts/**/*.test.ts"],
-    env: { TZ: "UTC" },
+    // Versão como o `next build` a fixaria (#118, `src/lib/versao-build.ts`), sem o git.
+    env: {
+      TZ: "UTC",
+      APP_VERSAO: JSON.parse(readFileSync("package.json", "utf8")).version,
+      APP_COMMIT: "dev",
+      APP_AMBIENTE: "development",
+      APP_DATA_BUILD: new Date().toISOString(),
+    },
     coverage: {
       provider: "v8",
       include: ["src/**/*.ts", "src/**/*.tsx"],

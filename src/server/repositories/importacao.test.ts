@@ -6,6 +6,7 @@ import { concursoSchema, VALORES_INICIAIS_CONCURSO } from "@/lib/schemas/concurs
 import { eventoSchema, VALORES_INICIAIS_EVENTO } from "@/lib/schemas/evento";
 import { linkSchema } from "@/lib/schemas/link";
 import { resultadoFaseSchema, VALORES_INICIAIS_RESULTADO_FASE } from "@/lib/schemas/resultado-fase";
+import { versao } from "@/lib/versao";
 import { ID_USUARIO_INICIAL as U } from "@/server/db/schema";
 import { criarBancoTeste, criarUsuarioTeste } from "../db/banco-teste";
 import type { Db } from "../db/client";
@@ -177,6 +178,7 @@ describe("exportar → importar", () => {
     const exportado = await exportarDados(origem.db, U, T1);
 
     expect(exportado.schemaVersion).toBe(VERSAO_BACKUP);
+    expect(exportado.versaoApp).toBe(versao);
     expect(exportado.dados.concursos).toHaveLength(2);
     expect(exportado.dados.tags.map((t) => t.nome).sort()).toEqual(["prioridade", "tribunais"]);
     expect(exportado.dados.concursoTags).toHaveLength(3);
@@ -446,6 +448,12 @@ describe("validarBackup", () => {
     const b = await base();
     const { anexos: _, ...dados } = b.dados;
     expect(validarBackup({ ...b, dados }).dados.anexos).toEqual([]);
+  });
+
+  it("aceita backup sem versaoApp e de outra versão do app (#118)", async () => {
+    const { versaoApp: _, ...semVersao } = await base();
+    expect(() => validarBackup(semVersao)).not.toThrow();
+    expect(() => validarBackup({ ...semVersao, versaoApp: "1.0.0" })).not.toThrow();
   });
 });
 

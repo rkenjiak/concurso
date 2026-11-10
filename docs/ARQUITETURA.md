@@ -77,6 +77,7 @@ erDiagram
   USUARIO ||--o{ CONCURSO : "é dono"
   USUARIO ||--o{ EMAIL_PERMITIDO : "liberou"
   USUARIO ||--o{ AUDITORIA_ADMIN : "executou"
+  USUARIO ||--o{ FEEDBACK : "enviou / tratou"
   CONCURSO ||--o{ LINK : tem
   CONCURSO ||--o{ EVENTO : tem
   CONCURSO ||--o{ STATUS_HISTORICO : registra
@@ -102,8 +103,20 @@ obrigatório, garantido por triggers porque a coluna foi adicionada com `ALTER T
 - `auditoria_admin`: `id`, `admin_id` e `alvo_usuario_id` → `usuario.id` (`SET NULL`), `admin` e
   `alvo` (cópias do e-mail/descrição no momento da ação, para o registro sobreviver a mudanças),
   `acao` (`PROMOVER_ADMIN`, `REBAIXAR_ADMIN`, `BLOQUEAR_USUARIO`, `DESBLOQUEAR_USUARIO`,
-  `PERMITIR_EMAIL`, `REMOVER_EMAIL`, `REVOGAR_TOKENS` — #108; o enum existe só em TS e a coluna é
-  texto, então novas ações não exigem migração), `created_at` (índice).
+  `PERMITIR_EMAIL`, `REMOVER_EMAIL`, `REVOGAR_TOKENS` — #108; `EXPORTAR_FEEDBACK`,
+  `DESCARTAR_FEEDBACK`, `RESTAURAR_FEEDBACK`, `EXCLUIR_FEEDBACK` — #117, um registro por lote com a
+  quantidade no `alvo` ("5 feedbacks"); o enum existe só em TS e a coluna é texto, então novas
+  ações não exigem migração), `created_at` (índice).
+
+**Feedback (#117, migração `0008_feedback`):**
+- `feedback`: `id`, `usuario_id` → `usuario.id` (`SET NULL`) e `usuario` (cópia do e-mail no envio,
+  como em `auditoria_admin`), `tipo` (`TipoFeedback`), `mensagem` (10–2000), `pagina` (rota sem
+  query string, com segmentos numéricos trocados por `[id]`), `versao_app` e `commit_app` (da build
+  no ar, `lib/versao.ts`, §8.4), `user_agent` (do cabeçalho, cortado em 300), `status`
+  (`StatusFeedback`, default `NOVO`), `tratado_por` → `usuario.id` (`SET NULL`) e `tratado_em`
+  (último admin que exportou, descartou ou restaurou), `created_at`. Índices (`status`,
+  `created_at`) para a caixa de entrada e (`usuario_id`, `created_at`) para o limite de envios.
+  Não entra no backup do usuário (é do painel, não dos dados dele).
 
 **Uso real (#108, migração `0007_uso_tokens`):**
 - `usuario.mcp_token_usado_em` e `usuario.ics_token_usado_em` (epoch ms, nuláveis): último uso de
@@ -197,6 +210,8 @@ obrigatório, garantido por triggers porque a coluna foi adicionada com `ALTER T
 | `TipoEvento` | `PUBLICACAO_EDITAL`, `INICIO_INSCRICOES`, `FIM_INSCRICOES`, `PEDIDO_ISENCAO`, `VENCIMENTO_BOLETO`, `PROVA_OBJETIVA`, `PROVA_DISCURSIVA`, `OUTRA_FASE` (TAF, títulos, psicotécnico, investigação social…), `GABARITO_PRELIMINAR`, `PRAZO_RECURSO`, `RESULTADO_FINAL`, `HOMOLOGACAO`, `CONVOCACAO`, `NOMEACAO`, `POSSE`, `VALIDADE`, `OUTRO` |
 | `Fase` | `OBJETIVA`, `DISCURSIVA`, `TAF`, `TITULOS`, `PSICOTECNICO`, `INVESTIGACAO_SOCIAL`, `ORAL`, `CURSO_FORMACAO`, `OUTRA` |
 | `SituacaoFase` | `PENDENTE`, `APROVADO`, `CLASSIFICADO`, `ELIMINADO`, `SUB_JUDICE` |
+| `TipoFeedback` | `BUG`, `SUGESTAO`, `OUTRO` (#117) |
+| `StatusFeedback` | `NOVO`, `EXPORTADO`, `DESCARTADO` (#117) |
 | `CorConcurso` | `AZUL`, `CIANO`, `VERDE_AGUA`, `VERDE`, `VIOLETA`, `MAGENTA`, `ROSA`, `CINZA` (`domain/cores.ts`) |
 
 Semântica: **Aprovado** = dentro das vagas; **Classificado** = fora das vagas (cadastro de reserva);
@@ -366,20 +381,22 @@ seguinte, seletor e atalhos), então o filtro se mantém ao trocar de mês.
 | `/concursos/novo` | **Formulário** de cadastro; ao salvar abre o detalhe na aba Eventos (#100) | MVP |
 | `/concursos/[id]` | **Detalhe** em abas: Visão geral · Eventos · Links · Resultados · Histórico; a aba aberta fica em `?aba=` (#77): abas controladas pelo `useSearchParams`, troca gravada com `history.replaceState`, sem ir ao servidor. `?evento=<id>` destaca um evento e `?foco=validade` o card Validade; `de`/`mes`/`concursos` definem o link de volta (allowlist); `?mudar=status` abre "Mudar status". Cabeçalho: Editar, Mudar status e menu Mais ações (.ics, Silenciar, Excluir) (#100) | MVP |
 | `/concursos/[id]/editar` | Formulário de edição | MVP |
-| `/configuracoes` | Seções Avisos (regras de notificação, calendário .ics), Dados (exportar/importar), Integrações (token do MCP) e Conta (acesso), com índice de âncoras (#106) | MVP |
+| `/configuracoes` | Seções Avisos (regras de notificação, calendário .ics), Dados (exportar/importar), Integrações (token do MCP), Conta (acesso) e Sobre (versão do app, `#sobre`, com links para a release e o CHANGELOG; #118), com índice de âncoras (#106) | MVP |
 | `/notificacoes` | **Central de notificações** (#65): avisos gerados pelas regras para prazos pendentes, agrupados pela proximidade do prazo — Hoje e amanhã (0–1 dia), Próximos 7 dias (2–7), Mais adiante (8+) —, o mais próximo primeiro em cada grupo (`lib/agrupar-por-prazo.ts`, #104); marcar como lida, marcar todas, dispensar. O dashboard é o "o que fazer agora" | v2.2 |
 | `/login` | Login Google e/ou senha única (só se auth habilitada) | MVP |
 | `/admin` | **Painel admin** (#50, só papel `ADMIN`; 403 para os demais): visão geral com totais de usuários, concursos e eventos, uso (ativos em 7/30 dias, com token do MCP, com feed .ics; #108) e ações recentes | v1.4 |
 | `/admin/usuarios` | Usuários (nome, e-mail, papel, cadastro, último acesso real, selos MCP/.ics e "Sem acesso hoje", nº de concursos); promover/rebaixar, bloquear/desbloquear | v1.4 · #108 |
 | `/admin/usuarios/[id]` | Detalhe (#108): origem do acesso, "sem acesso hoje" e motivo, conta Google vinculada, contagens agregadas (concursos, eventos, links, resultados), tokens MCP/.ics com último uso; **Revogar tokens**. ID inválido ou inexistente → 404 (conferido no `layout.tsx` do `[id]`, #110) | #108 |
 | `/admin/acesso` | Allowlist do login Google: e-mails das variáveis (só leitura) e liberados no painel (adicionar/retirar) | v1.4 |
+| `/admin/feedback?status=&tipo=&busca=&pagina=` | **Caixa de entrada de feedback** (#117): abas Novos (padrão, com contador), Exportados, Descartados e Todos; filtro por tipo e texto; 50 por página. Tabela no estilo da auditoria com seleção em massa (checkbox por linha; no cabeçalho, todos os visíveis, indeterminado quando parcial; Shift+clique ou Shift+Espaço para o intervalo, `lib/selecao.ts`), barra de ações fixa só com seleção (Exportar, Descartar, Limpar; em Descartados, Restaurar e Excluir definitivamente), `Esc` limpa, quantidade anunciada (`aria-live`). Exportar abre a prévia nos quatro formatos (`lib/feedback-exportacao.ts`) | #117 |
 | `/admin/auditoria` | Log das ações administrativas (últimas 200) | v1.4 |
 | `/concursos?visao=quadro` | Quadro por status (kanban; arrastar ou “Mover para” = transição validada) | v1.1 |
 | `/calendario?mes=AAAA-MM&concursos=1,3` | Visão mensal de eventos (agenda em lista no celular); clique abre o painel do evento (concluir, ocultar, editar, ver no concurso; gaveta no celular, #100); cor/ícone por concurso com legenda (#46); seletor de mês e ano com eventos por mês, atalhos "Próximos eventos" e "Próxima prova", e filtro de concursos pela legenda (#83, §4.6) | v1.1 |
 
 Layout responsivo (alvo: 360 px sem rolagem horizontal, #48): navegação lateral no desktop, barra
-inferior no celular; menu da conta (avatar) com Sair e, só para admins, o seletor de
-visão (§7.1). No celular a barra inferior é Dashboard, Concursos, Calendário e Notificações (com
+inferior no celular; menu da conta (avatar) com "Enviar feedback" (#117), Sair e, só para
+admins, o seletor de visão (§7.1). Na visão admin, a navegação tem Feedback com o contador de
+novos (barra inferior com 5 itens no celular) e a visão geral, um card com os novos. No celular a barra inferior é Dashboard, Concursos, Calendário e Notificações (com
 contador; o nome acessível traz o número), e o cabeçalho tem só marca, Atualizar e menu da conta
 (na visão admin, com o selo); o tema e Configurações ficam dentro do menu (#78, #105). No desktop,
 o sino fica na lateral e Configurações na navegação. Um só ponto de entrada de notificações e um
@@ -418,6 +435,9 @@ Os ícones são gerados de `assets/logo.svg` por `pnpm icones` (`scripts/gerar-i
 | `definirPapelAcao(id, papel)`, `definirBloqueioAcao(id, bloqueado)` | #50 — admin; protege o último admin ativo e os de `ADMIN_EMAILS` |
 | `adicionarEmailPermitidoAcao(email)`, `removerEmailPermitidoAcao(email)` | #50 — admin; allowlist do painel |
 | `revogarTokensAcao(id)` | #108 — admin; revoga os tokens MCP e .ics sem bloquear, auditado (`REVOGAR_TOKENS`); devolve `{ revogou }` (sem tokens ativos, não muda nada nem audita) |
+| `enviarFeedbackAcao({ tipo, mensagem, pagina })` | #117 — qualquer usuário logado, sempre em nome do usuário da sessão (a visão escolhida por um admin não muda o autor; campos extras do cliente são ignorados). Versão e commit vêm de `lib/versao.ts` e o user agent do cabeçalho. Limite de 10 envios por usuário por hora, contado no banco na mesma transação do envio |
+| `exportarFeedbacksAcao(ids, formato, incluirEmail)` | #117 — admin; marca `EXPORTADO` (com quem e quando) e devolve `{ conteudo, exportados }` em `MARKDOWN_ISSUES`, `MARKDOWN_AGRUPADO`, `JSON` ou `GH`; sem e-mail salvo `incluirEmail`; ignora descartados; `@` e `#` da mensagem e do título ganham um espaço de largura zero (sem menções nem referências cruzadas no GitHub); navegador, e-mail e página vão como código inline (nada vira menção, link, HTML nem item de lista). O diálogo copia **o conteúdo devolvido pelo servidor** (`ClipboardItem` com promessa, pedido ainda no clique), então o que foi copiado, o aviso e a auditoria contam os mesmos itens; sem a API ou se a cópia falhar, mostra o conteúdo com um botão "Copiar". Se a ação falhar, nada é copiado. A opção de incluir o e-mail volta a desmarcada sempre que o diálogo fecha |
+| `descartarFeedbacksAcao(ids)`, `desfazerDescarteAcao({ anteriores, descartadoEm })`, `restaurarFeedbacksAcao(ids)`, `excluirFeedbacksAcao(ids)` | #117 — admin; descartar devolve o status anterior de cada item e o instante do descarte (`tratado_em`); o "Desfazer" do aviso só volta os itens que ainda estão **naquele** descarte (mesmo admin e mesmo `tratado_em`, status alegado só `NOVO`/`EXPORTADO`), então um desfazer antigo não reverte o que outro admin (ou o próprio) fez depois; restaurar volta a `NOVO`; excluir apaga só os descartados. Todas em lote (1–200 IDs, sem repetição), numa transação, com um registro de auditoria por lote (lote sem efeito não audita) |
 
 Todas: checagem de sessão (`exigirUsuarioAcao`, ou `exigirAdminAcao` no painel) → validação Zod →
 `executar` (transação no repositório; `ErroDominio` vira mensagem, exceção inesperada vira
@@ -464,6 +484,7 @@ Uma rota `[id]` nova deve seguir o mesmo padrão; nada com `loading.tsx` deve fi
 | `GET /api/export?formato=json\|csv\|ics` | RF09 — `json` (padrão) = backup completo do usuário; `csv` = só os concursos (separador `;`, BOM UTF-8, proteção contra fórmulas); `ics` = RF08, todos os concursos ou `&concurso=<id>` |
 | `POST /api/import` | RF09 — `multipart/form-data` com `arquivo` e `confirmacao=SUBSTITUIR_TUDO`; substitui todos os dados do usuário numa transação (até 20 MB; valida com Zod e `schemaVersion`; IDs renumerados) |
 | `GET /api/health` | health check do deploy |
+| `GET /api/versao` | #118 — `{ versao, commit, ambiente }` da build no ar, para conferir o deploy por `curl` ou monitoramento; público e sem mais nada (a data do build fica só no admin) |
 | `POST/GET/DELETE /api/mcp` | RF10 — servidor MCP (Streamable HTTP); exige `Authorization: Bearer <token pessoal>` |
 | `GET /api/auth/google` e `/api/auth/google/callback` | #49 — login com Google (OIDC, código + PKCE) |
 | `GET /api/calendario.ics?token=…` | RF08 (#65) — feed assinável; pública no `proxy.ts`, autenticada pelo token do feed (`cics_…`, SHA-256 em `usuario.ics_token_hash`); token inválido/revogado, usuário bloqueado ou sem acesso (#96) → 404; atraso progressivo como o MCP |
@@ -534,7 +555,8 @@ Decisões (issue #39):
 │   │   ├── formulario/             # proteção de alterações não salvas, foco no erro (#100)
 │   │   ├── dashboard/              # lista de prazos (concluir na linha), ocultar/reexibir
 │   │   ├── configuracoes/          # regras de notificação, calendário .ics, export/import, token MCP
-│   │   ├── admin/                  # painel admin (#50)
+│   │   ├── admin/                  # painel admin (#50), caixa de entrada e exportação de feedback (#117)
+│   │   ├── feedback/               # diálogo "Enviar feedback" do menu da conta (#117)
 │   │   ├── auth/                   # login (Google/senha) e sair
 │   │   ├── layout/                 # casca, navegação, menu da conta, botão Atualizar
 │   │   ├── notificacoes/           # sino e central de notificações (#65)
@@ -555,7 +577,7 @@ Decisões (issue #39):
 │   │   ├── log.ts                  # logger estruturado (§9.4)
 │   │   ├── erro-requisicao.ts      # onRequestError → log (§9.4)
 │   │   └── inicializacao.ts        # checagem do ambiente e migrações ao iniciar
-│   ├── lib/                        # format, tz, normalize, csv, tema, pwa, tags, aba-concurso, atualizar, agrupar-por-prazo, schemas Zod
+│   ├── lib/                        # format, tz, normalize, csv, tema, pwa, tags, aba-concurso, atualizar, agrupar-por-prazo, versao (+ versao-build), feedback-exportacao, selecao, schemas Zod
 │   ├── instrumentation.ts          # inicialização ao subir o servidor e onRequestError (§9.4)
 │   └── proxy.ts
 ├── biome.json  drizzle.config.ts  next.config.ts  vitest.config.ts  playwright.config.ts
@@ -585,7 +607,7 @@ Decisões (issue #39):
   após falhas. Em produção não pode coexistir com o Google.
 - **Sessão:** cookie **JWT assinado** (`jose`, HS256 com `AUTH_SECRET` ≥ 32 bytes) com o ID do
   usuário e o método de login; `httpOnly`, `Secure` em produção, `SameSite=Lax`, 30 dias. `proxy.ts` confere só
-  a assinatura (sem banco) e protege tudo exceto `/login`, `/api/health`, `/api/auth/google…`,
+  a assinatura (sem banco) e protege tudo exceto `/login`, `/api/health`, `/api/versao`, `/api/auth/google…`,
   `/api/mcp`, `/api/calendario.ics` e o manifest e os ícones do PWA (`lib/pwa.ts`); páginas, Server
   Actions e Route Handlers obtêm o usuário em `auth/acesso.ts`
   (`exigirUsuarioPagina/Acao/Rota`), que relê o usuário no banco.
@@ -707,8 +729,8 @@ do React). O e2e `seguranca.spec.ts` confere os cabeçalhos e a ausência de vio
 | Nível | Ferramenta | Escopo | Meta |
 |---|---|---|---|
 | Unitário | Vitest | `domain/*` (transições, prazos, validade, criticidade), `lib/format`, parsers BRL, schemas Zod | meta: cobertura ≥ 90% em `domain/` (medida no CI, sem limite configurado) |
-| Integração | Vitest + libSQL `:memory:` + migrações | repositories/queries (transação de status, tags, filtros, export→import ida e volta); servidor MCP com cliente em memória (`InMemoryTransport`) | casos principais |
-| E2E | Playwright (Chromium) | smoke: criar concurso → evento → aparece no dashboard → mudar status → exportar/importar; login, MCP, PWA e lembretes com auth ativa; painel admin com o usuário inicial (sem auth), incluindo selos MCP/.ics, detalhe do usuário e revogar tokens → `/api/mcp` 401 e feed 404 (#108); status HTTP 404 nas rotas `[id]` (inexistente, malformado, de outro usuário), 403 no painel para não admin e esqueleto nas listagens (#110); busca, quadro, calendário (navegação rápida e filtro de concursos no desktop e em 360 px, #83), cor/ícone, ocultar prazos, tema, lembretes (sino, regras, feed .ics), um só ponto de entrada de notificações por layout (barra inferior no celular, sino no desktop) e tema e Configurações pelo menu no celular, sem duplicação (#82, #105); seções, índice e âncoras de Configurações (#106); grupos pela proximidade do prazo em Notificações (#104), menu da conta pelo teclado no celular (#105), PWA, aba do detalhe na URL e botão Atualizar com limite de 60 s (#77), deep-link e volta à origem, painel do evento com concluir/Desfazer, cabeçalho do concurso, avisos e alterações não salvas (#100) e layout em 360 px; `/api/mcp` com token → concurso visível no app. Dois servidores (com e sem auth) com bancos temporários em `e2e/.tmp` | poucos fluxos |
+| Integração | Vitest + libSQL `:memory:` + migrações | repositories/queries (transação de status, tags, filtros, export→import ida e volta); servidor MCP com cliente em memória (`InMemoryTransport`); actions de feedback (permissão, limite por hora e do lote, auditoria por lote, #117) e os comandos `gh` executados num bash real com um `gh` falso (nada da mensagem é expandido) | casos principais |
+| E2E | Playwright (Chromium) | smoke: criar concurso → evento → aparece no dashboard → mudar status → exportar/importar; login, MCP, PWA e lembretes com auth ativa; painel admin com o usuário inicial (sem auth), incluindo selos MCP/.ics, detalhe do usuário e revogar tokens → `/api/mcp` 401 e feed 404 (#108); status HTTP 404 nas rotas `[id]` (inexistente, malformado, de outro usuário), 403 no painel para não admin e esqueleto nas listagens (#110); busca, quadro, calendário (navegação rápida e filtro de concursos no desktop e em 360 px, #83), cor/ícone, ocultar prazos, tema, lembretes (sino, regras, feed .ics), um só ponto de entrada de notificações por layout (barra inferior no celular, sino no desktop) e tema e Configurações pelo menu no celular, sem duplicação (#82, #105); seções, índice e âncoras de Configurações (#106); versão do app no menu da conta, em Configurações → Sobre, no admin e em `/api/versao`, pública mesmo com login (#118); feedback: enviar pelo menu da conta (desktop, teclado e 360 px), selecionar vários com mouse, Shift+clique e Shift+Espaço, Esc, exportar como comandos `gh` (área de transferência), descartar com Desfazer, restaurar e excluir, auditoria por lote (#117); grupos pela proximidade do prazo em Notificações (#104), menu da conta pelo teclado no celular (#105), PWA, aba do detalhe na URL e botão Atualizar com limite de 60 s (#77), deep-link e volta à origem, painel do evento com concluir/Desfazer, cabeçalho do concurso, avisos e alterações não salvas (#100) e layout em 360 px; `/api/mcp` com token → concurso visível no app. Dois servidores (com e sem auth) com bancos temporários em `e2e/.tmp` | poucos fluxos |
 
 Datas sempre fixadas (`vi.setSystemTime` / `hoje` injetado).
 
@@ -720,7 +742,8 @@ jobs:
   check:  pnpm install --frozen-lockfile → biome ci → pnpm typecheck → vitest run --coverage → pnpm build
   e2e:    (needs: check) pnpm e2e (Playwright/Chromium, navegadores em cache)
   docker: (needs: check) docker build + smoke test: sem login o container sai com código 1;
-          com APP_PASSWORD responde /api/health e recusa /api/export e /api/mcp sem credencial (401)
+          com APP_PASSWORD responde /api/health e /api/versao (com o commit do build arg
+          GIT_COMMIT_SHA) e recusa /api/export e /api/mcp sem credencial (401)
   branch-policy: em PRs para master, falha se head ≠ release/* ou hotfix/*
 ```
 - **Proteção de branches**: `master` e `develop` exigem PR + CI verde; sem push direto.
@@ -735,7 +758,29 @@ jobs:
   *Keep a Changelog*; PR para `master` → tag `vX.Y.Z` → PR da mesma `release/*` de volta para `develop`.
 - `hotfix/*` incrementa PATCH. Mensagens de commit no estilo *Conventional Commits* (recomendado,
   não obrigatório por ferramenta).
-- Mudança de schema = nova migração Drizzle; o JSON de export carrega `schemaVersion`.
+- Mudança de schema = nova migração Drizzle; o JSON de export carrega `schemaVersion` (é ele que
+  decide a compatibilidade) e, só como informação, `versaoApp`.
+
+### 8.4 Versão no código e na build (#118)
+- **Fonte da versão:** o `version` do `package.json`, bumpado na `release/X.Y.Z`. O **commit**
+  (SHA curto) identifica a build, porque várias builds (previews, `develop`) compartilham a mesma
+  versão.
+- **Ponto único de leitura:** `src/lib/versao.ts` (`versao`, `commit`, `ambiente`, `dataBuild`,
+  `VERSAO_APP`, `rotuloVersao`, links da release e do CHANGELOG). Serve ao servidor e ao cliente e
+  não importa o `package.json` (iria inteiro para o bundle do cliente): lê `process.env.APP_*`.
+- **Fixado no build:** `src/lib/versao-build.ts` (só Node) calcula os `APP_*` e o `next.config.ts`
+  os passa em `env`, que o Next substitui no código do servidor e do cliente durante o
+  `next build`. Commit: `VERCEL_GIT_COMMIT_SHA` → build arg `GIT_COMMIT_SHA` (Docker; o `.git` não
+  entra no contexto) → `git rev-parse HEAD` → `dev`. Ambiente: `VERCEL_ENV`, senão `NODE_ENV`
+  (`production` no `next build`, `development` no `next dev`). Mudar variáveis depois do build não
+  muda os valores.
+- **Fora do Next:** o MCP por stdio chama `definirVersaoNoAmbiente()` antes de carregar o app, e o
+  Vitest preenche os `APP_*` no `vitest.config.ts` (commit `dev`, ambiente `development`).
+- **Onde aparece:** rodapé do menu da conta (`vX.Y.Z` em produção; em preview e dev também
+  `· commit · ambiente`), Configurações → Sobre (`#sobre`, link para a GitHub Release
+  `v<versao>` e para o CHANGELOG), card "Versão no ar" na visão geral do admin (com a data do
+  build), `GET /api/versao` (só `{ versao, commit, ambiente }`), `serverInfo.version` do MCP,
+  `versaoApp` do backup JSON e as linhas `error` dos logs (`versaoApp`, `commit`, §9.4).
 
 ---
 
@@ -809,6 +854,9 @@ log.warn("auth.login_falhou", { metodo: "senha", motivo: "senha_incorreta", ip }
 | `LOG_LEVEL` | `info` em produção, `debug` em dev, `silent` em teste | nível mínimo: `debug`, `info`, `warn`, `error` ou `silent`. `log.fatal` (erro que encerra o processo na inicialização) sai sempre |
 | `LOG_FORMAT` | `json` em produção, `texto` fora dela | `json` (uma linha JSON `{ ts, nivel, evento, ...campos }`) ou `texto` legível, com a stack nas linhas seguintes |
 
+Linhas de nível `error` (incluindo `log.fatal`) levam também `versaoApp` e `commit` da build
+(#118, §8.4), para cruzar um erro com o deploy que o causou.
+
 **Erros de servidor.** `onRequestError` (`src/instrumentation.ts` → `server/erro-requisicao.ts`)
 registra `requisicao.erro` com método, caminho (só o pathname, mais os **nomes** dos parâmetros
 da query, nunca os valores), `routePath`, `routeType` (`render`/`route`/`action`/`proxy`),
@@ -837,6 +885,7 @@ O hook só vê o que **escapa** do código: `executar` (Server Actions e MCP), `
 | `auth.config_invalida` | error | `erro` (proxy) |
 | `dados.importacao` / `dados.importacao_recusada` / `dados.importacao_erro` | info / info / error | `usuarioId`, contagens do resumo, `motivo` ou `erro` |
 | `dados.exportacao` | info | `usuarioId`, `formato`, `concurso` (id validado, só no `.ics` de um concurso); só depois de gerar o arquivo com sucesso |
+| `feedback.enviado` | info | `usuarioId`, `tipo` (#117), sem a mensagem |
 | `mcp.ferramenta` | info (error se lançar) | `usuarioId`, `ferramenta`, `ok`, `duracaoMs`, sem os argumentos |
 | `mcp.erro` | error | `erro` (transporte/protocolo) |
 | `health.falhou` | error | `erro` |

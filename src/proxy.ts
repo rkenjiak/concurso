@@ -1,11 +1,11 @@
 /**
  * Proteção das rotas (ARQUITETURA.md §7.1). Com a autenticação ligada, exige sessão válida em
- * todas as rotas, exceto `/login`, `/api/health`, o fluxo do login Google (`/api/auth/google…`),
- * `/api/mcp` e `/api/calendario.ics` (#65; autenticadas pelo próprio handler com o token do
- * usuário), o manifest e os ícones do PWA (#66, buscados pelo navegador sem sessão) e os arquivos
- * estáticos (ver `matcher`). Aqui só
- * se confere a assinatura do cookie (sem banco); páginas, Server Actions e Route Handlers obtêm o
- * usuário de novo (`auth/acesso.ts`), o que também barra sessões de e-mails retirados da allowlist.
+ * todas as rotas, exceto `/login`, `/api/health`, `/api/versao` (#118), o fluxo do login Google
+ * (`/api/auth/google…`), `/api/mcp` e `/api/calendario.ics` (#65; autenticadas pelo próprio
+ * handler com o token do usuário), o manifest e os ícones do PWA (#66, buscados pelo navegador sem
+ * sessão) e os arquivos estáticos (ver `matcher`). Aqui só se confere a assinatura do cookie (sem
+ * banco); páginas, Server Actions e Route Handlers obtêm o usuário de novo (`auth/acesso.ts`), o
+ * que também barra sessões de e-mails retirados da allowlist.
  */
 import { type NextRequest, NextResponse } from "next/server";
 import { ehArquivoPwaPublico } from "./lib/pwa";
@@ -16,6 +16,7 @@ import { log } from "./server/log";
 const ROTAS_PUBLICAS = new Set([
   "/login",
   "/api/health",
+  "/api/versao",
   "/api/mcp",
   "/api/calendario.ics",
   "/api/auth/google",

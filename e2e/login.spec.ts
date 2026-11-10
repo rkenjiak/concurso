@@ -2,9 +2,10 @@ import { expect, test } from "@playwright/test";
 import { SENHA_E2E } from "./constantes";
 
 test("exige login, rejeita senha errada, entra e sai", async ({ page, request }) => {
-  // APIs sem sessão respondem 401; o health check é público.
+  // APIs sem sessão respondem 401; o health check e a versão (#118) são públicos.
   expect((await request.get("/api/export")).status()).toBe(401);
   expect((await request.get("/api/health")).status()).toBe(200);
+  expect((await request.get("/api/versao")).status()).toBe(200);
 
   await page.goto("/concursos?ordem=nome");
   await expect(page).toHaveURL(/\/login\?para=%2Fconcursos%3Fordem%3Dnome$/);

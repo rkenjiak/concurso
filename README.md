@@ -59,6 +59,7 @@ Copie `.env.example` para `.env.local` e ajuste. Nada é obrigatório para rodar
 | `BACKUP_KEEP` | `10` | Quantos backups o `pnpm db:backup` mantém |
 | `LOG_LEVEL` | `info` (produção), `debug` (dev) | Nível mínimo dos logs: `debug`, `info`, `warn`, `error` ou `silent` |
 | `LOG_FORMAT` | `json` (produção), `texto` (dev) | Formato dos logs: uma linha JSON por evento ou texto legível |
+| `GIT_COMMIT_SHA` | — | **Só no build** (build arg do Docker): commit da build exibido com a versão. Ver [Versão do app](#versão-do-app) |
 
 ## Autenticação
 
@@ -73,19 +74,19 @@ dados (inclusive export/import e MCP).
 - **Painel admin** (`/admin`, só admins): lista os usuários com o último acesso real e os tokens
   ativos (MCP e calendário), mostra quem está ativo e por que alguém está sem acesso,
   promove/rebaixa admins, revoga tokens, bloqueia contas (sem acesso por sessão nem pelos tokens do
-  MCP e do calendário), libera e-mails além dos de `ALLOWED_EMAILS` e registra tudo num log de
-  auditoria. Mostra só metadados e contagens: os dados dos usuários continuam privados. O admin
-  alterna entre "Visão admin" e "Visão usuário" no menu da conta, sem novo login. Os e-mails de
-  `ADMIN_EMAILS` são admins garantidos, e o último admin ativo não pode ser rebaixado nem
-  bloqueado.
+  MCP e do calendário), libera e-mails além dos de `ALLOWED_EMAILS`, trata o feedback dos usuários
+  (ver [Feedback](#feedback)) e registra tudo num log de auditoria. Mostra só metadados e
+  contagens: os dados dos usuários continuam privados. O admin alterna entre "Visão admin" e
+  "Visão usuário" no menu da conta, sem novo login. Os e-mails de `ADMIN_EMAILS` são admins
+  garantidos, e o último admin ativo não pode ser rebaixado nem bloqueado.
 - **Senha única** (`APP_PASSWORD` + `AUTH_SECRET`): para uso local; entra sempre como o usuário
   inicial. Em produção não pode ser combinada com o login Google. Após 5 senhas erradas, novas
   tentativas do mesmo cliente esperam cada vez mais.
-- Com login, todas as páginas e APIs exigem sessão, exceto `/login`, `/api/health`, o fluxo do
-  Google em `/api/auth/google…`, o manifest e os ícones do PWA e `/api/mcp` e
-  `/api/calendario.ics` (que usam token próprio). A sessão fica em um cookie JWT assinado
-  (`httpOnly`, `SameSite=Lax`, `Secure` em produção) válido por 30 dias; "Sair" fica no menu da
-  conta e em **Configurações → Conta**.
+- Com login, todas as páginas e APIs exigem sessão, exceto `/login`, `/api/health`,
+  `/api/versao`, o fluxo do Google em `/api/auth/google…`, o manifest e os ícones do PWA e
+  `/api/mcp` e `/api/calendario.ics` (que usam token próprio). A sessão fica em um cookie JWT
+  assinado (`httpOnly`, `SameSite=Lax`, `Secure` em produção) válido por 30 dias; "Sair" fica no
+  menu da conta e em **Configurações → Conta**.
 - Gere o segredo com `openssl rand -base64 32` (ou
   `node -e "console.log(crypto.randomBytes(32).toString('base64'))"`). Trocar o `AUTH_SECRET`
   encerra todas as sessões.
@@ -114,7 +115,8 @@ cada deploy) não conseguem fazer login com Google. Use um domínio fixo de prod
 ## Backup e restauração
 
 **Export/import JSON (qualquer banco).** Em **Configurações**: "Baixar backup (JSON)" gera um
-arquivo versionado com todos os seus dados (concursos, tags, links, eventos, histórico,
+arquivo versionado (`schemaVersion`; o campo `versaoApp` só informa a versão do app que exportou)
+com todos os seus dados (concursos, tags, links, eventos, histórico,
 resultados, regras de notificação e o que já foi lido); "Baixar concursos (CSV)" gera uma
 planilha (separador `;`, abre direto no Excel/LibreOffice). "Importar…" restaura um
 backup JSON **substituindo todos os seus dados** (com confirmação; tudo ou nada) — os de outros
@@ -143,6 +145,34 @@ restaura. Para restaurar um único `.db` (ex.: de `pnpm db:backup`), apague ante
 `concurso.db-wal` e o `concurso.db-shm`, que sobram quando o container é parado: um `-wal` antigo
 ao lado de outro arquivo principal corrompe o banco. Ou use o export JSON. No Turso, use o point-in-time
 restore do serviço e o export JSON periódico.
+
+## Feedback
+
+Qualquer usuário logado envia um feedback pelo **menu da conta → Enviar feedback** (também no
+celular): tipo (Bug, Sugestão ou Outro) e uma mensagem de 10 a 2000 caracteres. O app anexa a
+página atual (só o caminho, sem filtros nem buscas, e com os IDs trocados por `[id]`), a versão e o
+commit da build e o navegador. O feedback é sempre de quem está logado, e cada usuário envia até 10
+por hora.
+
+O admin trata tudo em **`/admin/feedback`** (item Feedback da navegação, com o número de novos):
+
+- abas Novos, Exportados, Descartados e Todos, filtro por tipo e busca na mensagem;
+- seleção em massa: checkbox por linha, no cabeçalho (todos os visíveis) e Shift+clique ou
+  Shift+Espaço para marcar um intervalo; com seleção, uma barra fixa traz **Exportar**,
+  **Descartar** e **Limpar seleção** (`Esc` também limpa);
+- **Exportar** mostra a prévia e copia (ou baixa) o conteúdo gerado pelo servidor, em quatro
+  formatos: Markdown com uma issue por feedback, Markdown com uma issue agrupando todos, JSON e
+  comandos `gh issue create` (cole num terminal bash ou zsh com o
+  [GitHub CLI](https://cli.github.com) autenticado; o corpo vai num heredoc literal, então nada da
+  mensagem é executado). O e-mail do usuário só entra se você marcar a opção (que volta a
+  desmarcada a cada exportação), porque as issues são públicas. Se o navegador não deixar copiar,
+  o conteúdo aparece no diálogo com um botão **Copiar**. Menções e referências do GitHub no texto
+  do usuário (`@usuario`, `#12`) são neutralizadas para não notificar ninguém. Os itens passam a
+  **Exportado** (descartados ficam de fora: restaure-os antes);
+- **Descartar** não apaga e tem **Desfazer** (que só desfaz aquele descarte: se alguém mexeu nos
+  itens depois, eles ficam como estão); em Descartados dá para restaurar ou excluir de vez.
+
+Cada ação em lote (até 200 itens) gera um único registro em `/admin/auditoria`, com a quantidade.
 
 ## Lembretes: notificações e calendário
 
@@ -272,7 +302,7 @@ O `Dockerfile` gera uma imagem `standalone` (Node 24, usuário sem privilégios)
 um volume em `/app/data`; as migrações rodam ao iniciar (`MIGRATE_ON_START=true`).
 
 ```bash
-docker build -t concurso .
+docker build --build-arg GIT_COMMIT_SHA="$(git rev-parse HEAD)" -t concurso .
 docker run -d --name concurso -p 3000:3000 \
   -v concurso-dados:/app/data \
   -e APP_PASSWORD='sua-senha' \
@@ -284,7 +314,36 @@ Coloque um proxy com HTTPS na frente (Caddy, Traefik, Fly.io…). A imagem tem `
 `/api/health`. Sem `APP_PASSWORD` nem login Google o container recusa iniciar (salvo
 `ALLOW_NO_AUTH=true`). Para o login com Google no container, troque `APP_PASSWORD` pelas variáveis
 do Google (e `APP_URL`, se o proxy não repassar o host original). Para usar o Turso, passe
-`DATABASE_URL`/`DATABASE_AUTH_TOKEN`.
+`DATABASE_URL`/`DATABASE_AUTH_TOKEN`. O build arg `GIT_COMMIT_SHA` identifica a build (ver
+[Versão do app](#versão-do-app)); sem ele, o commit aparece como `dev`.
+
+### Versão do app
+
+A versão vem do `package.json` (atualizada em cada `release/X.Y.Z`) e é fixada no build, junto com
+o commit, o ambiente e a data do build. Aparece:
+
+- no rodapé do **menu da conta**: `v2.7.0` em produção; em preview e dev, também o commit e o
+  ambiente (`v2.7.0 · a1b2c3d · preview`), porque várias builds compartilham a mesma versão;
+- em **Configurações → Sobre** (`/configuracoes#sobre`), com links para "O que há de novo" (a
+  GitHub Release da versão) e para o `CHANGELOG.md`;
+- na **visão geral do admin** (`/admin`): versão, commit, ambiente e data do build;
+- em `GET /api/versao`, público e sem dados sensíveis, para conferir o deploy:
+
+  ```bash
+  curl https://concursos.exemplo.com/api/versao
+  # {"versao":"2.7.0","commit":"a1b2c3d","ambiente":"production"}
+  ```
+
+- no servidor MCP (`serverInfo.version`), no campo `versaoApp` do backup JSON e nas linhas de erro
+  dos logs (`versaoApp` e `commit`).
+
+O commit vem, nesta ordem, de `VERCEL_GIT_COMMIT_SHA` (injetada pela Vercel no build), do build arg
+`GIT_COMMIT_SHA` (Docker; o `.git` não entra na imagem) ou do `git rev-parse HEAD` (build local);
+sem nenhum, `dev`. O ambiente é o `VERCEL_ENV` (`production`, `preview` ou `development`) ou, fora
+da Vercel, `production` no `pnpm build`/`pnpm start` e `development` no `pnpm dev`. Na Vercel não
+é preciso configurar nada, desde que *Settings → Environment Variables → Automatically expose
+System Environment Variables* esteja ligado (o padrão): sem isso, `VERCEL_GIT_COMMIT_SHA` e
+`VERCEL_ENV` não chegam ao build, e o commit aparece como `dev` (e o ambiente como `production`). Os valores ficam fixos na build: mudar variáveis depois não os altera.
 
 ### Logs
 

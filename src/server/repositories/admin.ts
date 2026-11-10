@@ -75,7 +75,7 @@ export function nomeUsuario(u: { nome: string | null; email: string | null }) {
   return u.nome ?? (u.email === null ? "Usuário inicial" : "Sem nome");
 }
 
-async function auditar(
+export async function auditar(
   tx: Executor,
   autor: AutorAdmin,
   acao: AcaoAdmin,

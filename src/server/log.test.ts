@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { commit, versao } from "@/lib/versao";
 import { configurarLog, log, mascararEmail, semSegredosNaUrl } from "./log";
 
 afterEach(() => {
@@ -103,9 +104,21 @@ describe("log", () => {
     log.error("acao.erro", { erro: new Error("boom") });
     const [linha] = linhas();
     expect(linha?.split("\n")[0]).toMatch(
-      /ERROR acao\.erro erro=\{"nome":"Error","mensagem":"boom"\}$/,
+      /ERROR acao\.erro versaoApp="[^"]+" commit="[^"]+" erro=\{"nome":"Error","mensagem":"boom"\}$/,
     );
     expect(linha).toContain("Error: boom\n");
+  });
+
+  it("linhas de erro levam a versão e o commit da build; as demais não (#118)", () => {
+    configurarLog({ nivel: "info", formato: "json" });
+    const { linhas } = capturar();
+    log.error("acao.erro", { versaoApp: "falsa", commit: "falso", a: 1 });
+    log.info("acao.ok");
+    // `linhas()` traz stdout (info) antes de stderr (error).
+    const [info, erro] = linhas().map((l) => JSON.parse(l));
+    expect(erro).toMatchObject({ evento: "acao.erro", versaoApp: versao, commit, a: 1 });
+    expect(info).not.toHaveProperty("versaoApp");
+    expect(info).not.toHaveProperty("commit");
   });
 
   it("não quebra com referência circular", () => {

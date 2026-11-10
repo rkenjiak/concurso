@@ -7,6 +7,7 @@ import { ROTULO_ESCOLARIDADE, ROTULO_ESFERA, ROTULO_STATUS } from "@/domain/labe
 import { centavosCsv, gerarCsv } from "@/lib/csv";
 import { formatarData, formatarDataHora } from "@/lib/format";
 import { APP_BACKUP, type BackupJson, VERSAO_BACKUP } from "@/lib/schemas/backup";
+import { versao } from "@/lib/versao";
 import type { Db } from "../db/client";
 import {
   anexo,
@@ -101,6 +102,8 @@ export async function exportarDados(
   return {
     app: APP_BACKUP,
     schemaVersion: VERSAO_BACKUP,
+    // Só informativo (#118); a compatibilidade é checada por `schemaVersion`.
+    versaoApp: versao,
     exportadoEm: agora.toISOString(),
     dados: {
       concursos: concursos.map(serializar),

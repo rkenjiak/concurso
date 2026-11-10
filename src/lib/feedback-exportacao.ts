@@ -1,0 +1,207 @@
+/**
+ * Exportação do feedback para issues do GitHub (#117), em funções puras usadas pela prévia no
+ * diálogo (cliente) e pela Server Action (servidor), que gera o conteúdo definitivo.
+ *
+ * Formatos: Markdown com uma issue por feedback, Markdown com uma issue agrupando todos, JSON e
+ * comandos `gh issue create`. Por padrão sem o e-mail do usuário (as issues são públicas).
+ *
+ * Nos comandos `gh`, a mensagem nunca é interpolada no shell: o corpo vai num heredoc com
+ * delimitador entre aspas (`<<'FEEDBACK_12'`), que desliga `$()`, crases e variáveis, e o
+ * delimitador muda se alguma linha do corpo for igual a ele. O título vai entre aspas simples.
+ */
+import type { StatusFeedback, TipoFeedback } from "@/domain/enums";
+import { LABEL_GITHUB_FEEDBACK, semCaracteresDeControle } from "@/domain/feedback";
+import { ROTULO_TIPO_FEEDBACK } from "@/domain/labels";
+import { formatarDataHora } from "./format";
+import type { FormatoExportacaoFeedback } from "./schemas/feedback";
+import { REPOSITORIO_GITHUB } from "./versao";
+
+export interface FeedbackExportavel {
+  id: number;
+  tipo: TipoFeedback;
+  mensagem: string;
+  pagina: string | null;
+  versaoApp: string;
+  commitApp: string;
+  userAgent: string | null;
+  /** E-mail (ou descrição) do usuário no envio. */
+  usuario: string;
+  status: StatusFeedback;
+  createdAt: Date;
+}
+
+export interface OpcoesExportacao {
+  /** Inclui o e-mail do usuário (padrão: não). */
+  incluirEmail?: boolean;
+}
+
+const TAMANHO_TITULO = 60;
+
+/** Quebras de linha no padrão Unix e sem caracteres de controle (exceto tab e quebra). */
+function limparTexto(texto: string): string {
+  return semCaracteresDeControle(texto.replace(/\r\n?/g, "\n"), "", "\n\t");
+}
+
+/** `[Bug] primeiros 60 caracteres…` (uma linha, espaços colapsados). */
+export function tituloFeedback(f: Pick<FeedbackExportavel, "tipo" | "mensagem">): string {
+  const linha = limparTexto(f.mensagem).replace(/\s+/g, " ").trim();
+  const resumo =
+    linha.length > TAMANHO_TITULO ? `${linha.slice(0, TAMANHO_TITULO).trimEnd()}…` : linha;
+  return `[${ROTULO_TIPO_FEEDBACK[f.tipo]}] ${resumo}`;
+}
+
+/** Mensagem como citação Markdown (`> ` em cada linha, inclusive as vazias). */
+function citar(mensagem: string): string {
+  return limparTexto(mensagem)
+    .trim()
+    .split("\n")
+    .map((l) => (l.trim() === "" ? ">" : `> ${l}`))
+    .join("\n");
+}
+
+/** Texto inline num item de lista: uma linha só, sem crases que quebrem o código. */
+function inline(texto: string): string {
+  return limparTexto(texto).replace(/\s+/g, " ").trim();
+}
+
+function metadados(f: FeedbackExportavel, opcoes: OpcoesExportacao): string[] {
+  const linhas = [
+    `- **Tipo:** ${ROTULO_TIPO_FEEDBACK[f.tipo]}`,
+    `- **Página:** ${f.pagina ? `\`${inline(f.pagina).replace(/`/g, "")}\`` : "—"}`,
+    `- **Versão:** ${inline(f.versaoApp)} (${inline(f.commitApp)}) · **Navegador:** ${
+      f.userAgent ? inline(f.userAgent) : "—"
+    }`,
+    `- **Recebido em:** ${formatarDataHora(f.createdAt)}`,
+  ];
+  if (opcoes.incluirEmail) linhas.push(`- **Usuário:** ${inline(f.usuario)}`);
+  linhas.push(`- **Ref.:** feedback #${f.id}`);
+  return linhas;
+}
+
+/** Corpo da issue de um feedback. */
+export function corpoFeedback(f: FeedbackExportavel, opcoes: OpcoesExportacao = {}): string {
+  return ["## Feedback de usuário", citar(f.mensagem), "", ...metadados(f, opcoes)].join("\n");
+}
+
+/** Uma issue por feedback: título sugerido e corpo, em blocos separados. */
+export function markdownIssues(
+  itens: readonly FeedbackExportavel[],
+  opcoes: OpcoesExportacao = {},
+): string {
+  return itens
+    .map((f, i) =>
+      [
+        `<!-- Issue ${i + 1} de ${itens.length} -->`,
+        `**Título:** ${tituloFeedback(f)}`,
+        "",
+        corpoFeedback(f, opcoes),
+      ].join("\n"),
+    )
+    .join("\n\n---\n\n");
+}
+
+/** Uma issue agrupando todos: título sugerido e cada mensagem citada com seus dados. */
+export function markdownAgrupado(
+  itens: readonly FeedbackExportavel[],
+  opcoes: OpcoesExportacao = {},
+): string {
+  const blocos = itens.map((f, i) =>
+    [`### ${i + 1}. ${tituloFeedback(f)}`, citar(f.mensagem), "", ...metadados(f, opcoes)].join(
+      "\n",
+    ),
+  );
+  return [
+    `**Título:** Feedback de usuários (${itens.length})`,
+    "",
+    "## Feedbacks de usuários",
+    "",
+    blocos.join("\n\n"),
+  ].join("\n");
+}
+
+/** Array JSON com os campos (para scripts). */
+export function jsonFeedbacks(
+  itens: readonly FeedbackExportavel[],
+  opcoes: OpcoesExportacao = {},
+): string {
+  return JSON.stringify(
+    itens.map((f) => ({
+      id: f.id,
+      tipo: f.tipo,
+      status: f.status,
+      titulo: tituloFeedback(f),
+      mensagem: f.mensagem,
+      pagina: f.pagina,
+      versaoApp: f.versaoApp,
+      commit: f.commitApp,
+      navegador: f.userAgent,
+      recebidoEm: f.createdAt.toISOString(),
+      ...(opcoes.incluirEmail ? { usuario: f.usuario } : {}),
+    })),
+    null,
+    2,
+  );
+}
+
+/** Texto entre aspas simples para o shell (`'` vira `'\''`). */
+export function aspasShell(texto: string): string {
+  return `'${texto.replace(/'/g, "'\\''")}'`;
+}
+
+/** Delimitador do heredoc que não aparece como linha do corpo. */
+export function delimitadorHeredoc(corpo: string, base: string): string {
+  const linhas = new Set(corpo.split("\n"));
+  let delimitador = base;
+  while (linhas.has(delimitador)) delimitador = `${delimitador}_X`;
+  return delimitador;
+}
+
+/** `gh issue create` de um feedback, com o corpo num heredoc literal. */
+export function comandoGh(f: FeedbackExportavel, opcoes: OpcoesExportacao = {}): string {
+  const corpo = limparTexto(corpoFeedback(f, opcoes));
+  const delimitador = delimitadorHeredoc(corpo, `FEEDBACK_${f.id}`);
+  const label = LABEL_GITHUB_FEEDBACK[f.tipo];
+  const partes = [
+    "gh issue create",
+    `--repo ${REPOSITORIO_GITHUB}`,
+    `--title ${aspasShell(tituloFeedback(f))}`,
+    ...(label ? [`--label ${label}`] : []),
+    "--body-file -",
+    `<<'${delimitador}'`,
+  ];
+  return `${partes.join(" ")}\n${corpo}\n${delimitador}`;
+}
+
+/** Todos os comandos, prontos para colar num terminal bash/zsh com o `gh` autenticado. */
+export function comandosGh(
+  itens: readonly FeedbackExportavel[],
+  opcoes: OpcoesExportacao = {},
+): string {
+  return [
+    `# ${itens.length} ${itens.length === 1 ? "issue" : "issues"}: cole num terminal bash ou zsh com o gh autenticado.`,
+    ...itens.map((f) => comandoGh(f, opcoes)),
+  ].join("\n\n");
+}
+
+/** Conteúdo exportado no formato escolhido. */
+export function exportarFeedbacksComo(
+  formato: FormatoExportacaoFeedback,
+  itens: readonly FeedbackExportavel[],
+  opcoes: OpcoesExportacao = {},
+): string {
+  switch (formato) {
+    case "MARKDOWN_ISSUES":
+      return markdownIssues(itens, opcoes);
+    case "MARKDOWN_AGRUPADO":
+      return markdownAgrupado(itens, opcoes);
+    case "JSON":
+      return jsonFeedbacks(itens, opcoes);
+    case "GH":
+      return comandosGh(itens, opcoes);
+  }
+}
+
+/** Nome do arquivo baixado no formato JSON. */
+export function nomeArquivoFeedbacks(agora: Date): string {
+  return `feedbacks-${agora.toISOString().slice(0, 10)}.json`;
+}

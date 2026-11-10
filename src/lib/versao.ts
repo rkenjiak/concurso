@@ -49,7 +49,9 @@ export function rotuloVersao(info: Pick<VersaoApp, "versao" | "commit" | "ambien
   return info.ambiente === "production" ? v : `${v} · ${info.commit} · ${info.ambiente}`;
 }
 
-const REPOSITORIO = "https://github.com/rkenjiak/concurso";
+/** Repositório no GitHub (`dono/nome`), para links e para `gh --repo` (#117). */
+export const REPOSITORIO_GITHUB = "rkenjiak/concurso";
+const REPOSITORIO = `https://github.com/${REPOSITORIO_GITHUB}`;
 
 /** GitHub Release da versão ("O que há de novo"), criada pelo `release.yml` com a tag `vX.Y.Z`. */
 export function urlRelease(v: string = versao): string {

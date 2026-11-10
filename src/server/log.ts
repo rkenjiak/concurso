@@ -10,7 +10,9 @@
  *   qualquer texto, valores de parâmetros sensíveis de URL são removidos e e-mails mascarados; os
  *   `params` das queries do Drizzle saem das mensagens de erro. Mesmo assim, quem chama não deve
  *   passar segredos nem e-mails completos (use `mascararEmail`).
+ * - Linhas `error` levam `versaoApp` e `commit` da build (#118), para cruzar erros com deploys.
  */
+import { commit, versao } from "@/lib/versao";
 
 export const NIVEIS_LOG = ["debug", "info", "warn", "error"] as const;
 export type NivelLog = (typeof NIVEIS_LOG)[number];
@@ -66,7 +68,7 @@ const PARAM_SENSIVEL =
   /([?&](?:[\w-]*(?:token|senha|pass|secret|segredo|key|chave|cookie|auth|sess|e-?mail)[\w-]*|code|state)=)[^&#\s"']*/gi;
 const EMAIL = /([A-Za-z0-9._%+-])[A-Za-z0-9._%+-]*@([A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+)/g;
 const REMOVIDO = "[removido]";
-const CABECALHO = new Set(["ts", "nivel", "evento"]);
+const CABECALHO = new Set(["ts", "nivel", "evento", "versaoApp", "commit"]);
 
 /** Remove de um texto (URL, mensagem de erro) os valores de parâmetros de query sensíveis. */
 export function semSegredosNaUrl(texto: string): string {
@@ -168,10 +170,11 @@ function registrar(
   const limpos = limpar(campos) as CamposLog;
   // Campos não sobrescrevem o cabeçalho da linha.
   for (const chave of CABECALHO) delete limpos[chave];
+  const build: CamposLog = nivel === "error" ? { versaoApp: versao, commit } : {};
   const linha =
     config.formato === "json"
-      ? linhaJson({ ts, nivel, evento, ...limpos })
-      : linhaTexto(ts, nivel, evento, limpos);
+      ? linhaJson({ ts, nivel, evento, ...build, ...limpos })
+      : linhaTexto(ts, nivel, evento, { ...build, ...limpos });
   const stderr = config.saida === "stderr" || PESO[nivel] >= PESO.warn;
   if (stderr) console.error(linha);
   else console.log(linha);

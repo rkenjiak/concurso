@@ -13,6 +13,9 @@
  * `concursos[].notificacoesSilenciadas`, `regrasNotificacao` e `notificacoes` (lembretes, #65:
  * regras personalizadas e estado de leitura/dispensa; ausentes = padrão, nada lido). Versões
  * antigas do app ignoram esses campos ao importar um backup novo.
+ *
+ * `versaoApp` (#118) é só informativo: a versão do app que exportou (ex.: `2.7.0`). Opcional e
+ * ignorado na importação; a compatibilidade continua sendo checada por `schemaVersion`.
  */
 import { z } from "zod";
 import { COR_CONCURSO, ehIconeValido } from "@/domain/cores";
@@ -265,6 +268,7 @@ function checarIntegridade(dados: Dados, ctx: z.RefinementCtx): void {
 export const backupSchema = z.object({
   app: z.literal(APP_BACKUP),
   schemaVersion: z.literal(VERSAO_BACKUP),
+  versaoApp: z.string().max(100).optional(),
   exportadoEm: z.iso.datetime({ offset: true }),
   dados: dadosBackup.superRefine(checarIntegridade),
 });

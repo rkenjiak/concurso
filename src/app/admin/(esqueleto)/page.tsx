@@ -6,6 +6,7 @@ import {
   ClipboardList,
   KeyRound,
   type LucideIcon,
+  MessageSquare,
   PlugZap,
   ShieldCheck,
   Users,
@@ -23,6 +24,7 @@ import { URL_CHANGELOG, urlCommit, urlRelease, VERSAO_APP } from "@/lib/versao";
 import { exigirAdminPagina } from "@/server/auth/admin";
 import { getDb } from "@/server/db/client";
 import { listarAuditoria, obterResumo } from "@/server/repositories/admin";
+import { contarFeedbacksNovos } from "@/server/repositories/feedback";
 
 export const metadata: Metadata = { title: "Visão geral" };
 
@@ -113,7 +115,11 @@ export default async function AdminPage() {
   await connection();
   await exigirAdminPagina();
   const db = getDb();
-  const [resumo, recentes] = await Promise.all([obterResumo(db), listarAuditoria(db, 5)]);
+  const [resumo, recentes, novosFeedback] = await Promise.all([
+    obterResumo(db),
+    listarAuditoria(db, 5),
+    contarFeedbacksNovos(db),
+  ]);
   const totais = [
     { rotulo: "Usuários", valor: resumo.usuarios, icone: Users },
     { rotulo: "Admins ativos", valor: resumo.admins, icone: ShieldCheck },
@@ -154,6 +160,24 @@ export default async function AdminPage() {
           <code>pnpm mcp</code>) não usa token e não é contado.
         </p>
       </section>
+      <Card>
+        <CardHeader>
+          <CardTitle>Feedback</CardTitle>
+          <CardAction>
+            <Button asChild variant="outline" size="sm">
+              <Link href="/admin/feedback">Abrir caixa de entrada</Link>
+            </Button>
+          </CardAction>
+        </CardHeader>
+        <CardContent className="flex items-center gap-3">
+          <MessageSquare className="size-5 text-muted-foreground" aria-hidden />
+          <p className="text-sm">
+            <span className="font-semibold text-2xl tabular-nums">{novosFeedback}</span>{" "}
+            {novosFeedback === 1 ? "feedback novo" : "feedbacks novos"}, enviados pelo menu da
+            conta.
+          </p>
+        </CardContent>
+      </Card>
       <Card>
         <CardHeader>
           <CardTitle>Ações recentes</CardTitle>

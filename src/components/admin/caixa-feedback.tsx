@@ -73,6 +73,9 @@ export function CaixaFeedback({ itens, status }: CaixaFeedbackProps) {
   if (quantidade > 0) houveSelecao.current = true;
   const descartados = status === "DESCARTADO";
   const itensSelecionados = itens.filter((i) => selecionados.has(i.id));
+  // Descartados não são exportados (o servidor também os ignora): restaure-os antes.
+  const exportaveis = itensSelecionados.filter((i) => i.status !== "DESCARTADO");
+  const descartadosNaSelecao = itensSelecionados.length - exportaveis.length;
 
   const limpar = useCallback(() => {
     setSelecao(new Set());
@@ -99,15 +102,15 @@ export function CaixaFeedback({ itens, status }: CaixaFeedbackProps) {
         return;
       }
       limpar();
-      const { anteriores } = r.data;
+      const { anteriores, descartadoEm } = r.data;
       avisar({
         texto: `${plural(anteriores.length, "feedback descartado", "feedbacks descartados")}.`,
         acao:
-          anteriores.length > 0
+          anteriores.length > 0 && descartadoEm !== null
             ? {
                 rotulo: "Desfazer",
                 executar: async () => {
-                  const d = await desfazerDescarteAcao(anteriores);
+                  const d = await desfazerDescarteAcao({ anteriores, descartadoEm });
                   avisar(
                     d.ok
                       ? { texto: "Descarte desfeito." }
@@ -270,7 +273,16 @@ export function CaixaFeedback({ itens, status }: CaixaFeedbackProps) {
               </>
             ) : (
               <>
-                <Button size="sm" onClick={() => setExportando(true)} disabled={pendente}>
+                <Button
+                  size="sm"
+                  onClick={() => setExportando(true)}
+                  disabled={pendente || exportaveis.length === 0}
+                  title={
+                    exportaveis.length === 0
+                      ? "Descartados não são exportados: restaure-os antes."
+                      : undefined
+                  }
+                >
                   <Download aria-hidden />
                   Exportar
                 </Button>
@@ -291,7 +303,8 @@ export function CaixaFeedback({ itens, status }: CaixaFeedbackProps) {
       <DialogoExportarFeedback
         aberto={exportando}
         aoMudarAberto={setExportando}
-        itens={itensSelecionados}
+        itens={exportaveis}
+        descartadosIgnorados={descartadosNaSelecao}
         aoExportar={limpar}
       />
       <DialogoConfirmar

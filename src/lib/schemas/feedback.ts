@@ -57,6 +57,15 @@ export const anterioresFeedbackSchema = z
   .min(1, "Selecione ao menos um feedback.")
   .max(MAX_LOTE_FEEDBACK, `Selecione no máximo ${MAX_LOTE_FEEDBACK} feedbacks por vez.`);
 
+/** Desfazer um descarte: os itens e o instante daquele descarte (epoch ms), que o amarra a ele. */
+export const desfazerDescarteSchema = z.object(
+  {
+    anteriores: anterioresFeedbackSchema,
+    descartadoEm: z.number({ error: "Descarte inválido." }).int().positive("Descarte inválido."),
+  },
+  { error: "Descarte inválido." },
+);
+
 /** Filtro de status da caixa de entrada (`TODOS` = sem filtro). */
 export const FILTRO_STATUS_FEEDBACK = ["NOVO", "EXPORTADO", "DESCARTADO", "TODOS"] as const;
 export type FiltroStatusFeedback = (typeof FILTRO_STATUS_FEEDBACK)[number];

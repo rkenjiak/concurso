@@ -182,7 +182,9 @@ describe("ações do admin", () => {
     const negado = { ok: false, erros: { _form: [MENSAGEM_SEM_PERMISSAO] } };
     expect(await exportarFeedbacksAcao(ids, "JSON", false)).toEqual(negado);
     expect(await descartarFeedbacksAcao(ids)).toEqual(negado);
-    expect(await desfazerDescarteAcao([{ id: ids[0], status: "NOVO" }])).toEqual(negado);
+    expect(
+      await desfazerDescarteAcao({ anteriores: [{ id: ids[0], status: "NOVO" }], descartadoEm: 1 }),
+    ).toEqual(negado);
     expect(await restaurarFeedbacksAcao(ids)).toEqual(negado);
     expect(await excluirFeedbacksAcao(ids)).toEqual(negado);
     expect((await linhas()).map((f) => f.status)).toEqual(["NOVO", "NOVO", "NOVO"]);
@@ -223,7 +225,7 @@ describe("ações do admin", () => {
     ]);
 
     const comEmail = await exportarFeedbacksAcao([ids[0]], "GH", true);
-    expect(comEmail.ok && comEmail.data.conteudo).toContain("- **Usuário:** bia@x.com");
+    expect(comEmail.ok && comEmail.data.conteudo).toContain("- **Usuário:** `bia@x.com`");
     expect(await auditoria()).toHaveLength(2);
     expect((await auditoria())[1]?.alvo).toBe("1 feedback");
   });
@@ -239,6 +241,7 @@ describe("ações do admin", () => {
           { id: ids[1], status: "NOVO" },
           { id: ids[2], status: "NOVO" },
         ],
+        descartadoEm: expect.any(Number),
       },
     });
     expect((await linhas()).map((f) => f.status)).toEqual([
@@ -247,17 +250,30 @@ describe("ações do admin", () => {
       "DESCARTADO",
     ]);
     // Descartar de novo não muda nada nem audita.
-    expect(await descartarFeedbacksAcao(ids)).toEqual({ ok: true, data: { anteriores: [] } });
-
-    if (!descarte.ok) return;
-    expect(await desfazerDescarteAcao(descarte.data.anteriores.slice(0, 2))).toEqual({
+    expect(await descartarFeedbacksAcao(ids)).toEqual({
       ok: true,
-      data: { restaurados: 2 },
+      data: { anteriores: [], descartadoEm: null },
     });
+
+    if (!descarte.ok || descarte.data.descartadoEm === null) return;
+    const { descartadoEm } = descarte.data;
+    expect(
+      await desfazerDescarteAcao({
+        anteriores: descarte.data.anteriores.slice(0, 2),
+        descartadoEm,
+      }),
+    ).toEqual({ ok: true, data: { restaurados: 2 } });
     expect(await statusDe(ids[0] as number)).toBe("EXPORTADO");
     expect(await statusDe(ids[1] as number)).toBe("NOVO");
-    // Desfazer não aceita voltar para DESCARTADO.
-    expect((await desfazerDescarteAcao([{ id: ids[0], status: "DESCARTADO" }])).ok).toBe(false);
+    // Desfazer só aceita voltar para NOVO ou EXPORTADO, e exige o instante do descarte.
+    for (const entrada of [
+      { anteriores: [{ id: ids[0], status: "DESCARTADO" }], descartadoEm },
+      { anteriores: [{ id: ids[0], status: "APROVADO" }], descartadoEm },
+      { anteriores: [{ id: ids[0], status: "NOVO" }] },
+      [{ id: ids[0], status: "NOVO" }],
+    ]) {
+      expect((await desfazerDescarteAcao(entrada)).ok).toBe(false);
+    }
 
     // Excluir ignora quem não está descartado.
     expect(await excluirFeedbacksAcao([ids[0], ids[2]])).toEqual({
@@ -278,6 +294,62 @@ describe("ações do admin", () => {
       ["DESCARTAR_FEEDBACK", "1 feedback"],
       ["RESTAURAR_FEEDBACK", "1 feedback"],
     ]);
+  });
+
+  it("desfazer antigo não reverte mudanças posteriores (outro admin ou novo descarte)", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      const carla = await criarUsuarioTeste(estado.db, "carla@x.com");
+      await estado.db.update(usuario).set({ papel: "ADMIN" }).where(eq(usuario.id, carla));
+      const ana = await sessaoDe(ID_USUARIO_INICIAL);
+      const sessaoCarla = await sessaoDe(carla);
+      const alvo = ids[0] as number;
+
+      // Ana descarta (o aviso com "Desfazer" fica aberto).
+      vi.setSystemTime(new Date("2026-11-09T12:00:00Z"));
+      estado.usuario = ana;
+      const descarte = await descartarFeedbacksAcao([alvo]);
+      if (!descarte.ok || descarte.data.descartadoEm === null) throw new Error("sem descarte");
+      const desfazerDaAna = {
+        anteriores: descarte.data.anteriores,
+        descartadoEm: descarte.data.descartadoEm,
+      };
+
+      // Carla restaura, exporta e descarta de novo.
+      estado.usuario = sessaoCarla;
+      vi.setSystemTime(new Date("2026-11-09T12:01:00Z"));
+      await restaurarFeedbacksAcao([alvo]);
+      vi.setSystemTime(new Date("2026-11-09T12:02:00Z"));
+      await exportarFeedbacksAcao([alvo], "JSON", false);
+      vi.setSystemTime(new Date("2026-11-09T12:03:00Z"));
+      await descartarFeedbacksAcao([alvo]);
+
+      // O desfazer antigo da Ana não mexe no descarte da Carla.
+      estado.usuario = ana;
+      expect(await desfazerDescarteAcao(desfazerDaAna)).toEqual({
+        ok: true,
+        data: { restaurados: 0 },
+      });
+      expect(await statusDe(alvo)).toBe("DESCARTADO");
+
+      // Nem o da própria Ana depois de ela restaurar e descartar de novo.
+      vi.setSystemTime(new Date("2026-11-09T12:04:00Z"));
+      await restaurarFeedbacksAcao([alvo]);
+      vi.setSystemTime(new Date("2026-11-09T12:05:00Z"));
+      const novo = await descartarFeedbacksAcao([alvo]);
+      expect(await desfazerDescarteAcao(desfazerDaAna)).toEqual({
+        ok: true,
+        data: { restaurados: 0 },
+      });
+      // O desfazer do descarte atual funciona, e uma vez só.
+      if (!novo.ok || novo.data.descartadoEm === null) throw new Error("sem descarte");
+      const atual = { anteriores: novo.data.anteriores, descartadoEm: novo.data.descartadoEm };
+      expect(await desfazerDescarteAcao(atual)).toEqual({ ok: true, data: { restaurados: 1 } });
+      expect(await statusDe(alvo)).toBe("NOVO");
+      expect(await desfazerDescarteAcao(atual)).toEqual({ ok: true, data: { restaurados: 0 } });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("exportar não tira itens de DESCARTADO (nem os inclui no conteúdo)", async () => {

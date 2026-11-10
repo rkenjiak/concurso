@@ -14,7 +14,7 @@ import { headers } from "next/headers";
 import { normalizarUserAgent } from "@/domain/feedback";
 import { exportarFeedbacksComo } from "@/lib/feedback-exportacao";
 import {
-  anterioresFeedbackSchema,
+  desfazerDescarteSchema,
   type FormatoExportacaoFeedback,
   feedbackSchema,
   formatoExportacaoSchema,
@@ -27,11 +27,11 @@ import { getDb } from "../db/client";
 import { log } from "../log";
 import {
   criarFeedback,
+  type Descarte,
   descartarFeedbacks,
   excluirFeedbacks,
   exportarFeedbacks,
   restaurarFeedbacks,
-  type StatusAnterior,
 } from "../repositories/feedback";
 import { executar, falhaValidacao, type ResultadoAcao, sucesso } from "./resultado";
 
@@ -87,35 +87,45 @@ export async function exportarFeedbacksAcao(
   );
 }
 
-/** Descarta (sem apagar). Devolve o status anterior de cada item, para o "Desfazer". */
-export async function descartarFeedbacksAcao(
-  idsBrutos: unknown,
-): Promise<ResultadoAcao<{ anteriores: StatusAnterior[] }>> {
+/**
+ * Descarta (sem apagar). Devolve o status anterior de cada item e o instante do descarte, para o
+ * "Desfazer".
+ */
+export async function descartarFeedbacksAcao(idsBrutos: unknown): Promise<ResultadoAcao<Descarte>> {
   const sessao = await exigirAdminAcao();
   if (!sessao.ok) return sessao;
   const ids = idsFeedbackSchema.safeParse(idsBrutos);
   if (!ids.success) return falhaValidacao(ids.error);
   return executar(
     async () => {
-      const anteriores = await descartarFeedbacks(getDb(), sessao.usuario, ids.data);
+      const descarte = await descartarFeedbacks(getDb(), sessao.usuario, ids.data);
       atualizarPainel();
-      return sucesso({ anteriores });
+      return sucesso(descarte);
     },
     { acao: "feedback.descartarFeedbacksAcao", usuarioId: sessao.usuario.id },
   );
 }
 
-/** Desfaz um descarte: cada item volta ao status que tinha. */
+/**
+ * Desfaz um descarte: cada item volta ao status que tinha, mas só se ainda estiver naquele
+ * descarte (mesmo admin, mesmo instante). Um desfazer antigo não reverte mudanças posteriores.
+ */
 export async function desfazerDescarteAcao(
-  anterioresBrutos: unknown,
+  entrada: unknown,
 ): Promise<ResultadoAcao<{ restaurados: number }>> {
   const sessao = await exigirAdminAcao();
   if (!sessao.ok) return sessao;
-  const anteriores = anterioresFeedbackSchema.safeParse(anterioresBrutos);
-  if (!anteriores.success) return falhaValidacao(anteriores.error);
+  const dados = desfazerDescarteSchema.safeParse(entrada);
+  if (!dados.success) return falhaValidacao(dados.error);
   return executar(
     async () => {
-      const restaurados = await restaurarFeedbacks(getDb(), sessao.usuario, anteriores.data);
+      const restaurados = await restaurarFeedbacks(
+        getDb(),
+        sessao.usuario,
+        dados.data.anteriores,
+        undefined,
+        { descartadoEm: dados.data.descartadoEm },
+      );
       atualizarPainel();
       return sucesso({ restaurados });
     },

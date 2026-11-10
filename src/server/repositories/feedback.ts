@@ -182,21 +182,31 @@ export interface StatusAnterior {
   status: Exclude<StatusFeedback, "DESCARTADO">;
 }
 
-/** Descarta (sem apagar). Devolve o status anterior dos que mudaram; já descartados ficam iguais. */
+/**
+ * Resultado de um descarte, para o "Desfazer": o status anterior de cada item que mudou e o
+ * instante do descarte (`tratado_em`), que amarra o desfazer a este descarte.
+ */
+export interface Descarte {
+  anteriores: StatusAnterior[];
+  /** Epoch ms; `null` se nada mudou. */
+  descartadoEm: number | null;
+}
+
+/** Descarta (sem apagar). Já descartados ficam iguais e não entram no resultado. */
 export async function descartarFeedbacks(
   db: Db,
   autor: AdminFeedback,
   ids: readonly number[],
   agora: Date = new Date(),
-): Promise<StatusAnterior[]> {
+): Promise<Descarte> {
   conferirLote(ids);
-  if (ids.length === 0) return [];
+  if (ids.length === 0) return { anteriores: [], descartadoEm: null };
   return db.transaction(async (tx) => {
     const antes = await tx
       .select({ id: feedback.id, status: feedback.status })
       .from(feedback)
       .where(and(inArray(feedback.id, [...ids]), ne(feedback.status, "DESCARTADO")));
-    if (antes.length === 0) return [];
+    if (antes.length === 0) return { anteriores: [], descartadoEm: null };
     await tx
       .update(feedback)
       .set({ status: "DESCARTADO", tratadoPor: autor.id, tratadoEm: agora })
@@ -207,19 +217,24 @@ export async function descartarFeedbacks(
         ),
       );
     await auditar(tx, autor, "DESCARTAR_FEEDBACK", quantidadeFeedbacks(antes.length), null, agora);
-    return antes as StatusAnterior[];
+    return { anteriores: antes as StatusAnterior[], descartadoEm: agora.getTime() };
   });
 }
 
 /**
  * Tira itens de `DESCARTADO`: para `NOVO` (restaurar, na aba Descartados) ou para o status que
  * cada um tinha (desfazer o descarte). Itens que não estão descartados ficam como estão.
+ *
+ * Com `descarte` (desfazer), só volta o item que **ainda está naquele descarte**: descartado pelo
+ * mesmo admin, com o mesmo `tratado_em`. Se alguém restaurou, exportou ou descartou de novo
+ * depois, o desfazer antigo não mexe nele. Status alegado fora de `NOVO`/`EXPORTADO` é ignorado.
  */
 export async function restaurarFeedbacks(
   db: Db,
   autor: AdminFeedback,
   itens: readonly StatusAnterior[],
   agora: Date = new Date(),
+  descarte?: { descartadoEm: number },
 ): Promise<number> {
   conferirLote(itens);
   if (itens.length === 0) return 0;
@@ -231,7 +246,14 @@ export async function restaurarFeedbacks(
       const linhas = await tx
         .update(feedback)
         .set({ status, tratadoPor: autor.id, tratadoEm: agora })
-        .where(and(inArray(feedback.id, ids), eq(feedback.status, "DESCARTADO")))
+        .where(
+          and(
+            inArray(feedback.id, ids),
+            eq(feedback.status, "DESCARTADO"),
+            descarte ? eq(feedback.tratadoEm, new Date(descarte.descartadoEm)) : undefined,
+            descarte ? eq(feedback.tratadoPor, autor.id) : undefined,
+          ),
+        )
         .returning({ id: feedback.id });
       alterados += linhas.length;
     }

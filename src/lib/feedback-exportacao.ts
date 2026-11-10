@@ -71,21 +71,36 @@ function citar(mensagem: string): string {
     .join("\n");
 }
 
-/** Texto inline num item de lista: uma linha só, sem crases que quebrem o código. */
+/** Texto inline num item de lista: uma linha só. */
 function inline(texto: string): string {
   return limparTexto(texto).replace(/\s+/g, " ").trim();
+}
+
+/**
+ * Texto livre (navegador, e-mail, página) como código inline: no GitHub nada dentro dele vira
+ * menção, referência, link, HTML ou formatação, e numa linha só ele não quebra a lista. A cerca
+ * usa mais crases que a maior sequência do texto (regra do CommonMark), com espaços quando o texto
+ * começa ou termina em crase.
+ */
+export function codigoInline(texto: string): string {
+  const t = inline(texto);
+  if (t === "") return "—";
+  const maior = Math.max(0, ...(t.match(/`+/g) ?? []).map((c) => c.length));
+  const cerca = "`".repeat(maior + 1);
+  const espaco = t.startsWith("`") || t.endsWith("`") ? " " : "";
+  return `${cerca}${espaco}${t}${espaco}${cerca}`;
 }
 
 function metadados(f: FeedbackExportavel, opcoes: OpcoesExportacao): string[] {
   const linhas = [
     `- **Tipo:** ${ROTULO_TIPO_FEEDBACK[f.tipo]}`,
-    `- **Página:** ${f.pagina ? `\`${inline(f.pagina).replace(/`/g, "")}\`` : "—"}`,
+    `- **Página:** ${f.pagina ? codigoInline(f.pagina) : "—"}`,
     `- **Versão:** ${inline(f.versaoApp)} (${inline(f.commitApp)}) · **Navegador:** ${
-      f.userAgent ? inline(f.userAgent) : "—"
+      f.userAgent ? codigoInline(f.userAgent) : "—"
     }`,
     `- **Recebido em:** ${formatarDataHora(f.createdAt)}`,
   ];
-  if (opcoes.incluirEmail) linhas.push(`- **Usuário:** ${inline(f.usuario)}`);
+  if (opcoes.incluirEmail) linhas.push(`- **Usuário:** ${codigoInline(f.usuario)}`);
   linhas.push(`- **Ref.:** feedback nº ${f.id}`);
   return linhas;
 }

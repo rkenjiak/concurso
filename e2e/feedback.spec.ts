@@ -115,7 +115,14 @@ test("feedback: enviar → selecionar vários (mouse e teclado) → exportar →
   await expect(previa).not.toHaveValue(/\*\*Usuário:\*\*/);
   await exportar.getByLabel(/Incluir e-mail do usuário/).check();
   await expect(previa).toHaveValue(/\*\*Usuário:\*\*/);
-  await exportar.getByLabel(/Incluir e-mail do usuário/).uncheck();
+  // Fechar (Esc) e reabrir volta ao padrão seguro: sem e-mail.
+  await page.keyboard.press("Escape");
+  await expect(exportar).toBeHidden();
+  await expect(barra(page)).toContainText("3 selecionados");
+  await barra(page).getByRole("button", { name: "Exportar" }).click();
+  await expect(exportar.getByLabel(/Incluir e-mail do usuário/)).not.toBeChecked();
+  await exportar.getByRole("radio", { name: /Comandos gh/ }).check();
+  await expect(previa).not.toHaveValue(/\*\*Usuário:\*\*/);
   await exportar.getByRole("button", { name: "Copiar e marcar como exportados" }).click();
   await expect(exportar).toBeHidden();
   await expect(

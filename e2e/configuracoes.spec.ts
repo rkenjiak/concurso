@@ -1,13 +1,14 @@
 import { expect, type Page, test } from "@playwright/test";
 
 /** Seções (h2) e cards (h3) de Configurações, na ordem da página, com a âncora de cada card (#106). */
-const SECOES = ["Avisos", "Dados", "Integrações", "Conta"];
+const SECOES = ["Avisos", "Dados", "Integrações", "Conta", "Sobre"];
 const CARDS = [
   { id: "notificacoes", titulo: "Notificações" },
   { id: "calendario", titulo: "Calendário (.ics)" },
   { id: "exportar", titulo: "Exportar e importar" },
   { id: "mcp", titulo: "Token do MCP" },
   { id: "acesso", titulo: "Acesso" },
+  { id: "sobre", titulo: "Versão" },
 ];
 
 const indice = (page: Page) => page.getByRole("navigation", { name: "Nesta página" });

@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { normalizarTema, ROTULO_TEMA, TEMAS } from "@/lib/tema";
 import { cn } from "@/lib/utils";
+import { rotuloVersao, VERSAO_APP } from "@/lib/versao";
 import { logout } from "@/server/actions/auth";
 import { alternarVisaoAcao } from "@/server/actions/visao";
 import type { Visao } from "@/server/auth/visao";
@@ -105,8 +106,9 @@ function Avatar({ conta }: { conta: ContaMenu }) {
 
 /**
  * Menu da conta (avatar): nome, alternância "Visão usuário" ↔ "Visão admin" (só admins, #50),
- * Configurações e tema (só no modo compacto, #105 e #78) e Sair. A troca de visão não exige novo
- * login. No desktop, Configurações fica só na navegação lateral (#82); no celular, só aqui (#105).
+ * Configurações e tema (só no modo compacto, #105 e #78), Sair e, no rodapé, a versão do app
+ * (#118; em preview e dev, também o commit e o ambiente). A troca de visão não exige novo login.
+ * No desktop, Configurações fica só na navegação lateral (#82); no celular, só aqui (#105).
  */
 export function MenuConta({
   conta,
@@ -197,6 +199,10 @@ export function MenuConta({
             Sair
           </DropdownMenuItem>
         ) : null}
+        <DropdownMenuSeparator />
+        <DropdownMenuLabel className="font-normal tabular-nums">
+          {rotuloVersao(VERSAO_APP)}
+        </DropdownMenuLabel>
       </DropdownMenuContent>
     </DropdownMenu>
   );

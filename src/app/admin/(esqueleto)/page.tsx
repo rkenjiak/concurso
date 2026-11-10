@@ -13,10 +13,13 @@ import {
 import type { Metadata } from "next";
 import Link from "next/link";
 import { connection } from "next/server";
+import type { ReactNode } from "react";
 import { TabelaAuditoria } from "@/components/admin/tabela-auditoria";
 import { CabecalhoPagina } from "@/components/layout/cabecalho-pagina";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { formatarDataHora } from "@/lib/format";
+import { URL_CHANGELOG, urlCommit, urlRelease, VERSAO_APP } from "@/lib/versao";
 import { exigirAdminPagina } from "@/server/auth/admin";
 import { getDb } from "@/server/db/client";
 import { listarAuditoria, obterResumo } from "@/server/repositories/admin";
@@ -41,6 +44,66 @@ function CartaoTotal({
           <p className="text-muted-foreground text-xs">{rotulo}</p>
           <p className="font-semibold text-2xl tabular-nums">{valor}</p>
         </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function Item({ rotulo, children }: { rotulo: string; children: ReactNode }) {
+  return (
+    <div className="space-y-0.5">
+      <dt className="text-muted-foreground text-xs">{rotulo}</dt>
+      <dd className="text-sm">{children}</dd>
+    </div>
+  );
+}
+
+const LINK = "font-medium text-primary underline-offset-4 hover:underline";
+
+/** Build no ar (#118): versão, commit, ambiente e data do build, fixados no `next build`. */
+function CartaoVersao() {
+  const { versao, commit, ambiente, dataBuild } = VERSAO_APP;
+  const linkCommit = urlCommit(commit);
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Versão no ar</CardTitle>
+        <CardAction>
+          <Button asChild variant="outline" size="sm">
+            <a href={URL_CHANGELOG} target="_blank" rel="noopener noreferrer">
+              CHANGELOG<span className="sr-only"> (abre em nova aba)</span>
+            </a>
+          </Button>
+        </CardAction>
+      </CardHeader>
+      <CardContent>
+        <dl className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          <Item rotulo="Versão">
+            <a href={urlRelease(versao)} target="_blank" rel="noopener noreferrer" className={LINK}>
+              {versao}
+              <span className="sr-only"> (release no GitHub, abre em nova aba)</span>
+            </a>
+          </Item>
+          <Item rotulo="Commit">
+            {linkCommit ? (
+              <a
+                href={linkCommit}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`${LINK} font-mono`}
+              >
+                {commit}
+                <span className="sr-only"> (commit no GitHub, abre em nova aba)</span>
+              </a>
+            ) : (
+              <span className="font-mono">{commit}</span>
+            )}
+          </Item>
+          <Item rotulo="Ambiente">{ambiente}</Item>
+          <Item rotulo="Data do build">
+            {formatarDataHora(dataBuild ? new Date(dataBuild) : null)}
+          </Item>
+        </dl>
       </CardContent>
     </Card>
   );
@@ -104,6 +167,7 @@ export default async function AdminPage() {
           <TabelaAuditoria registros={recentes} />
         </CardContent>
       </Card>
+      <CartaoVersao />
     </div>
   );
 }

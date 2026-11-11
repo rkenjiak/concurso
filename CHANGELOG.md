@@ -7,6 +7,8 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 
 ## [Unreleased]
 
+## [2.8.0] - 2026-11-10
+
 ### Adicionado
 
 - **Versão do app no site** (#118): o rodapé do menu da conta mostra `v2.7.0` (em preview e dev,

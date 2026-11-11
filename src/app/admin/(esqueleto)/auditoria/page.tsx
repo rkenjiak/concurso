@@ -19,7 +19,7 @@ export default async function AuditoriaPage() {
     <div className="space-y-6">
       <CabecalhoPagina
         titulo="Auditoria"
-        descricao={`Ações administrativas: papéis, bloqueios e lista de acesso (últimas ${LIMITE}).`}
+        descricao={`Ações administrativas: papéis, bloqueios, lista de acesso e feedback, um registro por lote (últimas ${LIMITE}).`}
       />
       <Card>
         <CardContent>

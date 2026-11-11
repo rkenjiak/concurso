@@ -15,6 +15,10 @@ process.chdir(fileURLToPath(new URL("..", import.meta.url)));
 const { carregarEnv } = await import("./env");
 carregarEnv();
 
+// Versão e commit (#118) como o `next build` os fixaria, antes de qualquer import que os leia.
+const { definirVersaoNoAmbiente } = await import("../src/lib/versao-build");
+definirVersaoNoAmbiente();
+
 // Logs da aplicação (#91) também só no stderr: o stdout é do protocolo.
 const { configurarLog, log } = await import("../src/server/log");
 configurarLog({ saida: "stderr" });

@@ -6,6 +6,7 @@ import {
   ClipboardList,
   KeyRound,
   type LucideIcon,
+  MessageSquare,
   PlugZap,
   ShieldCheck,
   Users,
@@ -13,13 +14,17 @@ import {
 import type { Metadata } from "next";
 import Link from "next/link";
 import { connection } from "next/server";
+import type { ReactNode } from "react";
 import { TabelaAuditoria } from "@/components/admin/tabela-auditoria";
 import { CabecalhoPagina } from "@/components/layout/cabecalho-pagina";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { formatarDataHora } from "@/lib/format";
+import { URL_CHANGELOG, urlCommit, urlRelease, VERSAO_APP } from "@/lib/versao";
 import { exigirAdminPagina } from "@/server/auth/admin";
 import { getDb } from "@/server/db/client";
 import { listarAuditoria, obterResumo } from "@/server/repositories/admin";
+import { contarFeedbacksNovos } from "@/server/repositories/feedback";
 
 export const metadata: Metadata = { title: "Visão geral" };
 
@@ -46,11 +51,75 @@ function CartaoTotal({
   );
 }
 
+function Item({ rotulo, children }: { rotulo: string; children: ReactNode }) {
+  return (
+    <div className="space-y-0.5">
+      <dt className="text-muted-foreground text-xs">{rotulo}</dt>
+      <dd className="text-sm">{children}</dd>
+    </div>
+  );
+}
+
+const LINK = "font-medium text-primary underline-offset-4 hover:underline";
+
+/** Build no ar (#118): versão, commit, ambiente e data do build, fixados no `next build`. */
+function CartaoVersao() {
+  const { versao, commit, ambiente, dataBuild } = VERSAO_APP;
+  const linkCommit = urlCommit(commit);
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Versão no ar</CardTitle>
+        <CardAction>
+          <Button asChild variant="outline" size="sm">
+            <a href={URL_CHANGELOG} target="_blank" rel="noopener noreferrer">
+              CHANGELOG<span className="sr-only"> (abre em nova aba)</span>
+            </a>
+          </Button>
+        </CardAction>
+      </CardHeader>
+      <CardContent>
+        <dl className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          <Item rotulo="Versão">
+            <a href={urlRelease(versao)} target="_blank" rel="noopener noreferrer" className={LINK}>
+              {versao}
+              <span className="sr-only"> (release no GitHub, abre em nova aba)</span>
+            </a>
+          </Item>
+          <Item rotulo="Commit">
+            {linkCommit ? (
+              <a
+                href={linkCommit}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`${LINK} font-mono`}
+              >
+                {commit}
+                <span className="sr-only"> (commit no GitHub, abre em nova aba)</span>
+              </a>
+            ) : (
+              <span className="font-mono">{commit}</span>
+            )}
+          </Item>
+          <Item rotulo="Ambiente">{ambiente}</Item>
+          <Item rotulo="Data do build">
+            {formatarDataHora(dataBuild ? new Date(dataBuild) : null)}
+          </Item>
+        </dl>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default async function AdminPage() {
   await connection();
   await exigirAdminPagina();
   const db = getDb();
-  const [resumo, recentes] = await Promise.all([obterResumo(db), listarAuditoria(db, 5)]);
+  const [resumo, recentes, novosFeedback] = await Promise.all([
+    obterResumo(db),
+    listarAuditoria(db, 5),
+    contarFeedbacksNovos(db),
+  ]);
   const totais = [
     { rotulo: "Usuários", valor: resumo.usuarios, icone: Users },
     { rotulo: "Admins ativos", valor: resumo.admins, icone: ShieldCheck },
@@ -93,6 +162,24 @@ export default async function AdminPage() {
       </section>
       <Card>
         <CardHeader>
+          <CardTitle>Feedback</CardTitle>
+          <CardAction>
+            <Button asChild variant="outline" size="sm">
+              <Link href="/admin/feedback">Abrir caixa de entrada</Link>
+            </Button>
+          </CardAction>
+        </CardHeader>
+        <CardContent className="flex items-center gap-3">
+          <MessageSquare className="size-5 text-muted-foreground" aria-hidden />
+          <p className="text-sm">
+            <span className="font-semibold text-2xl tabular-nums">{novosFeedback}</span>{" "}
+            {novosFeedback === 1 ? "feedback novo" : "feedbacks novos"}, enviados pelo menu da
+            conta.
+          </p>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
           <CardTitle>Ações recentes</CardTitle>
           <CardAction>
             <Button asChild variant="outline" size="sm">
@@ -104,6 +191,7 @@ export default async function AdminPage() {
           <TabelaAuditoria registros={recentes} />
         </CardContent>
       </Card>
+      <CartaoVersao />
     </div>
   );
 }

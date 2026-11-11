@@ -1,3 +1,4 @@
+import { ExternalLink } from "lucide-react";
 import type { Metadata } from "next";
 import { connection } from "next/server";
 import type { ReactNode } from "react";
@@ -8,6 +9,7 @@ import { RegrasNotificacao } from "@/components/configuracoes/regras-notificacao
 import { TokenMcp } from "@/components/configuracoes/token-mcp";
 import { CabecalhoPagina } from "@/components/layout/cabecalho-pagina";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { rotuloVersao, URL_CHANGELOG, urlRelease, VERSAO_APP } from "@/lib/versao";
 import { exigirUsuarioPagina } from "@/server/auth/acesso";
 import { lerConfigAuth } from "@/server/auth/config";
 import { getDb } from "@/server/db/client";
@@ -32,6 +34,7 @@ const INDICE = [
   { id: "exportar", rotulo: "Exportar e importar" },
   { id: "mcp", rotulo: "Token do MCP" },
   { id: "acesso", rotulo: "Acesso" },
+  { id: "sobre", rotulo: "Versão" },
 ] as const;
 
 function Secao({ id, titulo, children }: { id: string; titulo: string; children: ReactNode }) {
@@ -42,6 +45,22 @@ function Secao({ id, titulo, children }: { id: string; titulo: string; children:
       </h2>
       <div className="space-y-4">{children}</div>
     </section>
+  );
+}
+
+/** Link para fora do app, em nova aba (GitHub). */
+function LinkExterno({ href, children }: { href: string; children: ReactNode }) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="inline-flex items-center gap-1.5 font-medium text-primary text-sm underline-offset-4 hover:underline pointer-coarse:min-h-11"
+    >
+      {children}
+      <ExternalLink className="size-3.5 shrink-0" aria-hidden />
+      <span className="sr-only">(abre em nova aba)</span>
+    </a>
   );
 }
 
@@ -69,7 +88,7 @@ export default async function ConfiguracoesPage() {
     <div className="space-y-6">
       <CabecalhoPagina
         titulo="Configurações"
-        descricao="Avisos e calendário, backup dos dados, integração com LLM e acesso à conta."
+        descricao="Avisos e calendário, backup dos dados, integração com LLM, acesso à conta e versão do app."
       />
       {/* Rótulo visual em `<p>` (não heading) para os h2 serem só as seções. */}
       <nav aria-label="Nesta página" className="space-y-2">
@@ -172,6 +191,29 @@ export default async function ConfiguracoesPage() {
               <BotaoSair />
             </CardContent>
           ) : null}
+        </Card>
+      </Secao>
+      <Secao id="secao-sobre" titulo="Sobre">
+        <Card id="sobre" className={ALVO_ANCORA}>
+          <CardHeader>
+            <CardTitle asChild>
+              <h3>Versão</h3>
+            </CardTitle>
+            <CardDescription>
+              Versão do app no ar e o que mudou em cada versão. Informe-a ao relatar um problema.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="font-medium tabular-nums">{rotuloVersao(VERSAO_APP)}</p>
+            <ul className="flex flex-wrap gap-x-4 gap-y-1">
+              <li>
+                <LinkExterno href={urlRelease(VERSAO_APP.versao)}>O que há de novo</LinkExterno>
+              </li>
+              <li>
+                <LinkExterno href={URL_CHANGELOG}>Histórico de mudanças (CHANGELOG)</LinkExterno>
+              </li>
+            </ul>
+          </CardContent>
         </Card>
       </Secao>
     </div>

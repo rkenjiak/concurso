@@ -9,7 +9,9 @@ import {
   PAPEL,
   SITUACAO_FASE,
   STATUS,
+  STATUS_FEEDBACK,
   TIPO_EVENTO,
+  TIPO_FEEDBACK,
   TIPO_LINK,
   UF,
 } from "./enums";
@@ -25,7 +27,9 @@ import {
   ROTULO_PAPEL,
   ROTULO_SITUACAO_FASE,
   ROTULO_STATUS,
+  ROTULO_STATUS_FEEDBACK,
   ROTULO_TIPO_EVENTO,
+  ROTULO_TIPO_FEEDBACK,
   ROTULO_TIPO_LINK,
   ROTULO_UF,
 } from "./labels";
@@ -44,6 +48,8 @@ const pares: [string, readonly string[], Readonly<Record<string, string>>][] = [
   ["AcaoAdmin", ACAO_ADMIN, ROTULO_ACAO_ADMIN],
   ["OrigemAcesso", ORIGEM_ACESSO, ROTULO_ORIGEM_ACESSO],
   ["MotivoSemAcesso", MOTIVO_SEM_ACESSO, ROTULO_MOTIVO_SEM_ACESSO],
+  ["TipoFeedback", TIPO_FEEDBACK, ROTULO_TIPO_FEEDBACK],
+  ["StatusFeedback", STATUS_FEEDBACK, ROTULO_STATUS_FEEDBACK],
 ];
 
 describe("labels", () => {

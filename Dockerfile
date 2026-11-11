@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 # Imagem de produção (ARQUITETURA.md §9.2): build `standalone` do Next.js, usuário sem privilégios
 # e banco SQLite em volume (/app/data). Uso:
-#   docker build -t concurso .
+#   docker build --build-arg GIT_COMMIT_SHA=$(git rev-parse HEAD) -t concurso .
 #   docker run -d -p 3000:3000 -v concurso-dados:/app/data \
 #     -e APP_PASSWORD=... -e AUTH_SECRET=... concurso
 
@@ -25,6 +25,10 @@ ENV NEXT_TELEMETRY_DISABLED=1 \
     NEXT_OUTPUT=standalone
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+# Commit da build (#118), exibido no app e em `/api/versao`. O `.git` não entra no contexto (ver
+# .dockerignore): sem este build arg, o commit aparece como `dev`.
+# Declarado só aqui para não invalidar o cache das camadas anteriores.
+ARG GIT_COMMIT_SHA=""
 # `next build` direto: as migrações rodam ao iniciar o container (MIGRATE_ON_START), no volume.
 RUN pnpm exec next build
 

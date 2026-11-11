@@ -407,6 +407,7 @@ erDiagram
   USUARIO ||--o{ REGRA_NOTIFICACAO : "personaliza"
   USUARIO ||--o{ AUDITORIA_ADMIN : "executou"
   USUARIO ||--o{ EMAIL_PERMITIDO : "liberou"
+  USUARIO ||--o{ FEEDBACK : "enviou"
   CONCURSO ||--o{ EVENTO : "tem datas"
   CONCURSO ||--o{ LINK : "tem links"
   CONCURSO ||--o{ STATUS_HISTORICO : "registra"
@@ -483,7 +484,8 @@ erDiagram
 ```
 
 As tabelas de apoio — `regra_notificacao` e `notificacao_estado` (lembretes, #65),
-`email_permitido` e `auditoria_admin` (painel admin, #50) — aparecem só nos relacionamentos, sem
+`email_permitido` e `auditoria_admin` (painel admin, #50) e `feedback` (caixa de entrada do
+admin, #117) — aparecem só nos relacionamentos, sem
 atributos, para não poluir. A tabela `anexo` já existe no schema, mas só será usada com os anexos
 (M7). A `tag` é um vocabulário compartilhado só de nomes; cada usuário vê apenas as tags dos
 próprios concursos. Detalhes campo a campo em [`ARQUITETURA.md` §3](./ARQUITETURA.md#3-modelo-de-dados).
@@ -526,7 +528,7 @@ cookie (sem banco), e `auth/acesso.ts` em cada página, action e handler, que re
 flowchart TD
   REQ["Requisição"] --> H{"algum login<br/>configurado?"}
   H -->|não| LIVRE["✅ passa<br/>(uso local, usuário inicial)"]
-  H -->|sim| PUB{"rota pública?<br/>/login · /api/health · /api/auth/google…<br/>/api/mcp · /api/calendario.ics<br/>manifest e ícones do PWA"}
+  H -->|sim| PUB{"rota pública?<br/>/login · /api/health · /api/versao · /api/auth/google…<br/>/api/mcp · /api/calendario.ics<br/>manifest e ícones do PWA"}
   PUB -->|sim| LIVRE2["✅ passa<br/>(MCP e feed se autenticam por token)"]
   PUB -->|não| COOK{"cookie JWT<br/>com assinatura válida?"}
   COOK -->|sim| OK["✅ passa"]
@@ -779,7 +781,7 @@ mindmap
   root((concurso))
     src/app
       grupo app: páginas com navegação
-      admin/ painel admin
+      admin/ painel admin (feedback, #117)
       login/ · manifest.ts
       api/ export · import · health · mcp
       api/ auth/google · calendario.ics
@@ -787,7 +789,7 @@ mindmap
       ui/ shadcn
       concurso/ formulários, badges, quadro
       calendario/ · dashboard/ · tema/
-      admin/ · auth/ · configuracoes/
+      admin/ · auth/ · configuracoes/ · feedback/
       layout/ · notificacoes/
     src/domain
       status · prazos · validade
@@ -797,7 +799,8 @@ mindmap
     src/lib
       schemas/ Zod
       tz · format · normalize · csv
-      tema · pwa · tags
+      tema · pwa · tags · versao
+      feedback-exportacao · selecao
     src/server
       actions/ Server Actions
       queries/ leituras

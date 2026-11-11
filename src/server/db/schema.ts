@@ -19,7 +19,9 @@ import {
   PAPEL,
   SITUACAO_FASE,
   STATUS,
+  STATUS_FEEDBACK,
   TIPO_EVENTO,
+  TIPO_FEEDBACK,
   TIPO_LINK,
 } from "../../domain/enums";
 import { REGRAS_PENDENCIA } from "../../domain/sugestao-status";
@@ -104,6 +106,36 @@ export const auditoriaAdmin = sqliteTable(
     createdAt: criadoEm(),
   },
   (t) => [index("auditoria_admin_created_idx").on(t.createdAt)],
+);
+
+// feedback (#117): enviado por qualquer usuário logado, lido só pelo painel admin. A versão e o
+// commit vêm da build no ar (`lib/versao.ts`); o e-mail é uma cópia do momento do envio, como em
+// `auditoria_admin`.
+export const feedback = sqliteTable(
+  "feedback",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    usuarioId: integer("usuario_id").references(() => usuario.id, { onDelete: "set null" }),
+    /** E-mail (ou descrição) do usuário no momento do envio. */
+    usuario: text("usuario").notNull(),
+    tipo: text("tipo", { enum: TIPO_FEEDBACK }).notNull(),
+    mensagem: text("mensagem").notNull(),
+    /** Caminho da página (sem query string); `null` se não informado. */
+    pagina: text("pagina"),
+    versaoApp: text("versao_app").notNull(),
+    commitApp: text("commit_app").notNull(),
+    userAgent: text("user_agent"),
+    status: text("status", { enum: STATUS_FEEDBACK }).notNull().default("NOVO"),
+    /** Último admin que exportou, descartou ou restaurou. */
+    tratadoPor: integer("tratado_por").references(() => usuario.id, { onDelete: "set null" }),
+    tratadoEm: integer("tratado_em", { mode: "timestamp_ms" }),
+    createdAt: criadoEm(),
+  },
+  (t) => [
+    index("feedback_status_created_idx").on(t.status, t.createdAt),
+    // Limite de envios por hora.
+    index("feedback_usuario_created_idx").on(t.usuarioId, t.createdAt),
+  ],
 );
 
 // 3.1 concurso (RF01, RF03, RF05)
@@ -349,6 +381,7 @@ export type Usuario = typeof usuario.$inferSelect;
 export type NovoUsuario = typeof usuario.$inferInsert;
 export type EmailPermitido = typeof emailPermitido.$inferSelect;
 export type AuditoriaAdmin = typeof auditoriaAdmin.$inferSelect;
+export type Feedback = typeof feedback.$inferSelect;
 export type Concurso = typeof concurso.$inferSelect;
 export type NovoConcurso = typeof concurso.$inferInsert;
 export type Link = typeof link.$inferSelect;

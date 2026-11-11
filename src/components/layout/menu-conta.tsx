@@ -1,9 +1,10 @@
 "use client";
 
-import { LogOut, Settings, UserRound } from "lucide-react";
+import { LogOut, MessageSquare, Settings, UserRound } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useId, useTransition } from "react";
+import { useId, useRef, useState, useTransition } from "react";
+import { DialogoFeedback } from "@/components/feedback/dialogo-feedback";
 import { ICONE_TEMA, useTema } from "@/components/tema/seletor-tema";
 import {
   DropdownMenu,
@@ -17,6 +18,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { normalizarTema, ROTULO_TEMA, TEMAS } from "@/lib/tema";
 import { cn } from "@/lib/utils";
+import { rotuloVersao, VERSAO_APP } from "@/lib/versao";
 import { logout } from "@/server/actions/auth";
 import { alternarVisaoAcao } from "@/server/actions/visao";
 import type { Visao } from "@/server/auth/visao";
@@ -105,8 +107,10 @@ function Avatar({ conta }: { conta: ContaMenu }) {
 
 /**
  * Menu da conta (avatar): nome, alternância "Visão usuário" ↔ "Visão admin" (só admins, #50),
- * Configurações e tema (só no modo compacto, #105 e #78) e Sair. A troca de visão não exige novo
- * login. No desktop, Configurações fica só na navegação lateral (#82); no celular, só aqui (#105).
+ * Configurações e tema (só no modo compacto, #105 e #78), "Enviar feedback" (#117, em todas as
+ * visões e sempre em nome de quem está logado), Sair e, no rodapé, a versão do app
+ * (#118; em preview e dev, também o commit e o ambiente). A troca de visão não exige novo login.
+ * No desktop, Configurações fica só na navegação lateral (#82); no celular, só aqui (#105).
  */
 export function MenuConta({
   conta,
@@ -119,85 +123,111 @@ export function MenuConta({
   const [pendente, iniciar] = useTransition();
   const pathname = usePathname();
   const nome = conta.nome ?? conta.email ?? "Usuário local";
+  const gatilhoRef = useRef<HTMLButtonElement>(null);
+  const abrindoFeedback = useRef(false);
+  const [feedbackAberto, setFeedbackAberto] = useState(false);
 
-  // Sem nenhuma ação (não admin, sem login e sem tema no menu), um menu vazio seria anunciado
-  // sem itens: mostra só avatar e nome. O compacto sempre tem menu (tema; Configurações na visão
-  // usuário).
-  if (!ehAdmin && !podeSair && !compacto) {
-    return (
-      <div className={cn("flex min-w-0 items-center gap-2 p-1 text-sm", className)}>
-        <Avatar conta={conta} />
-        <span className="truncate font-medium">{nome}</span>
-      </div>
-    );
-  }
-
+  // O menu sempre tem ao menos "Enviar feedback" (#117). O diálogo fica fora dele, com estado
+  // controlado: o item some quando o menu fecha.
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
-        aria-label="Menu da conta"
-        disabled={pendente}
-        className={cn(
-          "flex min-w-0 items-center gap-2 rounded-md p-1 pointer-coarse:p-1.5 text-left text-sm outline-none hover:bg-sidebar-accent/60 focus-visible:ring-3 focus-visible:ring-ring/50",
-          // Só o avatar (28 px) no celular: alvo de toque de 44 px (#105).
-          compacto && "pointer-coarse:p-2",
-          className,
-        )}
-      >
-        <Avatar conta={conta} />
-        {compacto ? null : <span className="truncate font-medium">{nome}</span>}
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="max-w-72">
-        <DropdownMenuLabel>
-          <span className="block truncate font-medium text-foreground">{nome}</span>
-          {conta.email && conta.nome ? <span className="block truncate">{conta.email}</span> : null}
-        </DropdownMenuLabel>
-        {ehAdmin ? (
-          <>
-            <DropdownMenuSeparator />
-            <DropdownMenuRadioGroup
-              value={visao}
-              onValueChange={(v) => {
-                if (v === visao) return;
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          ref={gatilhoRef}
+          aria-label="Menu da conta"
+          disabled={pendente}
+          className={cn(
+            "flex min-w-0 items-center gap-2 rounded-md p-1 pointer-coarse:p-1.5 text-left text-sm outline-none hover:bg-sidebar-accent/60 focus-visible:ring-3 focus-visible:ring-ring/50",
+            // Só o avatar (28 px) no celular: alvo de toque de 44 px (#105).
+            compacto && "pointer-coarse:p-2",
+            className,
+          )}
+        >
+          <Avatar conta={conta} />
+          {compacto ? null : <span className="truncate font-medium">{nome}</span>}
+        </DropdownMenuTrigger>
+        <DropdownMenuContent
+          align="end"
+          className="max-w-72"
+          // Abrindo o feedback, o menu não devolve o foco ao gatilho: disputaria com o diálogo.
+          onCloseAutoFocus={(e) => {
+            if (abrindoFeedback.current) {
+              e.preventDefault();
+              abrindoFeedback.current = false;
+            }
+          }}
+        >
+          <DropdownMenuLabel>
+            <span className="block truncate font-medium text-foreground">{nome}</span>
+            {conta.email && conta.nome ? (
+              <span className="block truncate">{conta.email}</span>
+            ) : null}
+          </DropdownMenuLabel>
+          {ehAdmin ? (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuRadioGroup
+                value={visao}
+                onValueChange={(v) => {
+                  if (v === visao) return;
+                  iniciar(async () => {
+                    await alternarVisaoAcao(v);
+                  });
+                }}
+              >
+                <DropdownMenuRadioItem value="usuario">Visão usuário</DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="admin">Visão admin</DropdownMenuRadioItem>
+              </DropdownMenuRadioGroup>
+            </>
+          ) : null}
+          {compacto && visao === "usuario" ? (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem asChild>
+                <Link
+                  href="/configuracoes"
+                  aria-current={pathname === "/configuracoes" ? "page" : undefined}
+                >
+                  <Settings aria-hidden />
+                  Configurações
+                </Link>
+              </DropdownMenuItem>
+            </>
+          ) : null}
+          {compacto ? <ItensTema /> : null}
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            onSelect={() => {
+              abrindoFeedback.current = true;
+              setFeedbackAberto(true);
+            }}
+          >
+            <MessageSquare aria-hidden />
+            Enviar feedback
+          </DropdownMenuItem>
+          {podeSair ? (
+            <DropdownMenuItem
+              onSelect={() => {
                 iniciar(async () => {
-                  await alternarVisaoAcao(v);
+                  await logout();
                 });
               }}
             >
-              <DropdownMenuRadioItem value="usuario">Visão usuário</DropdownMenuRadioItem>
-              <DropdownMenuRadioItem value="admin">Visão admin</DropdownMenuRadioItem>
-            </DropdownMenuRadioGroup>
-          </>
-        ) : null}
-        {compacto && visao === "usuario" ? (
-          <>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem asChild>
-              <Link
-                href="/configuracoes"
-                aria-current={pathname === "/configuracoes" ? "page" : undefined}
-              >
-                <Settings aria-hidden />
-                Configurações
-              </Link>
+              <LogOut aria-hidden />
+              Sair
             </DropdownMenuItem>
-          </>
-        ) : null}
-        {compacto ? <ItensTema /> : null}
-        {podeSair ? <DropdownMenuSeparator /> : null}
-        {podeSair ? (
-          <DropdownMenuItem
-            onSelect={() => {
-              iniciar(async () => {
-                await logout();
-              });
-            }}
-          >
-            <LogOut aria-hidden />
-            Sair
-          </DropdownMenuItem>
-        ) : null}
-      </DropdownMenuContent>
-    </DropdownMenu>
+          ) : null}
+          <DropdownMenuSeparator />
+          <DropdownMenuLabel className="font-normal tabular-nums">
+            {rotuloVersao(VERSAO_APP)}
+          </DropdownMenuLabel>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <DialogoFeedback
+        aberto={feedbackAberto}
+        aoMudarAberto={setFeedbackAberto}
+        focoAoFechar={() => gatilhoRef.current}
+      />
+    </>
   );
 }

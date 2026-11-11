@@ -7,6 +7,8 @@ import { Casca } from "@/components/layout/casca";
 import { Badge } from "@/components/ui/badge";
 import { exigirAdminPagina } from "@/server/auth/admin";
 import { lerConfigAuth } from "@/server/auth/config";
+import { getDb } from "@/server/db/client";
+import { contarFeedbacksNovos } from "@/server/repositories/feedback";
 
 export const metadata: Metadata = {
   title: { template: "%s · Admin · Concursos", default: "Painel admin · Concursos" },
@@ -19,11 +21,14 @@ export const metadata: Metadata = {
 export default async function AdminLayout({ children }: { children: ReactNode }) {
   await connection();
   const usuario = await exigirAdminPagina();
+  // Recalculado na resposta das ações do painel (`revalidatePath("/admin", "layout")`).
+  const novosFeedback = await contarFeedbacksNovos(getDb());
   return (
     <Casca
       visao="admin"
       conta={usuario}
       ehAdmin
+      novosFeedback={novosFeedback}
       podeSair={lerConfigAuth().habilitada}
       selo={<Badge variant="destructive">Admin</Badge>}
       faixa={

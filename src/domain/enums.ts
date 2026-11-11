@@ -135,8 +135,22 @@ export const ACAO_ADMIN = [
   "REMOVER_EMAIL",
   /** Revoga os tokens pessoais (MCP e .ics) sem bloquear (#108). Só em TS: a coluna é texto. */
   "REVOGAR_TOKENS",
+  /** Feedback (#117): um registro por lote, com a quantidade no alvo ("5 feedbacks"). */
+  "EXPORTAR_FEEDBACK",
+  "DESCARTAR_FEEDBACK",
+  /** Restaurar da aba Descartados ou desfazer um descarte. */
+  "RESTAURAR_FEEDBACK",
+  "EXCLUIR_FEEDBACK",
 ] as const;
 export type AcaoAdmin = (typeof ACAO_ADMIN)[number];
+
+/** Tipo do feedback enviado pelo usuário (#117). */
+export const TIPO_FEEDBACK = ["BUG", "SUGESTAO", "OUTRO"] as const;
+export type TipoFeedback = (typeof TIPO_FEEDBACK)[number];
+
+/** Situação do feedback na caixa de entrada do admin (#117). */
+export const STATUS_FEEDBACK = ["NOVO", "EXPORTADO", "DESCARTADO"] as const;
+export type StatusFeedback = (typeof STATUS_FEEDBACK)[number];
 
 /**
  * O que dá acesso hoje a um usuário (#108), na mesma regra de `donoDoTokenAutorizado`: o usuário

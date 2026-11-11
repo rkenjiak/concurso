@@ -937,7 +937,8 @@ Cada item = uma branch `feature/*` a partir de `develop`; cada milestone fecha c
 | **Observabilidade** → `v2.5.0` | `feature/logs` (#91) | Logger estruturado, `onRequestError` e eventos de segurança e operação |
 | **UX dos eventos** → `v2.6.0` | `feature/ux-fluxo-eventos` (#100) | Painel do evento, concluir no dashboard, link direto para o evento, voltar à origem e avisos com Desfazer |
 | **Uso e navegação** → `v2.7.0` | `feature/admin-uso` (#108) · `feature/notfound-404` (#110) · `feature/sqlite-wal` (#112) · `feature/arquitetura-informacao` (#104–#107) | Uso real no painel admin, 404 de verdade, WAL no SQLite local, papel de Notificações, barra do celular e seções de Configurações |
-| **M7 — Anexos** → `v2.8.0` | `feature/anexos` | RF02 desejável |
+| **Versão e feedback** → `v2.8.0` | `feature/versao-feedback` (#117, #118) | Versão do app no site, no admin e em `GET /api/versao`; envio de feedback e caixa de entrada no admin com exportação para issues |
+| **M7 — Anexos** → `v2.9.0` | `feature/anexos` | RF02 desejável |
 
 ---
 

@@ -57,7 +57,8 @@ flowchart LR
 - **`domain/`** é TypeScript puro (sem Next, sem banco): enums, transições de status, cálculo de prazos e
   validade. É o alvo principal dos testes (RNF07).
 - **Leitura** acontece em Server Components chamando `server/queries`; **escrita** via Server Actions que
-  validam com Zod → aplicam regras de `domain/` → persistem em transação → `refresh()`.
+  validam com Zod → aplicam regras de `domain/` → persistem em transação → `refresh()` (as que
+  alteram dados exibidos na tela; exceções em §5.2).
 
 ---
 
@@ -320,11 +321,16 @@ senão → indefinida
   chamasse `refresh()`, o Next compensaria com um refresh extra da página de destino. Por isso
   `abrirNotificacaoAcao` só grava, e o cliente marca a chave como lida no
   `NotificacoesLidasProvider` (na `Casca`): o sino, a barra inferior e a lista descontam as chaves
-  abertas até o layout ser renderizado de novo com outro `naoLidas` (action com `refresh()`, botão
-  Atualizar), quando o valor do servidor volta a valer. Limite aceito: se nessa renderização o
-  total do servidor coincidir com o anterior (outro aviso disparou no meio tempo), o desconto
-  continua até a próxima mudança. O botão "Marcar como lida" usa `marcarNotificacaoLidaAcao`, com
-  `refresh()`.
+  abertas até o layout ser renderizado de novo. **Reset por versão:** o `AppLayout` gera um token
+  por renderização (`crypto.randomUUID()`, `versaoNaoLidas`, passado pela `Casca`), e o provider
+  zera o desconto quando o token muda, não quando o total muda. Qualquer re-renderização do layout
+  (action com `refresh()`, botão Atualizar, `router.refresh()`) reconcilia com o servidor, mesmo
+  quando o total coincide com o anterior (abriu uma e outra virou elegível no meio tempo). Navegar
+  não re-renderiza o layout, então o desconto sobrevive à ida ao prazo. Se a action de abrir
+  falhar (sessão expirada, rede, `{ ok: false }`; com a navegação, a promessa nem resolve e não dá
+  para desfazer pelo resultado), o item fica lido só no cliente até o próximo refresh, que o volta
+  a mostrar como não lido; a rejeição é engolida no clique (`.catch`), sem "unhandled rejection".
+  O botão "Marcar como lida" usa `marcarNotificacaoLidaAcao`, com `refresh()`.
 - Mudanças feitas fora desta aba (MCP, outro aparelho) não chegam sozinhas: não há refresh
   automático, polling nem realtime, para poupar as invocações do plano gratuito da hospedagem. O
   botão **Atualizar** (#77, `layout/botao-atualizar.tsx`), no cabeçalho do celular e na barra
@@ -452,8 +458,13 @@ Os ícones são gerados de `assets/logo.svg` por `pnpm icones` (`scripts/gerar-i
 Todas: checagem de sessão (`exigirUsuarioAcao`, ou `exigirAdminAcao` no painel) → validação Zod →
 `executar` (transação no repositório; `ErroDominio` vira mensagem, exceção inesperada vira
 mensagem genérica e uma linha `acao.erro` no log com `{ acao, usuarioId }`, §9.4; erros de
-controle do Next são relançados com `unstable_rethrow`) → `refresh()`. Retorno padronizado `{ ok: true, data } | { ok: false, erros }`
-(`actions/resultado.ts`).
+controle do Next são relançados com `unstable_rethrow`) → `refresh()`, nas que alteram dados
+exibidos na tela. Retorno padronizado `{ ok: true, data } | { ok: false, erros }`
+(`actions/resultado.ts`). Sem `refresh()`: `abrirNotificacaoAcao` (sai junto com a navegação,
+§4.4), `enviarFeedbackAcao` (nada na tela de quem envia muda), `login`/`logout` e
+`alternarVisaoAcao` (gravam cookie e redirecionam; cookie gravado numa action já faz o Next
+esvaziar o cache do cliente) e `gerarTokenMcpAcao`/`revogarTokenMcpAcao` (o cartão mostra o
+resultado da própria action).
 
 O `refresh()` (de `next/cache`) faz a resposta da action trazer a tela atual já re-renderizada a
 partir da raiz (uma viagem só ao servidor). Por isso os componentes **não** chamam
@@ -470,9 +481,12 @@ extra era marcar a resposta como `ActionDidRevalidateStaticAndDynamic`, que faz 
 mutação. O `refresh()` marca `ActionDidRevalidateDynamicOnly`: re-renderiza a tela atual e limpa o
 histórico de voltar/avançar (bfcache), mas mantém o prefetch. As outras telas são dinâmicas e
 buscam os dados ao navegar; o que fica pré-carregado é só o que vem até o primeiro `loading.tsx`.
-Risco aceito: um layout pré-carregado pode ficar até 5 min (`staleTimes.static`) desatualizado, o
-que só aparece ao entrar em `(app)` vindo de `/admin` (contador de não lidas do momento do
-prefetch). Os Route Handlers (`/api/import`, `/api/mcp`) não aceitam `refresh()` e mantêm o
+Um layout pré-carregado pode ficar até 5 min (`staleTimes.static`) desatualizado, mas na prática
+isso não aparece: dentro de `(app)` o layout é compartilhado (não vem do prefetch), e de `/admin`
+para `(app)` o único link é o da marca (`layout/marca.tsx`, para `/`), cujo dashboard redireciona
+de volta a `/admin` enquanto a visão admin estiver escolhida. Trocar de visão, entrar e sair gravam
+cookie, o que marca a resposta como `ActionDidRevalidateStaticAndDynamic` e esvazia o cache de
+prefetch. Os Route Handlers (`/api/import`, `/api/mcp`) não aceitam `refresh()` e mantêm o
 `revalidatePath`, que ali não afeta nenhum navegador.
 
 **Prefetch sob demanda** (#124): listas com um link por item usam `components/ui/link-sob-demanda`

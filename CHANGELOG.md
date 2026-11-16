@@ -29,7 +29,9 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 - **Abrir uma notificação não gera mais um refresh extra** (#124): o clique marcava a notificação
   como lida numa action que disputava com a navegação, e o Next refazia a página de destino logo
   depois. Agora a leitura é gravada sem atualizar a tela, e o sino, a barra inferior e a lista
-  descontam a notificação na hora, no próprio navegador.
+  descontam a notificação na hora, no próprio navegador. A próxima atualização da tela (qualquer
+  alteração ou o botão Atualizar) volta a usar a contagem do servidor, o que também corrige o
+  contador se a gravação tiver falhado.
 
 ## [2.8.0] - 2026-11-10
 

@@ -1,7 +1,6 @@
 "use client";
 
 import { AlertTriangle, Check, Circle, Clock, EyeOff, MapPin } from "lucide-react";
-import Link from "next/link";
 import { MarcadorConcurso } from "@/components/concurso/marcador-concurso";
 import { BadgeSituacao } from "@/components/evento/badge-situacao";
 import { NomeEvento } from "@/components/evento/nome-evento";
@@ -9,6 +8,7 @@ import { BotaoAbrirEvento, usePainelEvento } from "@/components/evento/painel-ev
 import { COR_URGENCIA } from "@/components/evento/urgencia";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { LinkSobDemanda } from "@/components/ui/link-sob-demanda";
 import { hrefPrazo } from "@/domain/navegacao-concurso";
 import { descreverDias, nomePrazo, type Prazo, situacaoPrazo } from "@/domain/prazos";
 import { formatarData } from "@/lib/format";
@@ -129,7 +129,7 @@ export function ListaPrazos({ prazos }: { prazos: readonly PrazoDashboard[] }) {
               </BotaoAbrirEvento>
               {/* Link irmão do botão (D6): o concurso, com o evento destacado na aba Eventos. */}
               <p className="-mt-2 pr-3 pb-3 pl-[4.5rem] text-sm">
-                <Link
+                <LinkSobDemanda
                   href={hrefPrazo(p.concurso.id, p.evento, { de: "dashboard" })}
                   className="inline-flex max-w-full items-center gap-1.5 rounded-sm text-muted-foreground underline-offset-2 hover:text-foreground hover:underline focus-visible:outline-2 focus-visible:outline-ring"
                 >
@@ -137,7 +137,7 @@ export function ListaPrazos({ prazos }: { prazos: readonly PrazoDashboard[] }) {
                   <span className="min-w-0 truncate">
                     {p.concurso.orgao} — {p.concurso.cargo}
                   </span>
-                </Link>
+                </LinkSobDemanda>
               </p>
             </div>
           </li>

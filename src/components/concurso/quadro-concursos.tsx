@@ -1,11 +1,11 @@
 "use client";
 
 import { CalendarDays, ChevronLeft, ChevronRight, GripVertical } from "lucide-react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type DragEvent, useOptimistic, useState, useTransition } from "react";
 import { useAvisos } from "@/components/avisos/avisos";
 import { Button } from "@/components/ui/button";
+import { LinkSobDemanda } from "@/components/ui/link-sob-demanda";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import type { CorConcurso } from "@/domain/cores";
 import type { Status } from "@/domain/enums";
@@ -256,14 +256,14 @@ function Cartao({
       <div className="flex items-start gap-1">
         <GripVertical className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden />
         <div className="min-w-0 flex-1">
-          <Link
+          <LinkSobDemanda
             href={`/concursos/${cartao.id}`}
             draggable={false}
             className="flex items-center gap-1.5 font-medium hover:underline focus-visible:outline-2 focus-visible:outline-ring"
           >
             <MarcadorConcurso cor={cartao.cor} icone={cartao.icone} />
             <span className="min-w-0 truncate">{cartao.orgao}</span>
-          </Link>
+          </LinkSobDemanda>
           <p className="truncate text-muted-foreground">{cartao.cargo}</p>
           {cartao.banca ? (
             <p className="truncate text-muted-foreground text-xs">{cartao.banca}</p>

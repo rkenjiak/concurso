@@ -19,20 +19,25 @@ const Contexto = createContext<ContextoLidas>({ lidas: VAZIO, marcarLida: () => 
  * contador desconta as chaves abertas, e a lista as mostra como lidas (inclusive ao voltar pelo
  * histórico, que pode reaproveitar a página antiga).
  *
- * Quando o servidor manda outro `naoLidas` (resposta de uma action com `refresh()`, botão
- * Atualizar), o valor do servidor volta a valer e o desconto é zerado.
+ * O desconto vale até o layout ser renderizado de novo no servidor: `versao` muda a cada
+ * renderização dele (resposta de uma action com `refresh()`, botão Atualizar), e aí o contador e a
+ * lista do servidor voltam a valer e o desconto é zerado. Comparar pela versão, e não pelo total,
+ * corrige também o que o desconto não acerta: a action de abrir que falhou (sessão expirada, rede)
+ * e mudanças que se anulam (abriu uma, outra virou elegível e o total ficou igual). O layout não é
+ * re-renderizado ao navegar, então o desconto sobrevive à navegação para o prazo.
  */
 export function NotificacoesLidasProvider({
-  naoLidas,
+  versao,
   children,
 }: {
-  naoLidas: number | undefined;
+  /** Muda a cada renderização do layout no servidor; ausente na visão admin (sem contador). */
+  versao: string | undefined;
   children: ReactNode;
 }) {
-  const [estado, setEstado] = useState({ base: naoLidas, lidas: VAZIO });
-  // Valor novo do servidor: zera o desconto já nesta renderização (estado derivado das props).
-  if (estado.base !== naoLidas) setEstado({ base: naoLidas, lidas: VAZIO });
-  const lidas = estado.base === naoLidas ? estado.lidas : VAZIO;
+  const [estado, setEstado] = useState({ versao, lidas: VAZIO });
+  // Layout novo do servidor: zera o desconto já nesta renderização (estado derivado das props).
+  if (estado.versao !== versao) setEstado({ versao, lidas: VAZIO });
+  const lidas = estado.versao === versao ? estado.lidas : VAZIO;
 
   const marcarLida = useCallback((chave: string) => {
     setEstado((atual) =>

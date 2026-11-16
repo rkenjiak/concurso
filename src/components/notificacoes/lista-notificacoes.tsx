@@ -116,7 +116,9 @@ export function ListaNotificacoes({ itens: doServidor }: { itens: readonly ItemN
                       onClick={() => {
                         if (n.lida) return;
                         marcarLida(n.chave);
-                        void abrirNotificacaoAcao(n.chave);
+                        // Sem tratar o resultado: a navegação descarta a resposta (a promessa pode
+                        // nem resolver). Se falhar, o próximo refresh do layout desfaz o desconto.
+                        abrirNotificacaoAcao(n.chave).catch(() => {});
                       }}
                       className="min-w-0 flex-1 space-y-1 p-3 transition-colors hover:bg-accent/50 focus-visible:outline-2 focus-visible:outline-ring"
                     >

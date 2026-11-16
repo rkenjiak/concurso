@@ -65,7 +65,7 @@ const marcar = (chave: string) =>
 describe("NotificacoesLidasProvider (#124)", () => {
   it("desconta do contador as chaves abertas no cliente, uma vez cada", () => {
     renderizar(
-      <NotificacoesLidasProvider naoLidas={3}>
+      <NotificacoesLidasProvider versao="v1">
         <Contador doServidor={3} chaves={["a", "b"]} />
       </NotificacoesLidasProvider>,
     );
@@ -80,7 +80,7 @@ describe("NotificacoesLidasProvider (#124)", () => {
 
   it("nunca fica negativo", () => {
     renderizar(
-      <NotificacoesLidasProvider naoLidas={1}>
+      <NotificacoesLidasProvider versao="v1">
         <Contador doServidor={1} chaves={["a", "b"]} />
       </NotificacoesLidasProvider>,
     );
@@ -89,17 +89,35 @@ describe("NotificacoesLidasProvider (#124)", () => {
     expect(contador()).toBe("0");
   });
 
-  it("volta a usar o valor do servidor quando ele muda", () => {
-    const tela = (n: number) => (
-      <NotificacoesLidasProvider naoLidas={n}>
-        <Contador doServidor={n} chaves={["a"]} />
-      </NotificacoesLidasProvider>
-    );
-    renderizar(tela(3));
+  const telaVersao = (n: number, versao: string) => (
+    <NotificacoesLidasProvider versao={versao}>
+      <Contador doServidor={n} chaves={["a"]} />
+    </NotificacoesLidasProvider>
+  );
+
+  it("volta a usar o valor do servidor quando o layout é renderizado de novo", () => {
+    renderizar(telaVersao(3, "v1"));
     marcar("a");
     expect(contador()).toBe("2");
     // Resposta de uma action com `refresh()`: o layout já conta a leitura.
-    renderizar(tela(2));
+    renderizar(telaVersao(2, "v2"));
+    expect(contador()).toBe("2");
+  });
+
+  it("zera o desconto com versão nova mesmo se o total do servidor não mudou", () => {
+    // Abriu "a" (3 → 2 no cliente), mas outra notificação virou elegível, ou a action falhou: o
+    // servidor devolve 3 de novo. Vale o servidor.
+    renderizar(telaVersao(3, "v1"));
+    marcar("a");
+    expect(contador()).toBe("2");
+    renderizar(telaVersao(3, "v2"));
+    expect(contador()).toBe("3");
+  });
+
+  it("mantém o desconto enquanto o layout não muda (navegação)", () => {
+    renderizar(telaVersao(3, "v1"));
+    marcar("a");
+    renderizar(telaVersao(3, "v1"));
     expect(contador()).toBe("2");
   });
 
@@ -121,8 +139,8 @@ const item = (chave: string, lida: boolean): ItemNotificacao => ({
 });
 
 describe("ListaNotificacoes: abrir uma notificação (#124)", () => {
-  const tela = (itens: ItemNotificacao[]) => (
-    <NotificacoesLidasProvider naoLidas={2}>
+  const tela = (itens: ItemNotificacao[], versao = "v1") => (
+    <NotificacoesLidasProvider versao={versao}>
       <Contador doServidor={2} />
       <ListaNotificacoes itens={itens} />
     </NotificacoesLidasProvider>
@@ -139,6 +157,23 @@ describe("ListaNotificacoes: abrir uma notificação (#124)", () => {
     expect(linha("evento-10:1")?.dataset.lida).toBe("true");
     expect(linha("evento-11:1")?.dataset.lida).toBeUndefined();
     expect(contador()).toBe("1");
+  });
+
+  it("falha da action não quebra a tela; o próximo layout do servidor desfaz o desconto", async () => {
+    // A rejeição precisa ser tratada no clique (sem "unhandled rejection").
+    const falhou = Promise.reject(new Error("rede"));
+    const tratar = vi.spyOn(falhou, "catch");
+    acoes.abrirNotificacaoAcao.mockReturnValueOnce(falhou);
+    const itens = [item("evento-10:1", false), item("evento-11:1", false)];
+    renderizar(tela(itens));
+    act(() => linha("evento-10:1")?.querySelector("a")?.click());
+    expect(tratar).toHaveBeenCalledOnce();
+    await act(() => falhou.catch(() => {}));
+    expect(contador()).toBe("1");
+    // Refresh seguinte: o servidor ainda conta a notificação como não lida.
+    renderizar(tela(itens, "v2"));
+    expect(contador()).toBe("2");
+    expect(linha("evento-10:1")?.dataset.lida).toBeUndefined();
   });
 
   it("notificação já lida não chama a action nem desconta de novo", () => {

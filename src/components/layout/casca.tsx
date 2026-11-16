@@ -25,6 +25,11 @@ interface CascaProps {
    * inferior (celular, #105). Ausente = sem sino (visão admin).
    */
   naoLidas?: number;
+  /**
+   * Muda a cada renderização do layout no servidor (#124): zera as notificações descontadas no
+   * cliente (`NotificacoesLidasProvider`), porque o `naoLidas` novo já é a verdade do servidor.
+   */
+  versaoNaoLidas?: string;
   /** Feedbacks novos (#117): contador do item Feedback na navegação admin. */
   novosFeedback?: number;
   children: ReactNode;
@@ -42,6 +47,7 @@ export function Casca({
   faixa,
   selo,
   naoLidas,
+  versaoNaoLidas,
   novosFeedback,
   children,
 }: CascaProps) {
@@ -50,7 +56,7 @@ export function Casca({
   return (
     <AvisosProvider>
       {/* Contador e lista descontam as notificações abertas no cliente (#124). */}
-      <NotificacoesLidasProvider naoLidas={naoLidas}>
+      <NotificacoesLidasProvider versao={versaoNaoLidas}>
         <div className="flex min-h-dvh">
           <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col gap-6 border-r bg-sidebar p-4 text-sidebar-foreground md:flex">
             <div className="flex items-center gap-2">

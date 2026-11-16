@@ -20,6 +20,15 @@ export type LinkSobDemandaProps = Omit<ComponentProps<typeof Link>, "prefetch">;
  *
  * No celular o toque vem pouco antes do clique, e a navegação quase sempre sai sem prefetch: o
  * {@link IndicadorPendente} mostra que o clique foi recebido enquanto o servidor responde.
+ *
+ * Restrições do indicador para quem usa:
+ * - o link ganha `relative` (a barra é `absolute` na base dele). Não serve para o padrão do cartão
+ *   inteiro clicável (`after:absolute after:inset-0` estendendo o link sobre um ancestral
+ *   `relative`): o `relative` no link prenderia o `::after` dentro dele;
+ * - o link ganha um primeiro filho (`<span>` vazio, `aria-hidden`). Seletores de quem chama sobre
+ *   os filhos diretos do link (`*:`, `first:`/`first-of-type:`, `divide-*`, `[&>…]`) passam a
+ *   contar esse span; `space-y-*` não é afetado (o span absoluto zera a própria margem e não é o
+ *   último filho).
  */
 export function LinkSobDemanda({
   onMouseEnter,

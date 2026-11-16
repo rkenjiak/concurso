@@ -330,6 +330,10 @@ senão → indefinida
   falhar (sessão expirada, rede, `{ ok: false }`; com a navegação, a promessa nem resolve e não dá
   para desfazer pelo resultado), o item fica lido só no cliente até o próximo refresh, que o volta
   a mostrar como não lido; a rejeição é engolida no clique (`.catch`), sem "unhandled rejection".
+  Limite aceito: se um refresh disparado já na página do prazo for renderizado no servidor antes
+  de a gravação de abrir terminar (só plausível com instâncias diferentes da função), o desconto
+  zera e a notificação reaparece como não lida até o próximo refresh; a gravação acontece de
+  qualquer forma.
   O botão "Marcar como lida" usa `marcarNotificacaoLidaAcao`, com `refresh()`.
 - Mudanças feitas fora desta aba (MCP, outro aparelho) não chegam sozinhas: não há refresh
   automático, polling nem realtime, para poupar as invocações do plano gratuito da hospedagem. O

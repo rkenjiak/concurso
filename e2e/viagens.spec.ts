@@ -32,6 +32,37 @@ async function contarViagens(page: Page, acao: () => Promise<void>) {
   };
 }
 
+/**
+ * Começa a observar os prefetches da página; `esperar()` resolve quando cada caminho em `caminhos`
+ * já teve o prefetch dos dados concluído (não só o `/_tree`) e nenhum prefetch está em andamento.
+ * Espera explícita no lugar do `networkidle`, que resolve cedo se a rede para por um instante.
+ */
+function observarPrefetches(page: Page) {
+  const pendentes = new Set<Request>();
+  const concluidos = new Set<string>();
+  const ehPrefetch = (r: Request) =>
+    r.resourceType() === "fetch" && !!r.headers()["next-router-prefetch"];
+  page.on("request", (r) => {
+    if (ehPrefetch(r)) pendentes.add(r);
+  });
+  const fim = (r: Request) => {
+    if (!pendentes.delete(r)) return;
+    if (r.headers()["next-router-segment-prefetch"] !== "/_tree") {
+      concluidos.add(new URL(r.url()).pathname);
+    }
+  };
+  page.on("requestfinished", fim);
+  page.on("requestfailed", fim);
+  return {
+    esperar: (caminhos: string[]) =>
+      expect
+        .poll(() => pendentes.size === 0 && caminhos.every((c) => concluidos.has(c)), {
+          message: `prefetch de ${caminhos.join(", ")}`,
+        })
+        .toBe(true),
+  };
+}
+
 const naoLidas = async (page: Page) => {
   const sino = page.getByRole("link", { name: /^Notificações/ });
   const nome = (await sino.getAttribute("aria-label")) ?? "";
@@ -58,8 +89,10 @@ test("mutações fazem uma viagem só e o sino atualiza sem recarregar (#73)", a
 
   // Marcar como lida na central: um POST e o contador cai na mesma resposta, sem refazer o
   // prefetch dos links visíveis (#124).
+  const prefetches = observarPrefetches(page);
   await page.goto("/notificacoes");
-  await page.waitForLoadState("networkidle");
+  // O menu já pré-carregou: o que vier depois da action seria prefetch refeito.
+  await prefetches.esperar(["/", "/concursos", "/calendario"]);
   const item = page
     .getByTestId("lista-notificacoes")
     .getByRole("listitem")
@@ -96,8 +129,10 @@ test("abrir uma notificação marca como lida sem refresh extra; o link só pré
       prefetchDoDetalhe.push(r.url());
     }
   });
+  const prefetches = observarPrefetches(page);
   await page.goto("/notificacoes");
-  await page.waitForLoadState("networkidle");
+  // Com o menu já pré-carregado, um prefetch do detalhe agora teria vindo por estar visível.
+  await prefetches.esperar(["/", "/concursos", "/calendario"]);
   const antes = await naoLidas(page);
   const item = page
     .getByTestId("lista-notificacoes")

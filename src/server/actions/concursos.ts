@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
 import { urlComAba } from "@/lib/aba-concurso";
 import { urlComAviso } from "@/lib/aviso-url";
@@ -19,7 +19,8 @@ const NAO_ENCONTRADO = "Concurso não encontrado.";
  * depois. Fica fora de `executar`, cujo `catch` engoliria o erro de controle do `redirect`. Em
  * caso de sucesso a action não retorna; só as falhas chegam ao cliente. O concurso recém-criado abre
  * na aba Eventos, onde o estado vazio orienta a cadastrar as datas (#100, D9). O destino leva
- * `?aviso=` para a página confirmar a ação com um aviso, e o remove da URL (#100, item 12).
+ * `?aviso=` para a página confirmar a ação com um aviso, e o remove da URL (#100, item 12). O
+ * `refresh()` (e não `revalidatePath`) mantém o cache de prefetch do navegador (#124).
  */
 
 export async function criarConcurso(entrada: unknown): Promise<ResultadoAcao> {
@@ -31,8 +32,7 @@ export async function criarConcurso(entrada: unknown): Promise<ResultadoAcao> {
   const r = await executar(
     async () => {
       const id = await repo.criarConcurso(getDb(), usuarioId, dados.data);
-      revalidatePath("/concursos");
-      revalidatePath("/");
+      refresh();
       return sucesso({ id });
     },
     { acao: "concursos.criarConcurso", usuarioId },
@@ -57,9 +57,7 @@ export async function atualizarConcurso(
     async () => {
       if (!(await repo.atualizarConcurso(getDb(), usuarioId, id.data, dados.data)))
         return falha(NAO_ENCONTRADO);
-      revalidatePath("/concursos");
-      revalidatePath(`/concursos/${id.data}`);
-      revalidatePath("/");
+      refresh();
       return sucesso(null);
     },
     { acao: "concursos.atualizarConcurso", usuarioId },
@@ -77,8 +75,7 @@ export async function excluirConcurso(idBruto: unknown): Promise<ResultadoAcao> 
   const r = await executar(
     async () => {
       if (!(await repo.excluirConcurso(getDb(), usuarioId, id.data))) return falha(NAO_ENCONTRADO);
-      revalidatePath("/concursos");
-      revalidatePath("/");
+      refresh();
       return sucesso(null);
     },
     { acao: "concursos.excluirConcurso", usuarioId },

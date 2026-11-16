@@ -34,7 +34,8 @@ function obterHandler(): McpHttpHandler {
       return criarServidorMcp({
         db: getDb(),
         usuarioId,
-        // Dados mudaram: todas as páginas leem do banco.
+        // Dados mudaram: todas as páginas leem do banco. Route Handler não aceita `refresh()`
+        // (#124), e o cliente MCP não é um navegador: nada para invalidar além disso.
         aoAlterar: () => revalidatePath("/", "layout"),
       });
     },

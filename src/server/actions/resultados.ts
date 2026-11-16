@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { refresh } from "next/cache";
 import { idSchema } from "@/lib/schemas/comum";
 import { resultadoFaseSchema } from "@/lib/schemas/resultado-fase";
 import { exigirUsuarioAcao } from "../auth/acesso";
@@ -35,7 +35,7 @@ export async function salvarResultadoFase(
       } else {
         id = await repo.criarResultadoFase(db, usuarioId, concursoId.data, dados.data);
       }
-      revalidatePath(`/concursos/${concursoId.data}`);
+      refresh();
       return sucesso({ id });
     },
     { acao: "resultados.salvarResultadoFase", usuarioId },
@@ -55,7 +55,7 @@ export async function excluirResultadoFase(
   return executar(
     async () => {
       await repo.excluirResultadoFase(getDb(), usuarioId, concursoId.data, resultadoId.data);
-      revalidatePath(`/concursos/${concursoId.data}`);
+      refresh();
       return sucesso(null);
     },
     { acao: "resultados.excluirResultadoFase", usuarioId },

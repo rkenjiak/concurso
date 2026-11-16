@@ -5,6 +5,7 @@ import { BotaoAtualizar } from "@/components/layout/botao-atualizar";
 import { Marca } from "@/components/layout/marca";
 import { type ContaMenu, MenuConta } from "@/components/layout/menu-conta";
 import { NavegacaoInferior, NavegacaoLateral } from "@/components/layout/navegacao";
+import { NotificacoesLidasProvider } from "@/components/notificacoes/notificacoes-lidas";
 import { SinoNotificacoes } from "@/components/notificacoes/sino-notificacoes";
 import { SeletorTema } from "@/components/tema/seletor-tema";
 import type { Visao } from "@/server/auth/visao";
@@ -48,51 +49,54 @@ export function Casca({
   const menu = { conta, ehAdmin, visao, podeSair };
   return (
     <AvisosProvider>
-      <div className="flex min-h-dvh">
-        <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col gap-6 border-r bg-sidebar p-4 text-sidebar-foreground md:flex">
-          <div className="flex items-center gap-2">
-            <Marca />
-            {selo}
-            {visao === "usuario" ? <BotaoAtualizar className="ml-auto" /> : null}
-            {naoLidas !== undefined ? (
-              <SinoNotificacoes
-                naoLidas={naoLidas}
-                className={visao === "usuario" ? undefined : "ml-auto"}
-              />
-            ) : null}
-          </div>
-          <NavegacaoLateral secao={secao} novosFeedback={novosFeedback} />
-          <div className="mt-auto flex flex-col gap-3">
-            <MenuConta {...menu} />
-            <SeletorTema className="self-start" />
-          </div>
-        </aside>
+      {/* Contador e lista descontam as notificações abertas no cliente (#124). */}
+      <NotificacoesLidasProvider naoLidas={naoLidas}>
+        <div className="flex min-h-dvh">
+          <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col gap-6 border-r bg-sidebar p-4 text-sidebar-foreground md:flex">
+            <div className="flex items-center gap-2">
+              <Marca />
+              {selo}
+              {visao === "usuario" ? <BotaoAtualizar className="ml-auto" /> : null}
+              {naoLidas !== undefined ? (
+                <SinoNotificacoes
+                  naoLidas={naoLidas}
+                  className={visao === "usuario" ? undefined : "ml-auto"}
+                />
+              ) : null}
+            </div>
+            <NavegacaoLateral secao={secao} novosFeedback={novosFeedback} />
+            <div className="mt-auto flex flex-col gap-3">
+              <MenuConta {...menu} />
+              <SeletorTema className="self-start" />
+            </div>
+          </aside>
 
-        <div className="flex min-w-0 flex-1 flex-col">
-          {/* Áreas seguras (#66): no app instalado, o cabeçalho não fica sob o notch/barra. */}
-          <header className="sticky top-0 z-30 flex h-[calc(3.5rem+env(safe-area-inset-top))] items-center gap-2 border-b bg-background/95 pt-[env(safe-area-inset-top)] pr-[max(1rem,env(safe-area-inset-right))] pl-[max(1rem,env(safe-area-inset-left))] backdrop-blur md:hidden">
-            {/* Com selo (visão admin), o nome não cabe ao lado dos controles em ~360 px: fica só o
+          <div className="flex min-w-0 flex-1 flex-col">
+            {/* Áreas seguras (#66): no app instalado, o cabeçalho não fica sob o notch/barra. */}
+            <header className="sticky top-0 z-30 flex h-[calc(3.5rem+env(safe-area-inset-top))] items-center gap-2 border-b bg-background/95 pt-[env(safe-area-inset-top)] pr-[max(1rem,env(safe-area-inset-right))] pl-[max(1rem,env(safe-area-inset-left))] backdrop-blur md:hidden">
+              {/* Com selo (visão admin), o nome não cabe ao lado dos controles em ~360 px: fica só o
                 ícone (o nome segue para leitores de tela). O tema e Configurações ficam dentro do
                 menu da conta (#78, #105), e as notificações, na barra inferior (#105): um só ponto
                 de entrada por layout. */}
-            <Marca nomeClassName={selo ? "max-[399px]:sr-only" : undefined} />
-            {selo}
-            <div className="ml-auto flex items-center gap-2">
-              {visao === "usuario" ? <BotaoAtualizar /> : null}
-              <MenuConta {...menu} compacto />
-            </div>
-          </header>
-          {faixa}
-          <main className="mx-auto w-full max-w-5xl flex-1 px-4 pt-6 pb-[calc(6rem+env(safe-area-inset-bottom))] md:px-8 md:pb-10">
-            {children}
-          </main>
+              <Marca nomeClassName={selo ? "max-[399px]:sr-only" : undefined} />
+              {selo}
+              <div className="ml-auto flex items-center gap-2">
+                {visao === "usuario" ? <BotaoAtualizar /> : null}
+                <MenuConta {...menu} compacto />
+              </div>
+            </header>
+            {faixa}
+            <main className="mx-auto w-full max-w-5xl flex-1 px-4 pt-6 pb-[calc(6rem+env(safe-area-inset-bottom))] md:px-8 md:pb-10">
+              {children}
+            </main>
+          </div>
         </div>
-      </div>
-      <NavegacaoInferior secao={secao} naoLidas={naoLidas} novosFeedback={novosFeedback} />
-      {/* `useSearchParams` fora de um limite de Suspense tiraria as páginas da pré-renderização. */}
-      <Suspense fallback={null}>
-        <AvisoDaUrl />
-      </Suspense>
+        <NavegacaoInferior secao={secao} naoLidas={naoLidas} novosFeedback={novosFeedback} />
+        {/* `useSearchParams` fora de um limite de Suspense tiraria as páginas da pré-renderização. */}
+        <Suspense fallback={null}>
+          <AvisoDaUrl />
+        </Suspense>
+      </NotificacoesLidasProvider>
     </AvisosProvider>
   );
 }

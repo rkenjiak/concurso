@@ -1,20 +1,22 @@
 "use client";
 
 import { Check, CheckCheck, Clock, Loader2, X } from "lucide-react";
-import Link from "next/link";
 import { useState, useTransition } from "react";
 import { MarcadorConcurso } from "@/components/concurso/marcador-concurso";
 import { Button } from "@/components/ui/button";
+import { LinkSobDemanda } from "@/components/ui/link-sob-demanda";
 import type { CorConcurso } from "@/domain/cores";
 import { hrefPrazo } from "@/domain/navegacao-concurso";
 import { agruparPorPrazo } from "@/lib/agrupar-por-prazo";
 import { formatarData } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import {
+  abrirNotificacaoAcao,
   dispensarNotificacaoAcao,
   marcarNotificacaoLidaAcao,
   marcarTodasLidasAcao,
 } from "@/server/actions/notificacoes";
+import { useNotificacoesLidas } from "./notificacoes-lidas";
 
 /** Notificação já pronta para exibir (serializável para o cliente). */
 export interface ItemNotificacao {
@@ -34,10 +36,15 @@ type ResultadoSimples = { ok: true } | { ok: false; erros: { _form?: string[] } 
 
 /**
  * Central de notificações (#65): marcar como lida, dispensar e marcar todas como lidas. Abrir o
- * evento no concurso (#100) marca a notificação como lida. Os avisos vêm agrupados pela proximidade
- * do prazo (#104; `dias` calculado no servidor), o mais próximo primeiro em cada grupo.
+ * evento no concurso (#100) marca a notificação como lida sem disputar com a navegação (#124): a
+ * action não chama `refresh()` e o cliente marca a chave como lida (`NotificacoesLidasProvider`),
+ * descontando-a do contador. Os avisos vêm agrupados pela proximidade do prazo (#104; `dias`
+ * calculado no servidor), o mais próximo primeiro em cada grupo. Os links só pré-carregam por
+ * intenção (#124).
  */
-export function ListaNotificacoes({ itens }: { itens: readonly ItemNotificacao[] }) {
+export function ListaNotificacoes({ itens: doServidor }: { itens: readonly ItemNotificacao[] }) {
+  const { lidas, marcarLida } = useNotificacoesLidas();
+  const itens = doServidor.map((n) => (n.lida || !lidas.has(n.chave) ? n : { ...n, lida: true }));
   const grupos = agruparPorPrazo(itens);
   const [pendente, iniciar] = useTransition();
   const [emAndamento, setEmAndamento] = useState<string | null>(null);
@@ -98,7 +105,7 @@ export function ListaNotificacoes({ itens }: { itens: readonly ItemNotificacao[]
                       n.lida ? "border-l-transparent" : "border-l-primary bg-primary/5",
                     )}
                   >
-                    <Link
+                    <LinkSobDemanda
                       href={hrefPrazo(
                         n.concurso.id,
                         n.eventoId === null ? null : { id: n.eventoId },
@@ -107,7 +114,9 @@ export function ListaNotificacoes({ itens }: { itens: readonly ItemNotificacao[]
                         },
                       )}
                       onClick={() => {
-                        if (!n.lida) void marcarNotificacaoLidaAcao(n.chave);
+                        if (n.lida) return;
+                        marcarLida(n.chave);
+                        void abrirNotificacaoAcao(n.chave);
                       }}
                       className="min-w-0 flex-1 space-y-1 p-3 transition-colors hover:bg-accent/50 focus-visible:outline-2 focus-visible:outline-ring"
                     >
@@ -130,7 +139,7 @@ export function ListaNotificacoes({ itens }: { itens: readonly ItemNotificacao[]
                           </span>
                         ) : null}
                       </p>
-                    </Link>
+                    </LinkSobDemanda>
                     <div className="flex shrink-0 gap-1 p-2">
                       {n.lida ? null : (
                         <Button

@@ -13,7 +13,8 @@ import { contarNotificacoesNaoLidas } from "@/server/queries/notificacoes";
  * lidas (#65; sino no desktop, item Notificações da barra inferior no celular) é recalculado na
  * resposta de toda Server Action que chama `refresh()`: o Next re-renderiza a rota atual a partir
  * da raiz (layout incluso) na mesma viagem, sem `router.refresh()` e sem esvaziar o cache de
- * prefetch (#124).
+ * prefetch (#124). Abrir uma notificação marca como lida sem `refresh()` e desconta no cliente
+ * (`NotificacoesLidasProvider`).
  */
 export default async function AppLayout({ children }: { children: ReactNode }) {
   await connection();

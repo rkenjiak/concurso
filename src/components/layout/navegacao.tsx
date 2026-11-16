@@ -21,6 +21,7 @@ import {
   rotuloNotificacoes,
   textoContadorNotificacoes,
 } from "@/components/notificacoes/contador-notificacoes";
+import { useNaoLidas } from "@/components/notificacoes/notificacoes-lidas";
 import { cn } from "@/lib/utils";
 
 interface ItemNavegacao {
@@ -150,7 +151,7 @@ export function NavegacaoLateral({
 /** Barra de navegação inferior (celular, abaixo de `md`). */
 export function NavegacaoInferior({
   secao = "app",
-  naoLidas = 0,
+  naoLidas: naoLidasDoServidor = 0,
   novosFeedback = 0,
 }: {
   secao?: Secao;
@@ -160,6 +161,8 @@ export function NavegacaoInferior({
   novosFeedback?: number;
 }) {
   const pathname = usePathname();
+  // Desconta as notificações abertas no cliente (#124).
+  const naoLidas = useNaoLidas(naoLidasDoServidor);
   const itens = ITENS_INFERIOR[secao];
   return (
     <nav

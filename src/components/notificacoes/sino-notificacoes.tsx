@@ -1,3 +1,5 @@
+"use client";
+
 import { Bell, BellDot } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
@@ -6,19 +8,22 @@ import {
   rotuloNotificacoes,
   textoContadorNotificacoes,
 } from "./contador-notificacoes";
+import { useNaoLidas } from "./notificacoes-lidas";
 
 /**
  * Sino da central de notificações (#65): leva a `/notificacoes`, com o contador de não lidas.
  * Fica só na barra lateral do desktop; no celular a entrada é o item Notificações da barra
- * inferior (#105). Um único ponto de entrada por layout (#78).
+ * inferior (#105). Um único ponto de entrada por layout (#78). O contador desconta as notificações
+ * abertas no cliente (#124).
  */
 export function SinoNotificacoes({
-  naoLidas,
+  naoLidas: doServidor,
   className,
 }: {
   naoLidas: number;
   className?: string;
 }) {
+  const naoLidas = useNaoLidas(doServidor);
   const Icone = naoLidas > 0 ? BellDot : Bell;
   return (
     <Link

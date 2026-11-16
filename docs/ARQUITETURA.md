@@ -57,7 +57,7 @@ flowchart LR
 - **`domain/`** é TypeScript puro (sem Next, sem banco): enums, transições de status, cálculo de prazos e
   validade. É o alvo principal dos testes (RNF07).
 - **Leitura** acontece em Server Components chamando `server/queries`; **escrita** via Server Actions que
-  validam com Zod → aplicam regras de `domain/` → persistem em transação → `revalidatePath`.
+  validam com Zod → aplicam regras de `domain/` → persistem em transação → `refresh()`.
 
 ---
 
@@ -312,9 +312,19 @@ senão → indefinida
   restantes (quem abre o app na véspera vê só "amanhã"). Identidade = (prazo, antecedência), sem a
   data: retificar a data mantém a notificação (e o estado). Do banco vêm só lida/dispensada.
 - Ordenação: dia de disparo (`data − antecedência`) desc, depois data/hora do prazo.
-- O contador de não lidas (sino no desktop, item Notificações da barra no celular) é calculado no layout do app. Toda Server Action que chama `revalidatePath`
+- O contador de não lidas (sino no desktop, item Notificações da barra no celular) é calculado no layout do app. Toda Server Action que chama `refresh()`
   recebe na própria resposta a rota atual re-renderizada a partir da raiz (layout incluso), então o
   sino atualiza sem `router.refresh()` (#73).
+- Abrir o prazo pelo link de uma notificação (#100) marca como lida **sem** disputar com a
+  navegação (#124): a action sai junto com o clique e a navegação descarta a resposta dela; se ela
+  chamasse `refresh()`, o Next compensaria com um refresh extra da página de destino. Por isso
+  `abrirNotificacaoAcao` só grava, e o cliente marca a chave como lida no
+  `NotificacoesLidasProvider` (na `Casca`): o sino, a barra inferior e a lista descontam as chaves
+  abertas até o layout ser renderizado de novo com outro `naoLidas` (action com `refresh()`, botão
+  Atualizar), quando o valor do servidor volta a valer. Limite aceito: se nessa renderização o
+  total do servidor coincidir com o anterior (outro aviso disparou no meio tempo), o desconto
+  continua até a próxima mudança. O botão "Marcar como lida" usa `marcarNotificacaoLidaAcao`, com
+  `refresh()`.
 - Mudanças feitas fora desta aba (MCP, outro aparelho) não chegam sozinhas: não há refresh
   automático, polling nem realtime, para poupar as invocações do plano gratuito da hospedagem. O
   botão **Atualizar** (#77, `layout/botao-atualizar.tsx`), no cabeçalho do celular e na barra
@@ -442,15 +452,40 @@ Os ícones são gerados de `assets/logo.svg` por `pnpm icones` (`scripts/gerar-i
 Todas: checagem de sessão (`exigirUsuarioAcao`, ou `exigirAdminAcao` no painel) → validação Zod →
 `executar` (transação no repositório; `ErroDominio` vira mensagem, exceção inesperada vira
 mensagem genérica e uma linha `acao.erro` no log com `{ acao, usuarioId }`, §9.4; erros de
-controle do Next são relançados com `unstable_rethrow`) → `revalidatePath`. Retorno padronizado `{ ok: true, data } | { ok: false, erros }`
+controle do Next são relançados com `unstable_rethrow`) → `refresh()`. Retorno padronizado `{ ok: true, data } | { ok: false, erros }`
 (`actions/resultado.ts`).
 
-O `revalidatePath` faz a resposta da action trazer a tela atual já re-renderizada (uma viagem só ao
-servidor). Por isso os componentes **não** chamam `router.refresh()` depois de `r.ok` (#73): isso
-seria uma segunda requisição refazendo todas as queries do layout e da página. Exceções: a importação
-(`POST /api/import`, Route Handler) e as falhas ao mover ou desfazer no quadro, que não revalidam
-nada. Criar, editar e excluir concurso terminam com `redirect()` na própria action (fora de
-`executar`, que engoliria o erro de controle): a resposta já traz a página de destino.
+O `refresh()` (de `next/cache`) faz a resposta da action trazer a tela atual já re-renderizada a
+partir da raiz (uma viagem só ao servidor). Por isso os componentes **não** chamam
+`router.refresh()` depois de `r.ok` (#73): isso seria uma segunda requisição refazendo todas as
+queries do layout e da página. Exceções: a importação (`POST /api/import`, Route Handler) e as
+falhas ao mover ou desfazer no quadro, que não revalidam nada. Criar, editar e excluir concurso
+terminam com `redirect()` na própria action (fora de `executar`, que engoliria o erro de
+controle): a resposta já traz a página de destino.
+
+`refresh()` e não `revalidatePath` (#124): o app não tem cache no servidor (as páginas chamam
+`connection()`, sem `use cache`), então o `revalidatePath` não invalidava nada lá; o único efeito
+extra era marcar a resposta como `ActionDidRevalidateStaticAndDynamic`, que faz o cliente esvaziar
+**todo** o cache de prefetch e refazer o prefetch de todos os links visíveis (menu incluso) a cada
+mutação. O `refresh()` marca `ActionDidRevalidateDynamicOnly`: re-renderiza a tela atual e limpa o
+histórico de voltar/avançar (bfcache), mas mantém o prefetch. As outras telas são dinâmicas e
+buscam os dados ao navegar; o que fica pré-carregado é só o que vem até o primeiro `loading.tsx`.
+Risco aceito: um layout pré-carregado pode ficar até 5 min (`staleTimes.static`) desatualizado, o
+que só aparece ao entrar em `(app)` vindo de `/admin` (contador de não lidas do momento do
+prefetch). Os Route Handlers (`/api/import`, `/api/mcp`) não aceitam `refresh()` e mantêm o
+`revalidatePath`, que ali não afeta nenhum navegador.
+
+**Prefetch sob demanda** (#124): listas com um link por item usam `components/ui/link-sob-demanda`
+(`LinkSobDemanda`) em vez do `<Link>`: `prefetch={false}` até o mouse passar, o link receber foco
+ou ser tocado, e daí o prefetch padrão (o `HoverPrefetchLink` da documentação do Next). Cada URL de
+evento tem a sua query string (`hrefPrazo`/`hrefEvento`) e o seu `/_tree`, e cada detalhe roda o
+`conferirConcurso` no layout, então pré-carregar todos os visíveis custava uma invocação por
+item. Usam: prazos e próximas provas do dashboard, notificações, lista e quadro de concursos. O
+menu, os atalhos do dashboard, o detalhe, o seletor de mês, a alternância de visão, os filtros e
+os botões do calendário mantêm o prefetch padrão (o esqueleto instantâneo depende dele). Custo no
+celular: o toque vem cerca de 100 ms antes do clique, e a navegação quase sempre sai sem prefetch;
+o link mostra uma barra fina de pendente (`useLinkStatus`, após 150 ms, `aria-hidden`) até o
+servidor responder.
 
 As páginas têm `loading.tsx` (#73): o esqueleto é pré-carregado e aparece na hora ao navegar. Como
 o stream começa no fallback, o status HTTP fica fixado em 200 a partir dele: um `notFound()`,
@@ -464,8 +499,9 @@ o stream começa no fallback, o status HTTP fica fixado em 200 a partir dele: um
   existência (e o dono, no concurso) **acima** do `loading.tsx` do detalhe e chamam `notFound()`
   → 404. A checagem (`carregar.ts`) é uma leitura enxuta pela chave primária, porque agora o
   prefetch dos links para o detalhe passa pelo layout (vai até o primeiro `loading.tsx`): cada
-  link visível (dashboard, lista, quadro, calendário, tabela de usuários) custa essa leitura, e em
-  troca o esqueleto do detalhe também é pré-carregado. As páginas carregam o dado completo e
+  link pré-carregado (calendário, tabela de usuários; no dashboard, na lista e no quadro, só os
+  que recebem hover, foco ou toque, #124) custa essa leitura, e em troca o esqueleto do detalhe
+  também é pré-carregado. As páginas carregam o dado completo e
   conferem de novo, como garantia: o layout não é reexecutado ao navegar entre o detalhe e a
   edição. O `React.cache` deduplica cada leitura na mesma renderização (a do concurso entre
   `generateMetadata` e a página);
@@ -503,7 +539,7 @@ usuarioId, aoAlterar })` serve dois transportes; cada instância só enxerga os 
   do servidor por requisição, presa ao dono do token via `authInfo`). Pública no `proxy.ts` porque
   se autentica sozinha: token pessoal gerado em Configurações (`cmcp_…`; o banco guarda só o
   SHA-256 em `usuario.mcp_token_hash`), com o mesmo atraso progressivo do login. Após escritas,
-  `revalidatePath`.
+  `revalidatePath` (Route Handler não aceita `refresh()`, #124).
 
 Camadas:
 
@@ -729,8 +765,9 @@ do React). O e2e `seguranca.spec.ts` confere os cabeçalhos e a ausência de vio
 | Nível | Ferramenta | Escopo | Meta |
 |---|---|---|---|
 | Unitário | Vitest | `domain/*` (transições, prazos, validade, criticidade), `lib/format`, parsers BRL, schemas Zod | meta: cobertura ≥ 90% em `domain/` (medida no CI, sem limite configurado) |
+| Componente | Vitest + happy-dom (`// @vitest-environment happy-dom` no arquivo; o padrão é `node`) | `LinkSobDemanda` (ativação por mouse, foco e toque, composição de handlers, `ref`, indicador pendente) e `NotificacoesLidasProvider` com o clique na central (#124), com um `next/link` falso; o resto dos componentes é testado com `renderToStaticMarkup` | casos principais |
 | Integração | Vitest + libSQL `:memory:` + migrações | repositories/queries (transação de status, tags, filtros, export→import ida e volta); servidor MCP com cliente em memória (`InMemoryTransport`); actions de feedback (permissão, limite por hora e do lote, auditoria por lote, #117) e os comandos `gh` executados num bash real com um `gh` falso (nada da mensagem é expandido) | casos principais |
-| E2E | Playwright (Chromium) | smoke: criar concurso → evento → aparece no dashboard → mudar status → exportar/importar; login, MCP, PWA e lembretes com auth ativa; painel admin com o usuário inicial (sem auth), incluindo selos MCP/.ics, detalhe do usuário e revogar tokens → `/api/mcp` 401 e feed 404 (#108); status HTTP 404 nas rotas `[id]` (inexistente, malformado, de outro usuário), 403 no painel para não admin e esqueleto nas listagens (#110); busca, quadro, calendário (navegação rápida e filtro de concursos no desktop e em 360 px, #83), cor/ícone, ocultar prazos, tema, lembretes (sino, regras, feed .ics), um só ponto de entrada de notificações por layout (barra inferior no celular, sino no desktop) e tema e Configurações pelo menu no celular, sem duplicação (#82, #105); seções, índice e âncoras de Configurações (#106); versão do app no menu da conta, em Configurações → Sobre, no admin e em `/api/versao`, pública mesmo com login (#118); feedback: enviar pelo menu da conta (desktop, teclado e 360 px), selecionar vários com mouse, Shift+clique e Shift+Espaço, Esc, exportar como comandos `gh` (área de transferência), descartar com Desfazer, restaurar e excluir, auditoria por lote (#117); grupos pela proximidade do prazo em Notificações (#104), menu da conta pelo teclado no celular (#105), PWA, aba do detalhe na URL e botão Atualizar com limite de 60 s (#77), deep-link e volta à origem, painel do evento com concluir/Desfazer, cabeçalho do concurso, avisos e alterações não salvas (#100) e layout em 360 px; `/api/mcp` com token → concurso visível no app. Dois servidores (com e sem auth) com bancos temporários em `e2e/.tmp` | poucos fluxos |
+| E2E | Playwright (Chromium) | smoke: criar concurso → evento → aparece no dashboard → mudar status → exportar/importar; login, MCP, PWA e lembretes com auth ativa; painel admin com o usuário inicial (sem auth), incluindo selos MCP/.ics, detalhe do usuário e revogar tokens → `/api/mcp` 401 e feed 404 (#108); status HTTP 404 nas rotas `[id]` (inexistente, malformado, de outro usuário), 403 no painel para não admin e esqueleto nas listagens (#110); busca, quadro, calendário (navegação rápida e filtro de concursos no desktop e em 360 px, #83), cor/ícone, ocultar prazos, tema, lembretes (sino, regras, feed .ics), um só ponto de entrada de notificações por layout (barra inferior no celular, sino no desktop) e tema e Configurações pelo menu no celular, sem duplicação (#82, #105); seções, índice e âncoras de Configurações (#106); versão do app no menu da conta, em Configurações → Sobre, no admin e em `/api/versao`, pública mesmo com login (#118); feedback: enviar pelo menu da conta (desktop, teclado e 360 px), selecionar vários com mouse, Shift+clique e Shift+Espaço, Esc, exportar como comandos `gh` (área de transferência), descartar com Desfazer, restaurar e excluir, auditoria por lote (#117); grupos pela proximidade do prazo em Notificações (#104), menu da conta pelo teclado no celular (#105), PWA, aba do detalhe na URL e botão Atualizar com limite de 60 s (#77), deep-link e volta à origem, mutação sem refazer o prefetch do menu e abrir notificação sem refresh extra, com o link pré-carregando só no hover (#124), painel do evento com concluir/Desfazer, cabeçalho do concurso, avisos e alterações não salvas (#100) e layout em 360 px; `/api/mcp` com token → concurso visível no app. Dois servidores (com e sem auth) com bancos temporários em `e2e/.tmp` | poucos fluxos |
 
 Datas sempre fixadas (`vi.setSystemTime` / `hoje` injetado).
 

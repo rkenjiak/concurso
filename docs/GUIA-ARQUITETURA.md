@@ -260,7 +260,7 @@ sequenceDiagram
     R->>DB: INSERT status_historico
     R->>DB: UPDATE concurso.status
   end
-  A->>A: revalidatePath("/", "/concursos", "/concursos/id")
+  A->>A: refresh() (re-renderiza a tela atual)
   A-->>C: { ok: true, data } ou { ok: false, erros }
   A-->>C: a mesma resposta traz a tela re-renderizada
   C->>C: mostra erros (se houver)
@@ -270,7 +270,7 @@ A "receita" de uma Server Action, em 5 passos:
 
 ```mermaid
 flowchart LR
-  S1["1. exigirUsuarioAcao()<br/>sessão → usuarioId"] --> S2["2. Zod<br/>validar entrada"] --> S3["3. repository<br/>transação + domínio"] --> S4["4. revalidatePath<br/>atualiza telas"] --> S5["5. ResultadoAcao<br/>{ ok, data | erros }"]
+  S1["1. exigirUsuarioAcao()<br/>sessão → usuarioId"] --> S2["2. Zod<br/>validar entrada"] --> S3["3. repository<br/>transação + domínio"] --> S4["4. refresh()<br/>atualiza a tela"] --> S5["5. ResultadoAcao<br/>{ ok, data | erros }"]
 ```
 
 E os erros viram mensagens amigáveis em `actions/resultado.ts`: a falha do Zod é tratada antes,
@@ -838,7 +838,8 @@ mindmap
 | **Server Action** | Função com `"use server"` chamada pelo cliente como se fosse local; o Next faz o POST por baixo. |
 | **Route Handler** | `route.ts` em `app/api/…`; endpoint HTTP clássico (export, import, MCP). |
 | **`proxy.ts`** | O antigo `middleware.ts` (renomeado no Next 16); roda antes de toda rota. |
-| **`revalidatePath`** | Avisa o Next que uma página mudou, para ela ser renderizada de novo com dados novos. |
+| **`refresh()`** | Chamado numa Server Action, faz a resposta trazer a tela atual renderizada de novo com dados novos, sem descartar o que o navegador já pré-carregou (#124). |
+| **`revalidatePath`** | Avisa o Next que uma página mudou; nos Route Handlers (import, MCP), onde `refresh()` não vale. |
 | **Drizzle** | ORM leve: o schema em TypeScript gera os tipos e as migrações SQL. |
 | **libSQL / Turso** | Fork do SQLite com driver que fala com arquivo local **ou** com um banco remoto. |
 | **Zod** | Biblioteca de schemas: valida dados e infere o tipo TypeScript. |

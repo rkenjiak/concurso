@@ -21,7 +21,7 @@ export const metadata: Metadata = {
 export default async function AdminLayout({ children }: { children: ReactNode }) {
   await connection();
   const usuario = await exigirAdminPagina();
-  // Recalculado na resposta das ações do painel (`revalidatePath("/admin", "layout")`).
+  // Recalculado na resposta das ações do painel, que chamam `refresh()` (#124).
   const novosFeedback = await contarFeedbacksNovos(getDb());
   return (
     <Casca

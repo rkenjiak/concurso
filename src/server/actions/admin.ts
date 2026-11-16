@@ -5,7 +5,7 @@
  * (`exigirAdminAcao`); não admins recebem "Acesso restrito a administradores." As regras (último
  * admin ativo, admins de `ADMIN_EMAILS`, auditoria) ficam em `repositories/admin.ts`.
  */
-import { revalidatePath } from "next/cache";
+import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { PAPEL } from "@/domain/enums";
@@ -37,8 +37,6 @@ function opcoesAdmin(): OpcoesAdmin {
   return { emailsAdminFixos: config.habilitada ? config.emailsAdmin : new Set() };
 }
 
-const atualizarPainel = () => revalidatePath("/admin", "layout");
-
 /** Promove a admin ou rebaixa a usuário comum. Quem se rebaixa volta para a visão usuário. */
 export async function definirPapelAcao(
   usuarioIdBruto: unknown,
@@ -53,7 +51,7 @@ export async function definirPapelAcao(
   const resultado = await executar(
     async () => {
       await definirPapel(getDb(), sessao.usuario, usuarioId.data, papel.data, opcoesAdmin());
-      atualizarPainel();
+      refresh();
       return sucesso(null);
     },
     { acao: "admin.definirPapelAcao", usuarioId: sessao.usuario.id },
@@ -78,7 +76,7 @@ export async function definirBloqueioAcao(
   return executar(
     async () => {
       await definirBloqueio(getDb(), sessao.usuario, usuarioId.data, bloqueado.data, opcoesAdmin());
-      atualizarPainel();
+      refresh();
       return sucesso(null);
     },
     { acao: "admin.definirBloqueioAcao", usuarioId: sessao.usuario.id },
@@ -99,7 +97,7 @@ export async function revogarTokensAcao(
   return executar(
     async () => {
       const revogou = await revogarTokens(getDb(), sessao.usuario, usuarioId.data);
-      atualizarPainel();
+      refresh();
       return sucesso({ revogou });
     },
     { acao: "admin.revogarTokensAcao", usuarioId: sessao.usuario.id },
@@ -115,7 +113,7 @@ export async function adicionarEmailPermitidoAcao(emailBruto: unknown): Promise<
   return executar(
     async () => {
       await adicionarEmailPermitido(getDb(), sessao.usuario, email.data);
-      atualizarPainel();
+      refresh();
       return sucesso(null);
     },
     { acao: "admin.adicionarEmailPermitidoAcao", usuarioId: sessao.usuario.id },
@@ -131,7 +129,7 @@ export async function removerEmailPermitidoAcao(emailBruto: unknown): Promise<Re
   return executar(
     async () => {
       await removerEmailPermitido(getDb(), sessao.usuario, email.data);
-      atualizarPainel();
+      refresh();
       return sucesso(null);
     },
     { acao: "admin.removerEmailPermitidoAcao", usuarioId: sessao.usuario.id },

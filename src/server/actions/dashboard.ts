@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { refresh } from "next/cache";
 import { z } from "zod";
 import { lerChavePrazo } from "@/domain/prazos";
 import { exigirUsuarioAcao } from "../auth/acesso";
@@ -28,9 +28,8 @@ export async function alternarPrazoOculto(
   return executar(
     async () => {
       await definirPrazoOculto(getDb(), usuarioId, alvo, oculto.data);
-      revalidatePath("/");
-      // O painel do evento no calendário também mostra o estado (#100).
-      revalidatePath("/calendario");
+      // Dashboard ou painel do evento no calendário (#100): re-renderiza a tela atual (#124).
+      refresh();
       return sucesso(null);
     },
     { acao: "dashboard.alternarPrazoOculto", usuarioId },

@@ -11,6 +11,7 @@ import { QuadroConcursos } from "@/components/concurso/quadro-concursos";
 import { CabecalhoPagina } from "@/components/layout/cabecalho-pagina";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { LinkSobDemanda } from "@/components/ui/link-sob-demanda";
 import { corDoConcurso } from "@/domain/cores";
 import { ROTULO_ESFERA } from "@/domain/labels";
 import { formatarBRL, formatarData } from "@/lib/format";
@@ -113,7 +114,7 @@ export default async function ConcursosPage({ searchParams }: PageProps<"/concur
             ].filter(Boolean);
             return (
               <li key={c.id}>
-                <Link
+                <LinkSobDemanda
                   href={`/concursos/${c.id}`}
                   className="block rounded-xl border bg-card p-4 transition-colors hover:bg-accent/50 focus-visible:outline-2 focus-visible:outline-ring"
                 >
@@ -141,7 +142,7 @@ export default async function ConcursosPage({ searchParams }: PageProps<"/concur
                       <ListaTags tags={c.tags} />
                     </div>
                   ) : null}
-                </Link>
+                </LinkSobDemanda>
               </li>
             );
           })}

@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { refresh } from "next/cache";
 import { z } from "zod";
 import { TIPO_EVENTO } from "@/domain/enums";
 import {
@@ -22,10 +22,14 @@ import {
 } from "../repositories/notificacoes";
 import { executar, falha, type ResultadoAcao, sucesso } from "./resultado";
 
-/** O sino fica no layout: qualquer mudança nas notificações revalida todas as páginas. */
-const revalidarTudo = () => revalidatePath("/", "layout");
+// O sino fica no layout: o `refresh()` traz a tela atual re-renderizada a partir da raiz (layout e
+// contador inclusos) na resposta da action, sem esvaziar o cache de prefetch do navegador (#124).
 
-async function marcar(chaveBruta: unknown, acao: AcaoNotificacao): Promise<ResultadoAcao> {
+async function marcar(
+  chaveBruta: unknown,
+  acao: AcaoNotificacao,
+  atualizar = true,
+): Promise<ResultadoAcao> {
   const sessao = await exigirUsuarioAcao();
   if (!sessao.ok) return sessao;
   const alvo = lerChaveNotificacao(chaveBruta);
@@ -33,16 +37,29 @@ async function marcar(chaveBruta: unknown, acao: AcaoNotificacao): Promise<Resul
   return executar(
     async () => {
       await marcarNotificacoes(getDb(), sessao.usuario.id, [alvo], acao);
-      revalidarTudo();
+      if (atualizar) refresh();
       return sucesso(null);
     },
-    { acao: `notificacoes.marcar.${acao}`, usuarioId: sessao.usuario.id },
+    {
+      acao: atualizar ? `notificacoes.marcar.${acao}` : "notificacoes.abrir",
+      usuarioId: sessao.usuario.id,
+    },
   );
 }
 
 /** Marca uma notificação (`evento-<id>:<dias>` / `validade-<concursoId>:<dias>`) como lida. */
 export async function marcarNotificacaoLidaAcao(chave: unknown): Promise<ResultadoAcao> {
   return marcar(chave, "LER");
+}
+
+/**
+ * Marca como lida ao abrir o prazo pela notificação (#124). Sai junto com a navegação, que descarta
+ * a resposta da action: por isso **não** chama `refresh()`, que o Next compensaria com um refresh
+ * extra da página de destino. A lista e o contador já mostram a notificação como lida no cliente
+ * (`NotificacoesLidasProvider`) até a próxima renderização do layout.
+ */
+export async function abrirNotificacaoAcao(chave: unknown): Promise<ResultadoAcao> {
+  return marcar(chave, "LER", false);
 }
 
 /** Dispensa a notificação: some da lista (até a próxima antecedência do mesmo prazo). */
@@ -65,7 +82,7 @@ export async function marcarTodasLidasAcao(): Promise<ResultadoAcao<{ marcadas: 
           return alvo ? [alvo] : [];
         });
       await marcarNotificacoes(db, usuarioId, alvos, "LER");
-      revalidarTudo();
+      refresh();
       return sucesso({ marcadas: alvos.length });
     },
     { acao: "notificacoes.marcarTodasLidasAcao", usuarioId },
@@ -107,7 +124,7 @@ export async function salvarRegrasNotificacaoAcao(entrada: unknown): Promise<Res
   return executar(
     async () => {
       await salvarRegras(getDb(), sessao.usuario.id, regras);
-      revalidarTudo();
+      refresh();
       return sucesso(null);
     },
     { acao: "notificacoes.salvarRegrasNotificacaoAcao", usuarioId: sessao.usuario.id },
@@ -121,7 +138,7 @@ export async function restaurarRegrasPadraoAcao(): Promise<ResultadoAcao> {
   return executar(
     async () => {
       await restaurarRegrasPadrao(getDb(), sessao.usuario.id);
-      revalidarTudo();
+      refresh();
       return sucesso(null);
     },
     { acao: "notificacoes.restaurarRegrasPadraoAcao", usuarioId: sessao.usuario.id },
@@ -144,7 +161,7 @@ export async function silenciarConcursoAcao(
   return executar(
     async () => {
       await definirConcursoSilenciado(getDb(), sessao.usuario.id, id.data, silenciado.data);
-      revalidarTudo();
+      refresh();
       return sucesso(null);
     },
     { acao: "notificacoes.silenciarConcursoAcao", usuarioId: sessao.usuario.id },

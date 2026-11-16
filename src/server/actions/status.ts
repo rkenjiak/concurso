@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { refresh } from "next/cache";
 import { z } from "zod";
 import { STATUS, type Status } from "@/domain/enums";
 import {
@@ -20,12 +20,6 @@ import { definirConcluido } from "../repositories/eventos";
 import { dispensarPendencia } from "../repositories/pendencias";
 import * as repo from "../repositories/status";
 import { executar, falha, falhaValidacao, type ResultadoAcao, sucesso } from "./resultado";
-
-function revalidar(id: number) {
-  revalidatePath(`/concursos/${id}`);
-  revalidatePath("/concursos");
-  revalidatePath("/");
-}
 
 /** Altera o status; devolve o id do registro do histórico para o "Desfazer" do aviso (#100). */
 export async function alterarStatus(
@@ -48,7 +42,7 @@ export async function alterarStatus(
         dados.data.para,
         dados.data.observacao,
       );
-      revalidar(id.data);
+      refresh();
       return sucesso({ registroId });
     },
     { acao: "status.alterarStatus", usuarioId },
@@ -78,7 +72,7 @@ export async function desfazerUltimoStatus(
   return executar(
     async () => {
       const status = await repo.desfazerUltimoStatus(getDb(), usuarioId, id.data, esperado.data);
-      revalidar(id.data);
+      refresh();
       return sucesso({ status });
     },
     { acao: "status.desfazerUltimoStatus", usuarioId },
@@ -141,8 +135,7 @@ export async function responderPendenciaStatus(
           observacaoResposta(pendencia, resposta),
         );
       });
-      revalidar(id.data);
-      if (concluirEvento) revalidatePath("/", "layout");
+      refresh();
       return sucesso({
         status: resposta.para ?? concurso.status,
         registroStatus,
@@ -177,8 +170,7 @@ export async function desfazerRespostaPendencia(
   return executar(
     async () => {
       const status = await repo.desfazerResposta(getDb(), usuarioId, id.data, dados.data);
-      if (dados.data.eventoConcluido !== null) revalidatePath("/", "layout");
-      revalidar(id.data);
+      refresh();
       return sucesso({ status });
     },
     { acao: "status.desfazerRespostaPendencia", usuarioId },
@@ -222,7 +214,7 @@ export async function dispensarPendenciaStatus(
         dataEvento: pendencia.dataEvento,
         ate: modo.data === "lembrar" ? somarDias(hoje, DIAS_LEMBRAR_DEPOIS) : null,
       });
-      revalidar(id.data);
+      refresh();
       return sucesso(null);
     },
     { acao: "status.dispensarPendenciaStatus", usuarioId },

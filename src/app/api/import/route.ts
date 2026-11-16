@@ -45,6 +45,7 @@ export async function POST(request: Request): Promise<Response> {
 
   try {
     const resumo = await substituirTudo(getDb(), usuario.id, validarBackup(json));
+    // `refresh()` só vale em Server Action (#124); aqui o cliente chama `router.refresh()`.
     revalidatePath("/", "layout");
     log.info("dados.importacao", { usuarioId: usuario.id, ...resumo });
     return Response.json(sucesso(resumo));

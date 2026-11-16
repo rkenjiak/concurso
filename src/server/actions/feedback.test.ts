@@ -25,7 +25,7 @@ vi.mock("../db/client", async (original) => ({
   ...(await original<typeof import("../db/client")>()),
   getDb: () => estado.db,
 }));
-vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+vi.mock("next/cache", () => ({ refresh: vi.fn() }));
 vi.mock("next/headers", () => ({
   headers: async () => ({
     get: (nome: string) => (nome === "user-agent" ? estado.userAgent : null),

@@ -1,7 +1,7 @@
 import { CalendarClock } from "lucide-react";
-import Link from "next/link";
 import { MarcadorConcurso } from "@/components/concurso/marcador-concurso";
 import { COR_URGENCIA } from "@/components/evento/urgencia";
+import { LinkSobDemanda } from "@/components/ui/link-sob-demanda";
 import { type Contagem, type DestaqueContagem, urgenciaContagem } from "@/domain/contagem";
 import type { CorConcurso } from "@/domain/cores";
 import { hrefEvento } from "@/domain/navegacao-concurso";
@@ -72,7 +72,7 @@ export function ListaContagens({ itens }: { itens: readonly ItemContagem[] }) {
     <ul className="space-y-2" data-testid="lista-contagens">
       {itens.map((c) => (
         <li key={c.concursoId}>
-          <Link
+          <LinkSobDemanda
             href={hrefEvento(c.concursoId, c.contagem.evento.id, { de: "dashboard" })}
             data-destaque={c.contagem.destaque}
             className={cn(
@@ -97,7 +97,7 @@ export function ListaContagens({ itens }: { itens: readonly ItemContagem[] }) {
                 {c.contagem.evento.hora ? ` às ${c.contagem.evento.hora}` : null}
               </p>
             </div>
-          </Link>
+          </LinkSobDemanda>
         </li>
       ))}
     </ul>

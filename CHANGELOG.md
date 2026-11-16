@@ -7,6 +7,32 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 
 ## [Unreleased]
 
+### Adicionado
+
+- **Prefetch sob demanda nas listas** (#124): os links dos prazos e das próximas provas no
+  dashboard, das notificações e da lista e do quadro de concursos só pré-carregam o destino quando
+  o mouse passa por cima, o link recebe foco ou é tocado (`LinkSobDemanda`), em vez de buscar todos
+  os que aparecem na tela. O menu e os demais links continuam pré-carregando como antes. Enquanto
+  a navegação de um desses links espera o servidor (comum no celular, onde o toque vem pouco antes
+  do clique), uma barra fina aparece na base do link.
+
+### Alterado
+
+- **Menos requisições depois de cada alteração** (#124): as Server Actions usam `refresh()` em
+  vez de `revalidatePath`. A tela atual continua voltando atualizada na mesma resposta (o contador
+  de não lidas inclusive), mas o navegador não descarta mais o que já tinha pré-carregado, então
+  os links do menu não são buscados de novo a cada alteração. A importação e o servidor MCP (Route
+  Handlers) não mudam.
+
+### Corrigido
+
+- **Abrir uma notificação não gera mais um refresh extra** (#124): o clique marcava a notificação
+  como lida numa action que disputava com a navegação, e o Next refazia a página de destino logo
+  depois. Agora a leitura é gravada sem atualizar a tela, e o sino, a barra inferior e a lista
+  descontam a notificação na hora, no próprio navegador. A próxima atualização da tela (qualquer
+  alteração ou o botão Atualizar) volta a usar a contagem do servidor, o que também corrige o
+  contador se a gravação tiver falhado.
+
 ## [2.8.0] - 2026-11-10
 
 ### Adicionado

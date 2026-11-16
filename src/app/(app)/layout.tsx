@@ -11,13 +11,18 @@ import { contarNotificacoesNaoLidas } from "@/server/queries/notificacoes";
  * Layout do app (visão usuário): o mesmo para todos, admins inclusive — nada de admin aparece
  * aqui além do seletor de visão no menu da conta, visível só para admins (#50). O contador de não
  * lidas (#65; sino no desktop, item Notificações da barra inferior no celular) é recalculado na
- * resposta de toda Server Action que revalida: com `revalidatePath`, o Next re-renderiza a rota
- * atual a partir da raiz (layout incluso) na mesma viagem, sem `router.refresh()`.
+ * resposta de toda Server Action que chama `refresh()`: o Next re-renderiza a rota atual a partir
+ * da raiz (layout incluso) na mesma viagem, sem `router.refresh()` e sem esvaziar o cache de
+ * prefetch (#124). Abrir uma notificação marca como lida sem `refresh()` e desconta no cliente
+ * (`NotificacoesLidasProvider`) até a próxima renderização deste layout (`versaoNaoLidas`).
  */
 export default async function AppLayout({ children }: { children: ReactNode }) {
   await connection();
   const usuario = await exigirUsuarioPagina();
   const naoLidas = await contarNotificacoesNaoLidas(getDb(), usuario.id, hojeSP());
+  // Uma por renderização (a rota já é dinâmica): o cliente zera o desconto local de notificações
+  // abertas quando ela muda (#124).
+  const versaoNaoLidas = crypto.randomUUID();
   return (
     <Casca
       visao="usuario"
@@ -25,6 +30,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
       ehAdmin={usuario.papel === "ADMIN"}
       podeSair={lerConfigAuth().habilitada}
       naoLidas={naoLidas}
+      versaoNaoLidas={versaoNaoLidas}
     >
       {children}
     </Casca>

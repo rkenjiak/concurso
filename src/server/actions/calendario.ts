@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { refresh } from "next/cache";
 import { z } from "zod";
 import { exigirUsuarioAcao } from "../auth/acesso";
 import { getDb } from "../db/client";
@@ -17,7 +17,7 @@ export async function gerarTokenIcsAcao(): Promise<ResultadoAcao<{ token: string
   return executar(
     async () => {
       const token = await gerarTokenIcs(getDb(), sessao.usuario.id);
-      revalidatePath("/configuracoes");
+      refresh();
       return sucesso({ token });
     },
     { acao: "calendario.gerarTokenIcsAcao", usuarioId: sessao.usuario.id },
@@ -31,7 +31,7 @@ export async function revogarTokenIcsAcao(): Promise<ResultadoAcao> {
   return executar(
     async () => {
       await revogarTokenIcs(getDb(), sessao.usuario.id);
-      revalidatePath("/configuracoes");
+      refresh();
       return sucesso(null);
     },
     { acao: "calendario.revogarTokenIcsAcao", usuarioId: sessao.usuario.id },
@@ -52,7 +52,7 @@ export async function salvarOpcoesIcsAcao(entrada: unknown): Promise<ResultadoAc
   return executar(
     async () => {
       await definirOpcoesIcs(getDb(), sessao.usuario.id, opcoes.data);
-      revalidatePath("/configuracoes");
+      refresh();
       return sucesso(null);
     },
     { acao: "calendario.salvarOpcoesIcsAcao", usuarioId: sessao.usuario.id },

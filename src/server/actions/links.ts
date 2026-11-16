@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { refresh } from "next/cache";
 import { idSchema } from "@/lib/schemas/comum";
 import { linkSchema, ordemLinksSchema } from "@/lib/schemas/link";
 import { exigirUsuarioAcao } from "../auth/acesso";
@@ -35,7 +35,7 @@ export async function salvarLink(
       } else {
         id = await repo.criarLink(db, usuarioId, concursoId.data, dados.data);
       }
-      revalidatePath(`/concursos/${concursoId.data}`);
+      refresh();
       return sucesso({ id });
     },
     { acao: "links.salvarLink", usuarioId },
@@ -55,7 +55,7 @@ export async function excluirLink(
   return executar(
     async () => {
       await repo.excluirLink(getDb(), usuarioId, concursoId.data, linkId.data);
-      revalidatePath(`/concursos/${concursoId.data}`);
+      refresh();
       return sucesso(null);
     },
     { acao: "links.excluirLink", usuarioId },
@@ -76,7 +76,7 @@ export async function reordenarLinks(
   return executar(
     async () => {
       await repo.reordenarLinks(getDb(), usuarioId, concursoId.data, ids.data);
-      revalidatePath(`/concursos/${concursoId.data}`);
+      refresh();
       return sucesso(null);
     },
     { acao: "links.reordenarLinks", usuarioId },

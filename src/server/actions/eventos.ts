@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { refresh } from "next/cache";
 import type { PendenciaStatus } from "@/domain/sugestao-status";
 import { idSchema } from "@/lib/schemas/comum";
 import { concluidoSchema, eventoSchema } from "@/lib/schemas/evento";
@@ -13,14 +13,10 @@ import { executar, falha, falhaValidacao, type ResultadoAcao, sucesso } from "./
 
 const INVALIDO = "Evento não encontrado.";
 
-/**
- * Eventos aparecem no detalhe, no dashboard, no calendário, em /notificacoes e no contador do
- * sino (calculado no layout): revalida o layout raiz, que cobre todas essas telas (#100, D15).
- */
-function revalidar(concursoId: number) {
-  revalidatePath(`/concursos/${concursoId}`);
-  revalidatePath("/", "layout");
-}
+// Eventos aparecem no detalhe, no dashboard, no calendário, em /notificacoes e no contador do sino
+// (calculado no layout). O `refresh()` traz a tela atual re-renderizada a partir da raiz (layout
+// incluso) na resposta da action, sem esvaziar o cache de prefetch do navegador (#124): as outras
+// telas são dinâmicas e buscam os dados de novo ao navegar (#100, D15).
 
 /** Cria (`eventoId` nulo) ou atualiza um evento do concurso. */
 export async function salvarEvento(
@@ -47,7 +43,7 @@ export async function salvarEvento(
       } else {
         id = await repo.criarEvento(db, usuarioId, concursoId.data, dados.data);
       }
-      revalidar(concursoId.data);
+      refresh();
       return sucesso({ id });
     },
     { acao: "eventos.salvarEvento", usuarioId },
@@ -67,7 +63,7 @@ export async function excluirEvento(
   return executar(
     async () => {
       await repo.excluirEvento(getDb(), usuarioId, concursoId.data, eventoId.data);
-      revalidar(concursoId.data);
+      refresh();
       return sucesso(null);
     },
     { acao: "eventos.excluirEvento", usuarioId },
@@ -103,7 +99,7 @@ export async function alternarConcluido(
     async () => {
       const db = getDb();
       await repo.definirConcluido(db, usuarioId, concursoId.data, eventoId.data, concluido.data);
-      revalidar(concursoId.data);
+      refresh();
       const pendencia = concluido.data
         ? await obterPendenciaDoEvento(db, usuarioId, concursoId.data, eventoId.data, hojeSP())
         : null;

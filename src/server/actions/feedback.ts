@@ -9,7 +9,7 @@
  * - Ações do admin (`exigirAdminAcao`), todas em lote (até 200 IDs), numa transação e com um
  *   registro de auditoria por lote (regras em `repositories/feedback.ts`).
  */
-import { revalidatePath } from "next/cache";
+import { refresh } from "next/cache";
 import { headers } from "next/headers";
 import { normalizarUserAgent } from "@/domain/feedback";
 import { exportarFeedbacksComo } from "@/lib/feedback-exportacao";
@@ -34,8 +34,6 @@ import {
   restaurarFeedbacks,
 } from "../repositories/feedback";
 import { executar, falhaValidacao, type ResultadoAcao, sucesso } from "./resultado";
-
-const atualizarPainel = () => revalidatePath("/admin", "layout");
 
 /** Envia um feedback (tipo, mensagem e a página atual, sem query string). */
 export async function enviarFeedbackAcao(entrada: unknown): Promise<ResultadoAcao<{ id: number }>> {
@@ -77,7 +75,7 @@ export async function exportarFeedbacksAcao(
   return executar(
     async () => {
       const itens = await exportarFeedbacks(getDb(), sessao.usuario, ids.data);
-      atualizarPainel();
+      refresh();
       const conteudo = exportarFeedbacksComo(formato.data as FormatoExportacaoFeedback, itens, {
         incluirEmail,
       });
@@ -99,7 +97,7 @@ export async function descartarFeedbacksAcao(idsBrutos: unknown): Promise<Result
   return executar(
     async () => {
       const descarte = await descartarFeedbacks(getDb(), sessao.usuario, ids.data);
-      atualizarPainel();
+      refresh();
       return sucesso(descarte);
     },
     { acao: "feedback.descartarFeedbacksAcao", usuarioId: sessao.usuario.id },
@@ -126,7 +124,7 @@ export async function desfazerDescarteAcao(
         undefined,
         { descartadoEm: dados.data.descartadoEm },
       );
-      atualizarPainel();
+      refresh();
       return sucesso({ restaurados });
     },
     { acao: "feedback.desfazerDescarteAcao", usuarioId: sessao.usuario.id },
@@ -148,7 +146,7 @@ export async function restaurarFeedbacksAcao(
         sessao.usuario,
         ids.data.map((id) => ({ id, status: "NOVO" as const })),
       );
-      atualizarPainel();
+      refresh();
       return sucesso({ restaurados });
     },
     { acao: "feedback.restaurarFeedbacksAcao", usuarioId: sessao.usuario.id },
@@ -166,7 +164,7 @@ export async function excluirFeedbacksAcao(
   return executar(
     async () => {
       const excluidos = await excluirFeedbacks(getDb(), sessao.usuario, ids.data);
-      atualizarPainel();
+      refresh();
       return sucesso({ excluidos });
     },
     { acao: "feedback.excluirFeedbacksAcao", usuarioId: sessao.usuario.id },

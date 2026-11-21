@@ -15,7 +15,10 @@ test("token malformado ou inexistente responde HTTP 404 real (#129)", async ({ p
   ]) {
     const resposta = await page.goto(rota);
     expect(resposta?.status(), rota).toBe(404);
-    await expect(page.getByText("This page could not be found.")).toBeVisible();
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Link não encontrado" }),
+    ).toBeVisible();
+    await expect(page.locator("a")).toHaveCount(0);
     expect((await request.get(rota)).status(), `GET ${rota}`).toBe(404);
   }
 });
@@ -232,16 +235,18 @@ test("compartilhamento público: DTO sem vazamentos, ilha cliente, 360 px e inva
     expect(await adminPage.content()).not.toContain("/compartilhado/");
     await adminPage.close();
 
-    // 4. Regenerar link invalida o token antigo no cache ISR.
+    // 4. Regenerar link (com confirmação) invalida o token antigo no cache ISR.
     await dlgCompartilhar.getByRole("button", { name: "Gerar novo link" }).click();
+    await dlgCompartilhar.getByRole("button", { name: "Confirmar novo link" }).click();
     await expect(campoUrl).not.toHaveValue(url1);
     const url2 = await campoUrl.inputValue();
     const caminho2 = new URL(url2).pathname;
     await esperarInvalidacaoIsr(request, caminho1, 404);
     expect((await request.get(caminho2)).status()).toBe(200);
 
-    // 5. Revogar invalida o token no cache ISR e remove o indicador.
+    // 5. Revogar (com confirmação) invalida o token no cache ISR e remove o indicador.
     await dlgCompartilhar.getByRole("button", { name: "Revogar acesso" }).click();
+    await dlgCompartilhar.getByRole("button", { name: "Confirmar revogação" }).click();
     await expect(
       dlgCompartilhar.getByRole("button", { name: "Ativar compartilhamento" }),
     ).toBeVisible();

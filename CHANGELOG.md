@@ -11,17 +11,18 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 
 - **Compartilhamento público do cronograma e linha do tempo** (#129): nova opção **Compartilhar…**
   no menu de ações de `/concursos/[id]` (com selo **Compartilhado** no cabeçalho quando ativa) para
-  gerar, copiar, regenerar (invalidando o endereço anterior na hora) ou revogar um link público
-  somente leitura em `/compartilhado/<token>` (token opaco de 192 bits em `compartilhamento_concurso`,
-  migração `0009_compartilhamento`), acessível mesmo com login obrigatório na instância.
+  gerar, copiar, regenerar ou revogar (estes dois com confirmação inline no diálogo e invalidação
+  imediata) um link público somente leitura em `/compartilhado/<token>` (token opaco de 192 bits em
+  `compartilhamento_concurso`, migração `0009_compartilhamento`), acessível mesmo com login
+  obrigatório na instância.
 - **Página pública com ISR sob demanda e DTO estrito** (#129): `/compartilhado/[token]` renderiza
   com `revalidate = 300`, `dynamicParams = true` e `generateStaticParams() => []` (sem APIs
-  dinâmicas, gravações no GET ou `loading.tsx`, devolvendo HTTP 404 real para tokens
-  malformados/ausentes/revogados ou de contas sem acesso). Expõe apenas dados gerais, cronograma
-  completo de eventos (ignorando `ocultoDashboard`), validade e transições de status — nunca
-  observações, locais, links, notas/resultados, remuneração, tags, IDs internos ou dados do dono —
-  com ilha cliente mínima para calcular datas relativas no horário de Brasília, `noindex, nofollow` e
-  metadata leve.
+  dinâmicas, gravações no GET ou `loading.tsx`, e `not-found.tsx` dedicada em pt-BR devolvendo
+  HTTP 404 real para tokens malformados/ausentes/revogados ou de contas sem acesso). Expõe apenas
+  dados gerais, cronograma completo de eventos (ignorando `ocultoDashboard`), homologação/validade e
+  transições de status — nunca observações, locais, links, notas/resultados, remuneração, tags, IDs
+  internos ou dados do dono — com ilha cliente mínima para calcular datas relativas no horário de
+  Brasília, `noindex, nofollow` e metadata leve.
 
 ### Alterado
 
@@ -29,10 +30,12 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
   - `src/proxy.ts` exclui `/compartilhado/*` direto no `matcher` e `next.config.ts` envia
     `X-Robots-Tag: noindex, nofollow` sem sobrescrever `Cache-Control`.
   - Revogar, regenerar e excluir concurso compartilhado invalidam exatamente o caminho do token no
-    ISR; edições normais na UI continuam só com `refresh()` (#124, atualizando a página pública em
-    até 5 min). Bloquear/desbloquear, retirar e-mail da allowlist e rebaixar admin no painel
-    invalidam `/compartilhado/[token]` mantendo o registro de compartilhamento intacto no bloqueio
-    (desbloquear restaura o link).
+    ISR; edições normais na UI continuam só com `refresh()` (#124, revalidando a página pública a
+    cada 5 min no próximo acesso via `stale-while-revalidate`), enquanto MCP e `/api/import` já
+    invalidam na hora via `revalidatePath("/", "layout")`. Alterar papel, bloquear/desbloquear e
+    adicionar/retirar e-mail da allowlist no painel invalidam ou restauram `/compartilhado/[token]`
+    mantendo o registro de compartilhamento intacto no bloqueio (`revogarTokens` não toca nos
+    compartilhamentos).
   - Painel admin (`/admin` e `/admin/usuarios/[id]`) passa a exibir apenas contagens agregadas de
     concursos compartilhados (nunca token nem URL); `exportacao.ts` ignora compartilhamentos no
     backup JSON e `substituirTudo` remove os antigos antes da importação; `caminhoSemValores` e

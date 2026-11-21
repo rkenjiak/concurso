@@ -7,43 +7,17 @@
  * regenerar.
  */
 import { randomBytes } from "node:crypto";
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import type { Db } from "../db/client";
-import { compartilhamentoConcurso, concurso } from "../db/schema";
+import { compartilhamentoConcurso } from "../db/schema";
+import type { CompartilhamentoAtivo } from "../queries/compartilhamento";
 import { exigirConcurso } from "./eventos";
-import type { Executor } from "./tipos";
 
-export interface CompartilhamentoAtivo {
-  token: string;
-  createdAt: Date;
-}
+export type { CompartilhamentoAtivo };
 
 /** Gera um token opaco de 192 bits em `base64url` (32 caracteres). */
 export function gerarTokenCompartilhamento(): string {
   return randomBytes(24).toString("base64url");
-}
-
-/**
- * Link de compartilhamento ativo do concurso, conferindo o dono (#49). Retorna `null` se o
- * concurso não estiver compartilhado ou pertencer a outro usuário.
- */
-export async function obterCompartilhamentoDoConcurso(
-  db: Executor,
-  usuarioId: number,
-  concursoId: number,
-): Promise<CompartilhamentoAtivo | null> {
-  const [linha] = await db
-    .select({
-      token: compartilhamentoConcurso.token,
-      createdAt: compartilhamentoConcurso.createdAt,
-    })
-    .from(compartilhamentoConcurso)
-    .innerJoin(concurso, eq(concurso.id, compartilhamentoConcurso.concursoId))
-    .where(
-      and(eq(compartilhamentoConcurso.concursoId, concursoId), eq(concurso.usuarioId, usuarioId)),
-    )
-    .limit(1);
-  return linha ?? null;
 }
 
 /**

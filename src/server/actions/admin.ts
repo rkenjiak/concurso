@@ -53,8 +53,8 @@ export async function definirPapelAcao(
   const resultado = await executar(
     async () => {
       await definirPapel(getDb(), sessao.usuario, usuarioId.data, papel.data, opcoesAdmin());
-      // Exceção consciente ao #124: rebaixamento pode retirar acesso e deve invalidar links compartilhados.
-      if (papel.data === "USUARIO") revalidatePath(ROTA_COMPARTILHADO, "page");
+      // Exceção consciente ao #124: alteração de papel pode retirar ou restaurar acesso de links compartilhados.
+      revalidatePath(ROTA_COMPARTILHADO, "page");
       refresh();
       return sucesso(null);
     },
@@ -119,6 +119,8 @@ export async function adicionarEmailPermitidoAcao(emailBruto: unknown): Promise<
   return executar(
     async () => {
       await adicionarEmailPermitido(getDb(), sessao.usuario, email.data);
+      // Exceção consciente ao #124: liberar e-mail restaura na hora links compartilhados em 404.
+      revalidatePath(ROTA_COMPARTILHADO, "page");
       refresh();
       return sucesso(null);
     },

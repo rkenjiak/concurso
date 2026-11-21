@@ -7,7 +7,7 @@
  *
  * Não depende de `headers()`, `cookies()` nem escreve no banco, preservando o ISR da rota pública.
  */
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { type CorConcurso, corDoConcurso } from "@/domain/cores";
 import type { Esfera, Status, TipoEvento } from "@/domain/enums";
 import type { DadosValidade } from "@/domain/validade";
@@ -17,6 +17,34 @@ import { donoDoTokenAutorizado } from "../auth/autorizacao";
 import type { ConfigAuth } from "../auth/config";
 import { compartilhamentoConcurso, concurso, evento, statusHistorico, usuario } from "../db/schema";
 import type { Executor } from "../repositories/tipos";
+
+export interface CompartilhamentoAtivo {
+  token: string;
+  createdAt: Date;
+}
+
+/**
+ * Link de compartilhamento ativo do concurso, conferindo o dono (#49, #129). Retorna `null` se
+ * o concurso não estiver compartilhado ou pertencer a outro usuário.
+ */
+export async function obterCompartilhamentoDoConcurso(
+  db: Executor,
+  usuarioId: number,
+  concursoId: number,
+): Promise<CompartilhamentoAtivo | null> {
+  const [linha] = await db
+    .select({
+      token: compartilhamentoConcurso.token,
+      createdAt: compartilhamentoConcurso.createdAt,
+    })
+    .from(compartilhamentoConcurso)
+    .innerJoin(concurso, eq(concurso.id, compartilhamentoConcurso.concursoId))
+    .where(
+      and(eq(compartilhamentoConcurso.concursoId, concursoId), eq(concurso.usuarioId, usuarioId)),
+    )
+    .limit(1);
+  return linha ?? null;
+}
 
 export interface EventoCompartilhado {
   tipo: TipoEvento;

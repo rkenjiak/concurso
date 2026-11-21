@@ -9,6 +9,7 @@ import { resultadoFaseSchema, VALORES_INICIAIS_RESULTADO_FASE } from "@/lib/sche
 import { criarBancoTeste, criarUsuarioTeste } from "../db/banco-teste";
 import type { Db } from "../db/client";
 import { ID_USUARIO_INICIAL, usuario } from "../db/schema";
+import { obterCompartilhamentoDoConcurso } from "../queries/compartilhamento";
 import {
   adicionarEmailPermitido,
   definirBloqueio,
@@ -24,7 +25,7 @@ import {
   revogarTokens,
   usuarioExiste,
 } from "./admin";
-import { ativarCompartilhamento, obterCompartilhamentoDoConcurso } from "./compartilhamento";
+import { ativarCompartilhamento } from "./compartilhamento";
 import { criarConcurso } from "./concursos";
 import { criarEvento } from "./eventos";
 import { criarLink } from "./links";

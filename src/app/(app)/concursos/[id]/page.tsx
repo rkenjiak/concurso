@@ -27,12 +27,12 @@ import { lerOrigem, linkVoltar } from "@/domain/navegacao-concurso";
 import { formatarBRL, formatarDataInstante } from "@/lib/format";
 import { hojeSP } from "@/lib/tz";
 import { getDb } from "@/server/db/client";
+import { obterCompartilhamentoDoConcurso } from "@/server/queries/compartilhamento";
 import { listarEventos } from "@/server/queries/eventos";
 import { obterOpcoesStatus } from "@/server/queries/historico";
 import { listarLinks } from "@/server/queries/links";
 import { listarResultadosFase } from "@/server/queries/resultados";
 import { obterPendenciaConcurso } from "@/server/queries/sugestoes";
-import { obterCompartilhamentoDoConcurso } from "@/server/repositories/compartilhamento";
 import { carregarConcurso } from "./carregar";
 
 export async function generateMetadata({

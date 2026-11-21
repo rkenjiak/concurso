@@ -1,7 +1,7 @@
 /**
  * Proteção das rotas (ARQUITETURA.md §7.1). Com a autenticação ligada, exige sessão válida em
  * todas as rotas, exceto `/login`, `/api/health`, `/api/versao` (#118), o fluxo do login Google
- * `/api/mcp` e `/api/calendario.ics` (#65; autenticadas pelo próprio
+ * (`/api/auth/google…`), `/api/mcp` e `/api/calendario.ics` (#65; autenticadas pelo próprio
  * handler com o token do usuário), o manifest e os ícones do PWA (#66, buscados pelo navegador sem
  * sessão), as páginas públicas de compartilhamento (`/compartilhado/*`, #129 — excluídas no
  * `matcher` para que acessos cacheados em ISR não invoquem nenhuma Function) e os arquivos

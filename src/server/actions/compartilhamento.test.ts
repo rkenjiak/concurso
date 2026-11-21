@@ -9,7 +9,7 @@ import type { UsuarioSessao } from "../auth/acesso";
 import { criarBancoTeste, criarUsuarioTeste } from "../db/banco-teste";
 import type { Db } from "../db/client";
 import { ID_USUARIO_INICIAL } from "../db/schema";
-import { obterCompartilhamentoDoConcurso } from "../repositories/compartilhamento";
+import { obterCompartilhamentoDoConcurso } from "../queries/compartilhamento";
 import { criarConcurso } from "../repositories/concursos";
 import { obterUsuario } from "../repositories/usuarios";
 

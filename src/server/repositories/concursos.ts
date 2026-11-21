@@ -129,7 +129,8 @@ export async function excluirConcursoComToken(
     const [comp] = await tx
       .select({ token: compartilhamentoConcurso.token })
       .from(compartilhamentoConcurso)
-      .where(eq(compartilhamentoConcurso.concursoId, id))
+      .innerJoin(concurso, eq(concurso.id, compartilhamentoConcurso.concursoId))
+      .where(and(eq(compartilhamentoConcurso.concursoId, id), eq(concurso.usuarioId, usuarioId)))
       .limit(1);
     const linhas = await tx
       .delete(concurso)

@@ -47,6 +47,7 @@ export function DialogoCompartilharConcurso({
   const [tokenAtual, setTokenAtual] = useState<string | null>(token);
   const [origem, setOrigem] = useState("");
   const [copiado, setCopiado] = useState(false);
+  const [confirmando, setConfirmando] = useState<"regenerar" | "revogar" | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [pendente, iniciar] = useTransition();
 
@@ -57,12 +58,14 @@ export function DialogoCompartilharConcurso({
   useEffect(() => {
     setTokenAtual(token);
     setCopiado(false);
+    setConfirmando(null);
   }, [token]);
 
   const url = tokenAtual && origem ? urlCompartilhada(origem, tokenAtual) : "";
 
   function ativar() {
     setErro(null);
+    setConfirmando(null);
     iniciar(async () => {
       const r = await gerarCompartilhamentoAcao(concursoId);
       if (!r.ok) {
@@ -85,6 +88,7 @@ export function DialogoCompartilharConcurso({
       }
       setTokenAtual(r.data.token);
       setCopiado(false);
+      setConfirmando(null);
       avisar({
         texto: "Novo link gerado. O anterior deixou de funcionar.",
         chave: `compartilhar-${concursoId}`,
@@ -102,6 +106,7 @@ export function DialogoCompartilharConcurso({
       }
       setTokenAtual(null);
       setCopiado(false);
+      setConfirmando(null);
       avisar({ texto: "Acesso público revogado.", chave: `compartilhar-${concursoId}` });
     });
   }
@@ -112,6 +117,7 @@ export function DialogoCompartilharConcurso({
       await navigator.clipboard.writeText(url);
       setCopiado(true);
       setErro(null);
+      avisar({ texto: "Link público copiado.", chave: `compartilhar-copia-${concursoId}` });
     } catch {
       setErro("Não foi possível copiar automaticamente. Copie o link do campo acima.");
     }
@@ -125,6 +131,7 @@ export function DialogoCompartilharConcurso({
         if (!v) {
           setErro(null);
           setCopiado(false);
+          setConfirmando(null);
         }
       }}
     >
@@ -141,7 +148,8 @@ export function DialogoCompartilharConcurso({
           <DialogTitle>Compartilhar cronograma</DialogTitle>
           <DialogDescription>
             Link público somente leitura para <strong>{nome}</strong>, sem exigir login. Alterações
-            no concurso aparecem em até 5 minutos.
+            no concurso passam a aparecer após alguns minutos (a página é revalidada a cada 5
+            minutos quando acessada).
           </DialogDescription>
         </DialogHeader>
 
@@ -149,8 +157,9 @@ export function DialogoCompartilharConcurso({
           <div className="space-y-1">
             <p className="font-medium text-foreground">O que fica visível no link:</p>
             <p className="text-muted-foreground">
-              Órgão, cargo, banca, esfera, cidade/UF, status atual, cronograma de eventos (datas,
-              horas e concluídos), fim da validade e histórico de transições de status.
+              Cor e ícone do concurso, órgão, cargo, banca, esfera, cidade/UF, status atual (com
+              data), cronograma de eventos (datas, horas e concluídos), homologação e validade
+              (meses, prorrogação e data final) e histórico de transições de status.
             </p>
           </div>
           <div className="space-y-1">
@@ -197,6 +206,46 @@ export function DialogoCompartilharConcurso({
                 Gerar um novo link substitui e invalida o endereço anterior imediatamente.
               </span>
             </p>
+            {confirmando ? (
+              <div
+                role="alert"
+                className="space-y-3 rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm"
+              >
+                <p className="text-foreground">
+                  {confirmando === "regenerar"
+                    ? "O link atual deixará de funcionar imediatamente para quem já o recebeu."
+                    : "Quem tiver este link deixará de ver o cronograma imediatamente."}
+                </p>
+                <div className="flex flex-wrap justify-end gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setConfirmando(null)}
+                    disabled={pendente}
+                  >
+                    Voltar
+                  </Button>
+                  {confirmando === "regenerar" ? (
+                    <Button type="button" size="sm" onClick={regenerar} disabled={pendente}>
+                      <RefreshCw aria-hidden />
+                      {pendente ? "Gerando…" : "Confirmar novo link"}
+                    </Button>
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="sm"
+                      onClick={revogar}
+                      disabled={pendente}
+                    >
+                      <Trash2 aria-hidden />
+                      {pendente ? "Revogando…" : "Confirmar revogação"}
+                    </Button>
+                  )}
+                </div>
+              </div>
+            ) : null}
           </div>
         ) : (
           <p className="text-muted-foreground text-sm">
@@ -214,11 +263,27 @@ export function DialogoCompartilharConcurso({
           {tokenAtual ? (
             <>
               <div className="flex flex-wrap gap-2">
-                <Button type="button" variant="outline" onClick={regenerar} disabled={pendente}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setErro(null);
+                    setConfirmando("regenerar");
+                  }}
+                  disabled={pendente}
+                >
                   <RefreshCw aria-hidden />
                   Gerar novo link
                 </Button>
-                <Button type="button" variant="destructive" onClick={revogar} disabled={pendente}>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  onClick={() => {
+                    setErro(null);
+                    setConfirmando("revogar");
+                  }}
+                  disabled={pendente}
+                >
                   <Trash2 aria-hidden />
                   Revogar acesso
                 </Button>

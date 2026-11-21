@@ -41,8 +41,9 @@ test("compartilhamento público funciona sem login enquanto rotas privadas redir
   expect(html).toContain(orgao);
   expect(html).toContain("Analista");
 
-  // Revoga e valida 404 imediato para o visitante.
+  // Revoga (com confirmação) e valida 404 imediato para o visitante.
   await dialogo.getByRole("button", { name: "Revogar acesso" }).click();
+  await dialogo.getByRole("button", { name: "Confirmar revogação" }).click();
   await expect(dialogo.getByRole("button", { name: "Ativar compartilhamento" })).toBeVisible();
   await esperarInvalidacaoIsr(request, caminho, 404);
 });

@@ -463,8 +463,8 @@ Os ícones são gerados de `assets/logo.svg` por `pnpm icones` (`scripts/gerar-i
 | `responderPendenciaStatus(id, chave, resposta)` | #65, #85 — responde à pendência de status recalculada no servidor (`<regra>-<eventoId>`) |
 | `dispensarPendenciaStatus(id, chave, modo)` | #85 — `"lembrar"` (3 dias) ou `"dispensar"` a pendência |
 | `alternarVisaoAcao(visao)` | #50 — "usuario" ou "admin" (só admins); grava o cookie da visão e leva a `/` ou `/admin` |
-| `definirPapelAcao(id, papel)`, `definirBloqueioAcao(id, bloqueado)` | #50 — admin; protege o último admin ativo e os de `ADMIN_EMAILS`; invalida links compartilhados em bloqueio/desbloqueio e rebaixamento (#129) |
-| `adicionarEmailPermitidoAcao(email)`, `removerEmailPermitidoAcao(email)` | #50 — admin; allowlist do painel; remover invalida links compartilhados (#129) |
+| `definirPapelAcao(id, papel)`, `definirBloqueioAcao(id, bloqueado)` | #50 — admin; protege o último admin ativo e os de `ADMIN_EMAILS`; invalida ou restaura `/compartilhado/[token]` em alterações de papel e bloqueio/desbloqueio (#129) |
+| `adicionarEmailPermitidoAcao(email)`, `removerEmailPermitidoAcao(email)` | #50 — admin; allowlist do painel; adicionar/remover invalida ou restaura `/compartilhado/[token]` (#129) |
 | `revogarTokensAcao(id)` | #108 — admin; revoga os tokens MCP e .ics sem bloquear, auditado (`REVOGAR_TOKENS`); devolve `{ revogou }` (sem tokens ativos, não muda nada nem audita) |
 | `gerarCompartilhamentoAcao(id)`, `regenerarCompartilhamentoAcao(id)`, `revogarCompartilhamentoAcao(id)` | #129 — ativa link público (idempotente), regenera (invalida o token anterior no cache ISR) ou revoga acesso público (invalida o cache ISR) |
 | `enviarFeedbackAcao({ tipo, mensagem, pagina })` | #117 — qualquer usuário logado, sempre em nome do usuário da sessão (a visão escolhida por um admin não muda o autor; campos extras do cliente são ignorados). Versão e commit vêm de `lib/versao.ts` e o user agent do cabeçalho. Limite de 10 envios por usuário por hora, contado no banco na mesma transação do envio |
@@ -503,18 +503,23 @@ na prática isso não aparece: dentro de `(app)` o layout é compartilhado (não
 redireciona de volta a `/admin` enquanto a visão admin estiver escolhida. Trocar de visão, entrar e
 sair gravam cookie, o que marca a resposta como `ActionDidRevalidateStaticAndDynamic` e esvazia o
 cache de prefetch. Os Route Handlers (`/api/import`, `/api/mcp`) não aceitam `refresh()` e mantêm o
-`revalidatePath`, que ali não afeta nenhum navegador.
+`revalidatePath("/", "layout")`: na área logada ele não dispara re-prefetch no navegador e, com o
+`#129`, passa a invalidar também as páginas `/compartilhado/*` em cache ISR.
 
 Exceções conscientes ao `#124` introduzidas pelo `#129` (por conta do cache ISR de `/compartilhado/[token]`):
 - **Edições normais na UI** (editar concurso, eventos, status) **continuam só com `refresh()`**: o
-  link público reflete as mudanças em até 5 min (TTL do ISR), preservando zero re-prefetch no app;
+  link público passa a refletir as mudanças após o TTL de 5 min, no próximo acesso (ISR com
+  `stale-while-revalidate`), preservando zero re-prefetch no app;
+- **MCP e importação** (`POST /api/mcp` e `POST /api/import`): já chamam
+  `revalidatePath("/", "layout")` e atualizam/invalidam na hora todos os links públicos;
 - **Invalidação cirúrgica** (`revalidatePath("/compartilhado/<tokenAnterior>")`): só em
   `revogarCompartilhamentoAcao`, `regenerarCompartilhamentoAcao` e `excluirConcurso` (e **apenas**
   quando o concurso tinha link ativo), garantindo que o primeiro `GET` seguinte já devolva HTTP 404;
-- **Ações do admin** (`definirBloqueioAcao`, `removerEmailPermitidoAcao` e `definirPapelAcao` ao
-  rebaixar para `USUARIO`): chamam `revalidatePath("/compartilhado/[token]", "page")` para invalidar
-  ou restaurar imediatamente links compartilhados afetados (não há prefetch da área logada dentro da
-  rota pública, e ações do painel são raras).
+- **Ações do admin** (`definirBloqueioAcao`, `definirPapelAcao`, `adicionarEmailPermitidoAcao` e
+  `removerEmailPermitidoAcao`): chamam `revalidatePath("/compartilhado/[token]", "page")` para
+  invalidar ou restaurar imediatamente links compartilhados afetados (não há prefetch da área logada
+  dentro da rota pública, e ações do painel são raras). `revogarTokensAcao` (#108) não toca nos
+  compartilhamentos.
 
 **Prefetch sob demanda** (#124): listas com um link por item usam `components/ui/link-sob-demanda`
 (`LinkSobDemanda`) em vez do `<Link>`: `prefetch={false}` até o mouse passar, o link receber foco

@@ -14,6 +14,7 @@ import type { Db } from "./db/client";
 import { ID_USUARIO_INICIAL } from "./db/schema";
 import * as op from "./mcp/operacoes";
 import { obterCalendario, obterCalendarioCompleto } from "./queries/calendario";
+import { obterCompartilhamentoDoConcurso } from "./queries/compartilhamento";
 import { listarConcursos, obterConcurso } from "./queries/concursos";
 import { contarPorStatus, obterDashboard } from "./queries/dashboard";
 import { listarEventos } from "./queries/eventos";
@@ -165,13 +166,11 @@ describe("escritas", () => {
 
     // Compartilhamento (#129): Bia não gera, regenera, lê nem revoga o da Ana.
     const { token } = await compartilhamento.ativarCompartilhamento(db, ANA, concursoId);
-    expect(await compartilhamento.obterCompartilhamentoDoConcurso(db, bia, concursoId)).toBeNull();
+    expect(await obterCompartilhamentoDoConcurso(db, bia, concursoId)).toBeNull();
     await recusa(compartilhamento.ativarCompartilhamento(db, bia, concursoId));
     await recusa(compartilhamento.regenerarCompartilhamento(db, bia, concursoId));
     await recusa(compartilhamento.revogarCompartilhamento(db, bia, concursoId));
-    expect(
-      await compartilhamento.obterCompartilhamentoDoConcurso(db, ANA, concursoId),
-    ).toMatchObject({ token });
+    expect(await obterCompartilhamentoDoConcurso(db, ANA, concursoId)).toMatchObject({ token });
 
     // Nada mudou para a dona.
     const c = await obterConcurso(db, ANA, concursoId);

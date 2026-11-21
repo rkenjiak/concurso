@@ -17,7 +17,6 @@ import type { Db } from "../db/client";
 import { emailPermitido, ID_USUARIO_INICIAL, usuario } from "../db/schema";
 import {
   ativarCompartilhamento,
-  obterCompartilhamentoDoConcurso,
   regenerarCompartilhamento,
   revogarCompartilhamento,
 } from "../repositories/compartilhamento";
@@ -27,7 +26,7 @@ import { criarEvento } from "../repositories/eventos";
 import { criarLink } from "../repositories/links";
 import { criarResultadoFase } from "../repositories/resultados";
 import { alterarStatus } from "../repositories/status";
-import { obterConcursoCompartilhado } from "./compartilhamento";
+import { obterCompartilhamentoDoConcurso, obterConcursoCompartilhado } from "./compartilhamento";
 
 let db: Db;
 let client: Client;

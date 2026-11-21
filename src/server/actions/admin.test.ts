@@ -178,27 +178,29 @@ describe("admin", () => {
     await expect(definirPapelAcao(ID_USUARIO_INICIAL, "USUARIO")).rejects.toThrow("REDIRECT /");
   });
 
-  it("invalida links compartilhados só em bloqueio, remoção de e-mail e rebaixamento (#129)", async () => {
+  it("invalida links compartilhados ao alterar acesso no painel, exceto revogarTokensAcao (#129)", async () => {
     await definirPapelAcao(bia, "ADMIN");
-    expect(estado.revalidatePath).not.toHaveBeenCalled();
+    expect(estado.revalidatePath).toHaveBeenCalledExactlyOnceWith("/compartilhado/[token]", "page");
 
+    estado.revalidatePath.mockClear();
     await definirPapelAcao(bia, "USUARIO");
-    expect(estado.revalidatePath).toHaveBeenCalledWith("/compartilhado/[token]", "page");
+    expect(estado.revalidatePath).toHaveBeenCalledExactlyOnceWith("/compartilhado/[token]", "page");
 
     estado.revalidatePath.mockClear();
     await definirBloqueioAcao(bia, true);
-    expect(estado.revalidatePath).toHaveBeenCalledWith("/compartilhado/[token]", "page");
+    expect(estado.revalidatePath).toHaveBeenCalledExactlyOnceWith("/compartilhado/[token]", "page");
 
     estado.revalidatePath.mockClear();
     await definirBloqueioAcao(bia, false);
-    expect(estado.revalidatePath).toHaveBeenCalledWith("/compartilhado/[token]", "page");
+    expect(estado.revalidatePath).toHaveBeenCalledExactlyOnceWith("/compartilhado/[token]", "page");
 
     estado.revalidatePath.mockClear();
     await adicionarEmailPermitidoAcao("convidado@x.com");
-    expect(estado.revalidatePath).not.toHaveBeenCalled();
+    expect(estado.revalidatePath).toHaveBeenCalledExactlyOnceWith("/compartilhado/[token]", "page");
 
+    estado.revalidatePath.mockClear();
     await removerEmailPermitidoAcao("convidado@x.com");
-    expect(estado.revalidatePath).toHaveBeenCalledWith("/compartilhado/[token]", "page");
+    expect(estado.revalidatePath).toHaveBeenCalledExactlyOnceWith("/compartilhado/[token]", "page");
 
     estado.revalidatePath.mockClear();
     await gerarTokenMcp(estado.db, bia);

@@ -8,6 +8,7 @@ import {
   type LucideIcon,
   MessageSquare,
   PlugZap,
+  Share2,
   ShieldCheck,
   Users,
 } from "lucide-react";
@@ -133,6 +134,7 @@ export default async function AdminPage() {
     { rotulo: "Ativos em 30 dias", valor: resumo.ativos30Dias, icone: Activity },
     { rotulo: "Com token do MCP", valor: resumo.comTokenMcp, icone: PlugZap },
     { rotulo: "Com feed .ics", valor: resumo.comFeedIcs, icone: CalendarSync },
+    { rotulo: "Concursos compartilhados", valor: resumo.concursosCompartilhados, icone: Share2 },
   ];
 
   return (

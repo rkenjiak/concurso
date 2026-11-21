@@ -1,4 +1,4 @@
-import { ArrowLeft, Pencil } from "lucide-react";
+import { ArrowLeft, Pencil, Share2 } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { AbasConcurso } from "@/components/concurso/abas-concurso";
@@ -16,6 +16,7 @@ import { ResultadosConcurso } from "@/components/concurso/resultados-concurso";
 import { SugestaoStatus } from "@/components/concurso/sugestao-status";
 import { TimelineStatus } from "@/components/concurso/timeline-status";
 import { ValidadeConcurso } from "@/components/concurso/validade-concurso";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -31,6 +32,7 @@ import { obterOpcoesStatus } from "@/server/queries/historico";
 import { listarLinks } from "@/server/queries/links";
 import { listarResultadosFase } from "@/server/queries/resultados";
 import { obterPendenciaConcurso } from "@/server/queries/sugestoes";
+import { obterCompartilhamentoDoConcurso } from "@/server/repositories/compartilhamento";
 import { carregarConcurso } from "./carregar";
 
 export async function generateMetadata({
@@ -53,11 +55,13 @@ const numero = (n: number | null) => (n == null ? "—" : n.toLocaleString("pt-B
 
 export default async function ConcursoPage({ params, searchParams }: PageProps<"/concursos/[id]">) {
   const c = await carregarConcurso((await params).id);
-  const [{ historico, opcoes }, links, eventos, resultados] = await Promise.all([
-    obterOpcoesStatus(getDb(), c.id, c.status),
-    listarLinks(getDb(), c.id),
-    listarEventos(getDb(), c.id),
-    listarResultadosFase(getDb(), c.id),
+  const db = getDb();
+  const [{ historico, opcoes }, links, eventos, resultados, compartilhamento] = await Promise.all([
+    obterOpcoesStatus(db, c.id, c.status),
+    listarLinks(db, c.id),
+    listarEventos(db, c.id),
+    listarResultadosFase(db, c.id),
+    obterCompartilhamentoDoConcurso(db, c.usuarioId, c.id),
   ]);
   const pendentes = eventos.filter((e) => !e.concluido).length;
   const hoje = hojeSP();
@@ -97,6 +101,16 @@ export default async function ConcursoPage({ params, searchParams }: PageProps<"
               transicoes={opcoes.transicoes}
               desfazerPara={opcoes.desfazerPara}
             />
+            {compartilhamento ? (
+              <Badge
+                variant="outline"
+                data-testid="indicador-compartilhado"
+                title="Este concurso tem um link público ativo"
+              >
+                <Share2 className="size-3" aria-hidden />
+                Compartilhado
+              </Badge>
+            ) : null}
           </div>
           <div className="pt-1">
             <ListaTags tags={c.tags} />
@@ -115,6 +129,7 @@ export default async function ConcursoPage({ params, searchParams }: PageProps<"
             concursoId={c.id}
             nome={`${c.orgao} — ${c.cargo}`}
             silenciado={c.notificacoesSilenciadas}
+            tokenCompartilhamento={compartilhamento?.token ?? null}
           />
         </div>
       </header>

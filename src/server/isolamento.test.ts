@@ -20,6 +20,7 @@ import { listarEventos } from "./queries/eventos";
 import { exportarConcursosCsv, exportarDados } from "./queries/exportacao";
 import { listarLinks } from "./queries/links";
 import { listarTags } from "./queries/tags";
+import * as compartilhamento from "./repositories/compartilhamento";
 import * as concursos from "./repositories/concursos";
 import { definirPrazoOculto } from "./repositories/dashboard";
 import * as eventos from "./repositories/eventos";
@@ -161,6 +162,16 @@ describe("escritas", () => {
 
     await recusa(definirPrazoOculto(db, bia, { tipo: "evento", eventoId }, true));
     await recusa(definirPrazoOculto(db, bia, { tipo: "validade", concursoId }, true));
+
+    // Compartilhamento (#129): Bia não gera, regenera, lê nem revoga o da Ana.
+    const { token } = await compartilhamento.ativarCompartilhamento(db, ANA, concursoId);
+    expect(await compartilhamento.obterCompartilhamentoDoConcurso(db, bia, concursoId)).toBeNull();
+    await recusa(compartilhamento.ativarCompartilhamento(db, bia, concursoId));
+    await recusa(compartilhamento.regenerarCompartilhamento(db, bia, concursoId));
+    await recusa(compartilhamento.revogarCompartilhamento(db, bia, concursoId));
+    expect(
+      await compartilhamento.obterCompartilhamentoDoConcurso(db, ANA, concursoId),
+    ).toMatchObject({ token });
 
     // Nada mudou para a dona.
     const c = await obterConcurso(db, ANA, concursoId);

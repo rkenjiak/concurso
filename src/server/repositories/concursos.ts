@@ -9,7 +9,7 @@ import type { ConcursoDados, ConcursoEdicaoDados } from "@/lib/schemas/concurso"
 import type { EventoDados } from "@/lib/schemas/evento";
 import type { LinkDados } from "@/lib/schemas/link";
 import type { Db } from "../db/client";
-import { concurso, statusHistorico } from "../db/schema";
+import { compartilhamentoConcurso, concurso, statusHistorico } from "../db/schema";
 import { inserirEvento } from "./eventos";
 import { inserirLink } from "./links";
 import { removerTagsOrfas, sincronizarTags } from "./tags";
@@ -116,15 +116,32 @@ export async function atualizarConcurso(
   });
 }
 
-/** Exclui o concurso (links, eventos, histórico etc. em cascata) e as tags que ficarem órfãs. */
-export async function excluirConcurso(db: Db, usuarioId: number, id: number): Promise<boolean> {
+/**
+ * Exclui o concurso (links, eventos, histórico, compartilhamento etc. em cascata) e as tags que
+ * ficarem órfãs, devolvendo o token de compartilhamento que estava ativo (para invalidar o ISR).
+ */
+export async function excluirConcursoComToken(
+  db: Db,
+  usuarioId: number,
+  id: number,
+): Promise<{ excluido: boolean; tokenCompartilhamento: string | null }> {
   return db.transaction(async (tx) => {
+    const [comp] = await tx
+      .select({ token: compartilhamentoConcurso.token })
+      .from(compartilhamentoConcurso)
+      .where(eq(compartilhamentoConcurso.concursoId, id))
+      .limit(1);
     const linhas = await tx
       .delete(concurso)
       .where(doUsuario(usuarioId, id))
       .returning({ id: concurso.id });
-    if (linhas.length === 0) return false;
+    if (linhas.length === 0) return { excluido: false, tokenCompartilhamento: null };
     await removerTagsOrfas(tx);
-    return true;
+    return { excluido: true, tokenCompartilhamento: comp?.token ?? null };
   });
+}
+
+/** Exclui o concurso (links, eventos, histórico etc. em cascata) e as tags que ficarem órfãs. */
+export async function excluirConcurso(db: Db, usuarioId: number, id: number): Promise<boolean> {
+  return (await excluirConcursoComToken(db, usuarioId, id)).excluido;
 }

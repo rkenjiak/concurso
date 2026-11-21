@@ -5,7 +5,7 @@
  * (`exigirAdminAcao`); não admins recebem "Acesso restrito a administradores." As regras (último
  * admin ativo, admins de `ADMIN_EMAILS`, auditoria) ficam em `repositories/admin.ts`.
  */
-import { refresh } from "next/cache";
+import { refresh, revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { PAPEL } from "@/domain/enums";
@@ -21,6 +21,8 @@ import {
   revogarTokens,
 } from "../repositories/admin";
 import { executar, falhaValidacao, type ResultadoAcao, sucesso } from "./resultado";
+
+const ROTA_COMPARTILHADO = "/compartilhado/[token]";
 
 const idSchema = z.number({ error: "Usuário inválido." }).int().positive("Usuário inválido.");
 const papelSchema = z.enum(PAPEL, { error: "Papel inválido." });
@@ -51,6 +53,8 @@ export async function definirPapelAcao(
   const resultado = await executar(
     async () => {
       await definirPapel(getDb(), sessao.usuario, usuarioId.data, papel.data, opcoesAdmin());
+      // Exceção consciente ao #124: rebaixamento pode retirar acesso e deve invalidar links compartilhados.
+      if (papel.data === "USUARIO") revalidatePath(ROTA_COMPARTILHADO, "page");
       refresh();
       return sucesso(null);
     },
@@ -76,6 +80,8 @@ export async function definirBloqueioAcao(
   return executar(
     async () => {
       await definirBloqueio(getDb(), sessao.usuario, usuarioId.data, bloqueado.data, opcoesAdmin());
+      // Exceção consciente ao #124: bloquear/desbloquear invalida ou restaura links compartilhados na hora.
+      revalidatePath(ROTA_COMPARTILHADO, "page");
       refresh();
       return sucesso(null);
     },
@@ -129,6 +135,8 @@ export async function removerEmailPermitidoAcao(emailBruto: unknown): Promise<Re
   return executar(
     async () => {
       await removerEmailPermitido(getDb(), sessao.usuario, email.data);
+      // Exceção consciente ao #124: remover e-mail da allowlist invalida links compartilhados na hora.
+      revalidatePath(ROTA_COMPARTILHADO, "page");
       refresh();
       return sucesso(null);
     },

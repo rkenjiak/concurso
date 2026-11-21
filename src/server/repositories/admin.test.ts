@@ -24,6 +24,7 @@ import {
   revogarTokens,
   usuarioExiste,
 } from "./admin";
+import { ativarCompartilhamento, obterCompartilhamentoDoConcurso } from "./compartilhamento";
 import { criarConcurso } from "./concursos";
 import { criarEvento } from "./eventos";
 import { criarLink } from "./links";
@@ -82,6 +83,7 @@ describe("leituras do painel", () => {
       ativos30Dias: 0,
       comTokenMcp: 0,
       comFeedIcs: 0,
+      concursosCompartilhados: 0,
     });
   });
 
@@ -326,6 +328,7 @@ describe("detalhe do usuário (#108)", () => {
     await db.update(usuario).set({ googleSub: "g-bia" }).where(eq(usuario.id, bia));
     await adicionarEmailPermitido(db, ana, "bia@x.com", AGORA);
     const token = await gerarTokenMcp(db, bia);
+    const { token: tokenCompartilhamento } = await ativarCompartilhamento(db, bia, concursoId);
 
     const detalhe = await obterDetalheUsuario(db, bia);
     expect(detalhe).toMatchObject({
@@ -335,15 +338,25 @@ describe("detalhe do usuário (#108)", () => {
       emailNoPainel: true,
       mcpTokenAtivo: true,
       icsTokenAtivo: false,
-      contagens: { concursos: 1, eventos: 1, links: 1, resultados: 1 },
+      contagens: { concursos: 1, eventos: 1, links: 1, resultados: 1, compartilhados: 1 },
     });
+    expect(await obterResumo(db, AGORA)).toMatchObject({ concursosCompartilhados: 1 });
     expect(await obterDetalheUsuario(db, 9999)).toBeNull();
     expect(await usuarioExiste(db, bia)).toBe(true);
     expect(await usuarioExiste(db, 9999)).toBe(false);
 
     // Isolamento: nenhuma leitura do painel devolve conteúdo de concursos nem segredos.
     const lido = JSON.stringify([detalhe, await listarUsuarios(db), await obterResumo(db)]);
-    for (const proibido of ["secret", "TRF", "Analista", "ex.com", "g-bia", token]) {
+    for (const proibido of [
+      "secret",
+      "TRF",
+      "Analista",
+      "ex.com",
+      "g-bia",
+      token,
+      tokenCompartilhamento,
+      "/compartilhado/",
+    ]) {
       expect(lido).not.toContain(proibido);
     }
     expect(lido).not.toMatch(/TokenHash|googleSub/);
@@ -414,5 +427,26 @@ describe("revogarTokens (#108)", () => {
     await gerarTokenIcs(db, bia);
     expect(await revogarTokens(db, ana, bia, AGORA)).toBe(true);
     expect((await obterUsuario(db, bia))?.icsTokenHash).toBeNull();
+  });
+
+  it("bloqueio e revogarTokens preservam compartilhamento_concurso (#129)", async () => {
+    const cid = await criarConcurso(
+      db,
+      bia,
+      concursoSchema.parse({ ...VALORES_INICIAIS_CONCURSO, orgao: "TRF", cargo: "Analista" }),
+    );
+    const { token } = await ativarCompartilhamento(db, bia, cid);
+    await gerarTokenMcp(db, bia);
+
+    await revogarTokens(db, ana, bia, AGORA);
+    expect(await obterCompartilhamentoDoConcurso(db, bia, cid)).toMatchObject({ token });
+
+    await definirBloqueio(db, ana, bia, true, SEM_FIXOS, AGORA);
+    expect(await obterCompartilhamentoDoConcurso(db, bia, cid)).toMatchObject({ token });
+    expect(await obterResumo(db, AGORA)).toMatchObject({ concursosCompartilhados: 0 });
+
+    await definirBloqueio(db, ana, bia, false, SEM_FIXOS, AGORA);
+    expect(await obterCompartilhamentoDoConcurso(db, bia, cid)).toMatchObject({ token });
+    expect(await obterResumo(db, AGORA)).toMatchObject({ concursosCompartilhados: 1 });
   });
 });

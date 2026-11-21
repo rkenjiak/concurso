@@ -17,11 +17,13 @@ deixar claro "o que vem a seguir" em cada concurso.
 
 **Incorporado depois do MVP**
 - Multiusuário com login Google e painel de administração (#49, #50; RF11): cada usuário vê só
-  os próprios concursos — não há compartilhamento de concursos entre usuários.
+  os próprios concursos no app autenticado.
+- Compartilhamento público somente leitura do cronograma e da linha do tempo de um concurso por
+  link, sem login (#129; RF12).
 - Lembretes no app e calendário .ics (RF08, #65) e app instalável no celular (PWA, #66).
 
 **Fora do escopo (por enquanto)**
-- Compartilhamento de concursos entre usuários.
+- Compartilhamento colaborativo ou edição de concursos entre contas.
 - Lembretes por e-mail (decisão de 2026-11-01; ver RF08).
 - Raspagem automática de sites de bancas ou importação automática de editais (o cadastro
   assistido por LLM do RF10 parte do edital que o usuário fornece).
@@ -126,6 +128,27 @@ Status sugeridos, em ordem:
 - O admin alterna entre "Visão admin" e "Visão usuário" sem novo login; na visão usuário vê o mesmo
   app que qualquer usuário. A autorização é sempre pelo papel no servidor; nunca pode faltar um
   admin ativo. Sem impersonação: o admin não vê os dados dos outros usuários.
+
+### RF12 — Compartilhamento público somente leitura (#129)
+- Pelo menu de ações do concurso (`/concursos/[id]`), o dono pode ativar, copiar, regenerar (com
+  aviso de que o endereço anterior deixa de funcionar) ou revogar um link público permanente
+  (`/compartilhado/<token>`); quando ativo, o cabeçalho exibe o selo "Compartilhado".
+- A página pública funciona sem login (mesmo quando a instância exige autenticação), responde com
+  ISR sob demanda (`revalidate = 300`, mantendo cabeçalho `Dados de dd/mm HH:mm` da geração em
+  cache), traz meta `robots` e `X-Robots-Tag: noindex, nofollow` e calcula datas relativas e contagem
+  regressiva no navegador pelo horário de Brasília.
+- **Fronteira rígida de privacidade:** só são expostos marcador (cor/ícone), órgão, cargo, banca,
+  esfera, cidade/UF, status atual (`statusDesde`), cronograma completo de eventos (`tipo`,
+  `titulo`, `data`, `hora`, `concluido`, ignorando `ocultoDashboard`), fim da validade do concurso
+  e histórico de transições (`de`, `para`, `alteradoEm`). Observações (do concurso, dos eventos e
+  do histórico), local de eventos, links, resultados/notas, remuneração/taxa/vagas/escolaridade,
+  tags, IDs internos e dados da conta do dono nunca entram no HTML nem no payload RSC.
+- Token malformado, inexistente, revogado, substituído por regeneração, de concurso excluído ou de
+  dono sem acesso (`donoDoTokenAutorizado`) devolve HTTP 404 real imediatamente (com invalidação no
+  primeiro `GET` após revogar, regenerar, excluir concurso compartilhado ou bloquear/retirar acesso
+  no painel admin). O backup JSON não exporta vínculos de compartilhamento e a restauração
+  substitutiva limpa os existentes. O painel admin mostra apenas contagens agregadas, nunca o
+  token ou a URL.
 
 ## 5. Requisitos não funcionais
 

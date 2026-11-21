@@ -10,8 +10,10 @@ import { versao } from "@/lib/versao";
 import { ID_USUARIO_INICIAL as U } from "@/server/db/schema";
 import { criarBancoTeste, criarUsuarioTeste } from "../db/banco-teste";
 import type { Db } from "../db/client";
+import { obterCompartilhamentoDoConcurso } from "../queries/compartilhamento";
 import { listarConcursos, obterConcurso } from "../queries/concursos";
 import { exportarConcursosCsv, exportarDados } from "../queries/exportacao";
+import { ativarCompartilhamento } from "./compartilhamento";
 import { criarConcurso } from "./concursos";
 import { definirPrazoOculto } from "./dashboard";
 import { criarEvento } from "./eventos";
@@ -297,6 +299,30 @@ describe("exportar → importar", () => {
     const vazio = await exportarDados(origem.db, U, T1);
     await substituirTudo(destino.db, U, validarBackup(viaArquivo(vazio)));
     expect(await exportarDados(destino.db, U, T1)).toEqual(vazio);
+  });
+
+  it("compartilhamento não entra no backup JSON e substituirTudo remove só os do usuário (#129)", async () => {
+    const { a } = await popular(origem.db);
+    const { token: tokenOrigem } = await ativarCompartilhamento(origem.db, U, a);
+    const exportado = await exportarDados(origem.db, U, T1);
+    expect(JSON.stringify(exportado)).not.toContain(tokenOrigem);
+
+    const { a: destA } = await popular(destino.db);
+    const { token: tokenDest } = await ativarCompartilhamento(destino.db, U, destA);
+    const outro = await criarUsuarioTeste(destino.db);
+    const outroCid = await criarConcurso(
+      destino.db,
+      outro,
+      concursoSchema.parse({ ...VALORES_INICIAIS_CONCURSO, orgao: "Outro", cargo: "Cargo" }),
+    );
+    const { token: tokenOutro } = await ativarCompartilhamento(destino.db, outro, outroCid);
+
+    await substituirTudo(destino.db, U, validarBackup(viaArquivo(exportado)));
+    expect(await obterCompartilhamentoDoConcurso(destino.db, U, destA)).toBeNull();
+    expect(await obterCompartilhamentoDoConcurso(destino.db, outro, outroCid)).toMatchObject({
+      token: tokenOutro,
+    });
+    expect(tokenDest).not.toBe(tokenOutro);
   });
 });
 

@@ -6,6 +6,7 @@ import {
   formatarDataHora,
   formatarDataInstante,
   formatarDataLonga,
+  formatarDiaMesHora,
   formatarMes,
   formatarNota,
   mascararBRL,
@@ -99,11 +100,14 @@ describe("formatarDataInstante / formatarDataHora", () => {
   it("exibe data e hora no fuso de São Paulo", () => {
     expect(formatarDataHora(instante)).toBe("28/02/2026 23:30");
     expect(formatarDataHora(new Date("2026-07-10T03:05:00Z"))).toBe("10/07/2026 00:05");
+    expect(formatarDiaMesHora(instante)).toBe("28/02 23:30");
+    expect(formatarDiaMesHora(new Date("2026-07-10T03:05:00Z"))).toBe("10/07 00:05");
   });
 
   it("valor ausente vira traço", () => {
     expect(formatarDataInstante(null)).toBe("—");
     expect(formatarDataHora(undefined)).toBe("—");
+    expect(formatarDiaMesHora(null)).toBe("—");
   });
 });
 

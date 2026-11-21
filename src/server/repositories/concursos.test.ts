@@ -14,11 +14,13 @@ import type { Db } from "../db/client";
 import { concurso, link, statusHistorico } from "../db/schema";
 import { listarConcursos, obterConcurso } from "../queries/concursos";
 import { listarEventos } from "../queries/eventos";
+import { ativarCompartilhamento } from "./compartilhamento";
 import {
   atualizarConcurso,
   criarConcurso,
   criarConcursoCompleto,
   excluirConcurso,
+  excluirConcursoComToken,
 } from "./concursos";
 
 let db: Db;
@@ -111,6 +113,19 @@ describe("excluirConcurso", () => {
 
   it("retorna false para concurso inexistente", async () => {
     expect(await excluirConcurso(db, U, 999)).toBe(false);
+  });
+
+  it("devolve o token de compartilhamento ao excluir concurso compartilhado (#129)", async () => {
+    const id = await criarConcurso(db, U, dados());
+    const { token } = await ativarCompartilhamento(db, U, id);
+    expect(await excluirConcursoComToken(db, U, id)).toEqual({
+      excluido: true,
+      tokenCompartilhamento: token,
+    });
+    expect(await excluirConcursoComToken(db, U, 999)).toEqual({
+      excluido: false,
+      tokenCompartilhamento: null,
+    });
   });
 });
 

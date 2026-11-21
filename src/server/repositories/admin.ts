@@ -30,6 +30,7 @@ import type { Db } from "../db/client";
 import {
   type AuditoriaAdmin,
   auditoriaAdmin,
+  compartilhamentoConcurso,
   concurso,
   emailPermitido,
   evento,
@@ -201,8 +202,14 @@ export async function listarUsuarios(db: Executor): Promise<UsuarioAdmin[]> {
 export interface DetalheUsuarioAdmin extends Omit<UsuarioAdmin, "totalConcursos"> {
   /** Conta Google vinculada (`google_sub` preenchido); o `sub` em si não sai daqui. */
   googleVinculado: boolean;
-  /** Só contagens agregadas: nada do conteúdo dos concursos (#108). */
-  contagens: { concursos: number; eventos: number; links: number; resultados: number };
+  /** Só contagens agregadas: nada do conteúdo dos concursos (#108, #129). */
+  contagens: {
+    concursos: number;
+    eventos: number;
+    links: number;
+    resultados: number;
+    compartilhados: number;
+  };
 }
 
 /**
@@ -225,7 +232,7 @@ export async function obterDetalheUsuario(
 ): Promise<DetalheUsuarioAdmin | null> {
   const total = async (consulta: Promise<{ n: number }[]>) => (await consulta)[0]?.n ?? 0;
   const doUsuario = eq(concurso.usuarioId, id);
-  const [[linha], concursos, eventos, links, resultados] = await Promise.all([
+  const [[linha], concursos, eventos, links, resultados, compartilhados] = await Promise.all([
     db
       .select({ ...colunasUsuario, googleSub: usuario.googleSub })
       .from(usuario)
@@ -253,13 +260,20 @@ export async function obterDetalheUsuario(
         .innerJoin(concurso, eq(concurso.id, resultadoFase.concursoId))
         .where(doUsuario),
     ),
+    total(
+      db
+        .select({ n: count() })
+        .from(compartilhamentoConcurso)
+        .innerJoin(concurso, eq(concurso.id, compartilhamentoConcurso.concursoId))
+        .where(doUsuario),
+    ),
   ]);
   if (!linha) return null;
   const { googleSub, ...resto } = linha;
   return {
     ...semSegredos(resto),
     googleVinculado: googleSub !== null,
-    contagens: { concursos, eventos, links, resultados },
+    contagens: { concursos, eventos, links, resultados, compartilhados },
   };
 }
 
@@ -276,6 +290,8 @@ export interface ResumoInstancia {
   /** Usuários não bloqueados com token do MCP / feed .ics ativo (#108). */
   comTokenMcp: number;
   comFeedIcs: number;
+  /** Concursos compartilhados de usuários não bloqueados (#129). */
+  concursosCompartilhados: number;
 }
 
 const DIA_MS = 24 * 60 * 60 * 1000;
@@ -300,6 +316,7 @@ export async function obterResumo(
     ativos30Dias,
     comTokenMcp,
     comFeedIcs,
+    concursosCompartilhados,
   ] = await Promise.all([
     total(db.select({ n: count() }).from(usuario)),
     total(
@@ -316,6 +333,14 @@ export async function obterResumo(
     contar(and(gte(usuario.ultimoAcessoEm, desde(30)), isNull(usuario.bloqueadoEm))),
     contar(and(isNotNull(usuario.mcpTokenHash), isNull(usuario.bloqueadoEm))),
     contar(and(isNotNull(usuario.icsTokenHash), isNull(usuario.bloqueadoEm))),
+    total(
+      db
+        .select({ n: count() })
+        .from(compartilhamentoConcurso)
+        .innerJoin(concurso, eq(concurso.id, compartilhamentoConcurso.concursoId))
+        .innerJoin(usuario, eq(usuario.id, concurso.usuarioId))
+        .where(isNull(usuario.bloqueadoEm)),
+    ),
   ]);
   return {
     usuarios,
@@ -328,6 +353,7 @@ export async function obterResumo(
     ativos30Dias,
     comTokenMcp,
     comFeedIcs,
+    concursosCompartilhados,
   };
 }
 

@@ -146,6 +146,7 @@ export default async function UsuarioAdminPage({ params }: PageProps<"/admin/usu
                 <Item rotulo="Eventos">{u.contagens.eventos}</Item>
                 <Item rotulo="Links">{u.contagens.links}</Item>
                 <Item rotulo="Resultados">{u.contagens.resultados}</Item>
+                <Item rotulo="Compartilhados">{u.contagens.compartilhados}</Item>
               </dl>
               <p className="mt-3 text-muted-foreground text-xs">
                 Só contagens: o conteúdo dos concursos continua privado.

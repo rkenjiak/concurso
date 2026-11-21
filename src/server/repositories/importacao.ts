@@ -14,6 +14,7 @@ import type { Backup } from "@/lib/schemas/backup";
 import type { Db } from "../db/client";
 import {
   anexo,
+  compartilhamentoConcurso,
   concurso,
   concursoTag,
   evento,
@@ -90,6 +91,7 @@ export async function substituirTudo(
       .where(eq(concurso.usuarioId, usuarioId));
     // Filhas primeiro (independe de ON DELETE CASCADE estar ativo).
     for (const tabela of [
+      compartilhamentoConcurso,
       notificacaoEstado,
       concursoTag,
       anexo,

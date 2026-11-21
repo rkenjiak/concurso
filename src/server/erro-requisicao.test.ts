@@ -1,6 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { registrarErroRequisicao } from "./erro-requisicao";
+import { caminhoSemValores, registrarErroRequisicao } from "./erro-requisicao";
 import { configurarLog } from "./log";
 
 afterEach(() => {
@@ -106,5 +106,29 @@ describe("registrarErroRequisicao", () => {
     const saida = capturar();
     registrarErroRequisicao("texto", { path: "/", method: "POST" }, contexto);
     expect(JSON.parse(String(saida.mock.calls[0]?.[0])).erro).toBe("texto");
+  });
+
+  it("redige o token em /compartilhado/<token> (#129)", () => {
+    const saida = capturar();
+    registrarErroRequisicao(
+      new Error("falha"),
+      { path: "/compartilhado/tok-sentinela?x=1", method: "GET" },
+      contexto,
+    );
+    const texto = String(saida.mock.calls[0]?.[0]);
+    expect(JSON.parse(texto)).toMatchObject({
+      caminho: "/compartilhado/[redigido]",
+      parametros: ["x"],
+    });
+    expect(texto).not.toMatch(/sentinela/);
+    expect(caminhoSemValores("/compartilhado/tok-sentinela")).toEqual({
+      caminho: "/compartilhado/[redigido]",
+    });
+    expect(caminhoSemValores("/compartilhado/tok-sentinela/extra")).toEqual({
+      caminho: "/compartilhado/[redigido]/extra",
+    });
+    expect(caminhoSemValores("/compartilhado-outro/x")).toEqual({
+      caminho: "/compartilhado-outro/x",
+    });
   });
 });

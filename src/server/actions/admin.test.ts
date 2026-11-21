@@ -21,13 +21,14 @@ const estado = vi.hoisted(() => ({
   db: null as unknown as Db,
   usuario: null as UsuarioSessao | null,
   cookies: new Map<string, string>(),
+  revalidatePath: vi.fn(),
 }));
 
 vi.mock("../db/client", async (original) => ({
   ...(await original<typeof import("../db/client")>()),
   getDb: () => estado.db,
 }));
-vi.mock("next/cache", () => ({ refresh: vi.fn() }));
+vi.mock("next/cache", () => ({ refresh: vi.fn(), revalidatePath: estado.revalidatePath }));
 vi.mock("next/headers", () => ({
   cookies: async () => ({
     get: (nome: string) =>
@@ -85,6 +86,7 @@ beforeEach(async () => {
   bia = await criarUsuarioTeste(estado.db, "bia@x.com");
   estado.cookies.clear();
   estado.usuario = await sessaoDe(ID_USUARIO_INICIAL);
+  estado.revalidatePath.mockClear();
 });
 
 afterEach(() => client.close());
@@ -174,6 +176,36 @@ describe("admin", () => {
   it("ao se rebaixar (havendo outro admin) volta para a visão usuário", async () => {
     await definirPapelAcao(bia, "ADMIN");
     await expect(definirPapelAcao(ID_USUARIO_INICIAL, "USUARIO")).rejects.toThrow("REDIRECT /");
+  });
+
+  it("invalida links compartilhados ao alterar acesso no painel, exceto revogarTokensAcao (#129)", async () => {
+    await definirPapelAcao(bia, "ADMIN");
+    expect(estado.revalidatePath).toHaveBeenCalledExactlyOnceWith("/compartilhado/[token]", "page");
+
+    estado.revalidatePath.mockClear();
+    await definirPapelAcao(bia, "USUARIO");
+    expect(estado.revalidatePath).toHaveBeenCalledExactlyOnceWith("/compartilhado/[token]", "page");
+
+    estado.revalidatePath.mockClear();
+    await definirBloqueioAcao(bia, true);
+    expect(estado.revalidatePath).toHaveBeenCalledExactlyOnceWith("/compartilhado/[token]", "page");
+
+    estado.revalidatePath.mockClear();
+    await definirBloqueioAcao(bia, false);
+    expect(estado.revalidatePath).toHaveBeenCalledExactlyOnceWith("/compartilhado/[token]", "page");
+
+    estado.revalidatePath.mockClear();
+    await adicionarEmailPermitidoAcao("convidado@x.com");
+    expect(estado.revalidatePath).toHaveBeenCalledExactlyOnceWith("/compartilhado/[token]", "page");
+
+    estado.revalidatePath.mockClear();
+    await removerEmailPermitidoAcao("convidado@x.com");
+    expect(estado.revalidatePath).toHaveBeenCalledExactlyOnceWith("/compartilhado/[token]", "page");
+
+    estado.revalidatePath.mockClear();
+    await gerarTokenMcp(estado.db, bia);
+    await revogarTokensAcao(bia);
+    expect(estado.revalidatePath).not.toHaveBeenCalled();
   });
 
   it("alterna a visão sem novo login, guardando-a em cookie", async () => {

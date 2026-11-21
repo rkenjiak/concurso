@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarArrowDown, Ellipsis, Trash2 } from "lucide-react";
+import { CalendarArrowDown, Ellipsis, Share2, Trash2 } from "lucide-react";
 import { useOptimistic, useRef, useState, useTransition } from "react";
 import { useAvisos } from "@/components/avisos/avisos";
 import { Button } from "@/components/ui/button";
@@ -13,25 +13,34 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { silenciarConcursoAcao } from "@/server/actions/notificacoes";
+import { DialogoCompartilharConcurso } from "./dialogo-compartilhar-concurso";
 import { DialogoExcluirConcurso } from "./dialogo-excluir-concurso";
 
 interface MenuAcoesConcursoProps {
   concursoId: number;
-  /** "Órgão — cargo", para a confirmação da exclusão. */
+  /** "Órgão — cargo", para a confirmação da exclusão e diálogo de compartilhamento. */
   nome: string;
   silenciado: boolean;
+  tokenCompartilhamento: string | null;
 }
 
 /**
- * Menu "⋯" (Mais ações) do cabeçalho do concurso (#100, D8): baixar o `.ics`, silenciar as
- * notificações (#65; item marcado quando silenciado, resultado anunciado por aviso fora do menu)
- * e, por último, excluir (com confirmação). A confirmação fica fora do menu, com estado
- * controlado: o item some quando o menu fecha e não pode ser o dono do diálogo.
+ * Menu "⋯" (Mais ações) do cabeçalho do concurso (#100, D8): compartilhar cronograma (#129),
+ * baixar o `.ics`, silenciar as notificações (#65; item marcado quando silenciado, resultado
+ * anunciado por aviso fora do menu) e, por último, excluir (com confirmação). Os diálogos ficam
+ * fora do menu, com estado controlado: o item some quando o menu fecha e não pode ser o dono do
+ * diálogo.
  */
-export function MenuAcoesConcurso({ concursoId, nome, silenciado }: MenuAcoesConcursoProps) {
+export function MenuAcoesConcurso({
+  concursoId,
+  nome,
+  silenciado,
+  tokenCompartilhamento,
+}: MenuAcoesConcursoProps) {
   const { avisar } = useAvisos();
   const gatilhoRef = useRef<HTMLButtonElement>(null);
-  const abrindoExclusao = useRef(false);
+  const abrindoDialogo = useRef(false);
+  const [compartilhando, setCompartilhando] = useState(false);
   const [excluindo, setExcluindo] = useState(false);
   const [silenciadoOtimista, setSilenciadoOtimista] = useOptimistic(silenciado);
   const [, iniciar] = useTransition();
@@ -79,15 +88,24 @@ export function MenuAcoesConcurso({ concursoId, nome, silenciado }: MenuAcoesCon
         </DropdownMenuTrigger>
         <DropdownMenuContent
           align="end"
-          // Abrindo a confirmação de exclusão, o menu não devolve o foco ao gatilho: isso
-          // disputaria o foco com o diálogo que está abrindo.
+          // Abrindo um diálogo (Compartilhar ou Excluir), o menu não devolve o foco ao gatilho:
+          // isso disputaria o foco com o diálogo que está abrindo.
           onCloseAutoFocus={(e) => {
-            if (abrindoExclusao.current) {
+            if (abrindoDialogo.current) {
               e.preventDefault();
-              abrindoExclusao.current = false;
+              abrindoDialogo.current = false;
             }
           }}
         >
+          <DropdownMenuItem
+            onSelect={() => {
+              abrindoDialogo.current = true;
+              setCompartilhando(true);
+            }}
+          >
+            <Share2 aria-hidden />
+            Compartilhar…
+          </DropdownMenuItem>
           <DropdownMenuItem asChild>
             <a
               href={`/api/export?formato=ics&concurso=${concursoId}`}
@@ -109,7 +127,7 @@ export function MenuAcoesConcurso({ concursoId, nome, silenciado }: MenuAcoesCon
           <DropdownMenuItem
             variante="destrutivo"
             onSelect={() => {
-              abrindoExclusao.current = true;
+              abrindoDialogo.current = true;
               setExcluindo(true);
             }}
           >
@@ -118,6 +136,14 @@ export function MenuAcoesConcurso({ concursoId, nome, silenciado }: MenuAcoesCon
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+      <DialogoCompartilharConcurso
+        concursoId={concursoId}
+        nome={nome}
+        token={tokenCompartilhamento}
+        aberto={compartilhando}
+        aoMudarAberto={setCompartilhando}
+        focoAoFechar={() => gatilhoRef.current}
+      />
       <DialogoExcluirConcurso
         id={concursoId}
         nome={nome}

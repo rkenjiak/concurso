@@ -1,4 +1,4 @@
-import { expect, type Page } from "@playwright/test";
+import { type APIRequestContext, expect, type Page } from "@playwright/test";
 import { hojeSP, somarDias } from "../src/lib/tz";
 
 /**
@@ -56,4 +56,39 @@ export async function cadastrarConcurso(page: Page, dados: NovoConcurso): Promis
   await expect(page.getByRole("heading", { level: 1, name: dados.orgao })).toBeVisible();
   const url = new URL(page.url());
   return `${url.origin}${url.pathname}`;
+}
+
+/**
+ * Confere a invalidação imediata do cache ISR exigindo transição para `statusEsperado` com
+ * `x-nextjs-cache: MISS` (nunca `STALE`). Tolera até `timeoutMs` (padrão 5 s, muito abaixo do
+ * TTL de 300 s) para absorver eventuais saltos de relógio do host no `FileSystemCache` do Next.js.
+ */
+export async function esperarInvalidacaoIsr(
+  request: APIRequestContext,
+  caminho: string,
+  statusEsperado: 200 | 404,
+  timeoutMs = 5_000,
+): Promise<void> {
+  const limite = performance.now() + timeoutMs;
+  let ultimoStatus = 0;
+  let ultimoCache: string | undefined;
+
+  while (true) {
+    const resp = await request.get(caminho, { maxRedirects: 0 });
+    ultimoStatus = resp.status();
+    ultimoCache = resp.headers()["x-nextjs-cache"];
+    expect(ultimoCache, `GET ${caminho} devolveu cache ${ultimoCache}`).not.toBe("STALE");
+
+    if (ultimoStatus === statusEsperado) {
+      expect(ultimoCache, `GET ${caminho} atingiu ${statusEsperado} via ${ultimoCache}`).toBe(
+        "MISS",
+      );
+      return;
+    }
+
+    if (performance.now() >= limite) break;
+    await new Promise((r) => setTimeout(r, 150));
+  }
+
+  expect(ultimoStatus, `GET ${caminho} (x-nextjs-cache=${ultimoCache})`).toBe(statusEsperado);
 }

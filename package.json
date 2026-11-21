@@ -1,6 +1,6 @@
 {
   "name": "concurso",
-  "version": "2.9.0",
+  "version": "2.10.0",
   "private": true,
   "type": "module",
   "description": "App pessoal para cadastrar e acompanhar concursos públicos",
@@ -30,15 +30,15 @@
   },
   "dependencies": {
     "@date-fns/tz": "^1.5.0",
-    "@hookform/resolvers": "^7.0.5",
+    "@hookform/resolvers": "^7.0.7",
     "@libsql/client": "^0.18.0",
     "@modelcontextprotocol/server": "^2.4.0",
     "class-variance-authority": "^0.7.1",
     "cn": "^0.5.2",
     "date-fns": "^4.4.0",
     "drizzle-orm": "^0.45.4",
-    "jose": "^6.2.17",
-    "lucide-react": "^1.72.0",
+    "jose": "^6.2.18",
+    "lucide-react": "^1.75.0",
     "next": "16.4.6",
     "radix-ui": "^1.8.1",
     "react": "19.3.1",
@@ -50,9 +50,9 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.6.6",
+    "@biomejs/biome": "2.6.8",
     "@modelcontextprotocol/client": "^2.4.0",
-    "@playwright/test": "^1.65.0",
+    "@playwright/test": "^1.65.1",
     "@tailwindcss/postcss": "^4.3.5",
     "@types/node": "^24.19.2",
     "@types/react": "^19.3.0",

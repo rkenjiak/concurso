@@ -66,13 +66,17 @@ const CAMPO_SENSIVEL = /senha|password|passwd|token|secret|segredo|cookie|author
 /** Parâmetros de URL cujo valor nunca vai para o log (o nome fica). */
 const PARAM_SENSIVEL =
   /([?&](?:[\w-]*(?:token|senha|pass|secret|segredo|key|chave|cookie|auth|sess|e-?mail)[\w-]*|code|state)=)[^&#\s"']*/gi;
+/** Token na rota pública `/compartilhado/<token>` (#129). */
+const CAMINHO_COMPARTILHADO = /(\/compartilhado\/)[^\s/?#"']+/gi;
 const EMAIL = /([A-Za-z0-9._%+-])[A-Za-z0-9._%+-]*@([A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+)/g;
 const REMOVIDO = "[removido]";
 const CABECALHO = new Set(["ts", "nivel", "evento", "versaoApp", "commit"]);
 
-/** Remove de um texto (URL, mensagem de erro) os valores de parâmetros de query sensíveis. */
+/** Remove de um texto (URL, mensagem de erro) valores de parâmetros sensíveis e tokens de compartilhamento. */
 export function semSegredosNaUrl(texto: string): string {
-  return texto.replace(PARAM_SENSIVEL, `$1${REMOVIDO}`);
+  return texto
+    .replace(PARAM_SENSIVEL, `$1${REMOVIDO}`)
+    .replace(CAMINHO_COMPARTILHADO, "$1[redigido]");
 }
 
 /** Texto com parâmetros sensíveis removidos e e-mails mascarados (`r***@dominio`). */

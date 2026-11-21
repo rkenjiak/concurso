@@ -1,9 +1,10 @@
 "use server";
 
-import { refresh } from "next/cache";
+import { refresh, revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { urlComAba } from "@/lib/aba-concurso";
 import { urlComAviso } from "@/lib/aviso-url";
+import { caminhoCompartilhado } from "@/lib/compartilhamento";
 import { idSchema } from "@/lib/schemas/comum";
 import { concursoEdicaoSchema, concursoSchema } from "@/lib/schemas/concurso";
 import { exigirUsuarioAcao } from "../auth/acesso";
@@ -74,7 +75,14 @@ export async function excluirConcurso(idBruto: unknown): Promise<ResultadoAcao> 
   if (!id.success) return falha(NAO_ENCONTRADO);
   const r = await executar(
     async () => {
-      if (!(await repo.excluirConcurso(getDb(), usuarioId, id.data))) return falha(NAO_ENCONTRADO);
+      const { excluido, tokenCompartilhamento } = await repo.excluirConcursoComToken(
+        getDb(),
+        usuarioId,
+        id.data,
+      );
+      if (!excluido) return falha(NAO_ENCONTRADO);
+      // Exceção consciente ao #124: concurso compartilhado excluído invalida o cache público na hora.
+      if (tokenCompartilhamento) revalidatePath(caminhoCompartilhado(tokenCompartilhamento));
       refresh();
       return sucesso(null);
     },

@@ -1,5 +1,5 @@
 import type { NextConfig } from "next";
-import { cabecalhosSeguranca } from "./src/lib/cabecalhos-seguranca";
+import { CABECALHOS_COMPARTILHADO, cabecalhosSeguranca } from "./src/lib/cabecalhos-seguranca";
 import { commitGit, valoresBuild } from "./src/lib/versao-build";
 
 const nextConfig: NextConfig = {
@@ -16,10 +16,14 @@ const nextConfig: NextConfig = {
   output: process.env.NEXT_OUTPUT === "standalone" ? "standalone" : undefined,
   // `forbidden()` (403) no painel admin (#50).
   experimental: { authInterrupts: true },
-  // CSP, anti-clickjacking, nosniff, Referrer/Permissions-Policy em todas as rotas (#95).
+  // CSP, anti-clickjacking, nosniff, Referrer/Permissions-Policy em todas as rotas (#95);
+  // `/compartilhado/*` recebe ainda `X-Robots-Tag: noindex, nofollow` (#129).
   async headers() {
     const dev = process.env.NODE_ENV === "development";
-    return [{ source: "/:path*", headers: cabecalhosSeguranca(dev) }];
+    return [
+      { source: "/:path*", headers: cabecalhosSeguranca(dev) },
+      { source: "/compartilhado/:path*", headers: CABECALHOS_COMPARTILHADO },
+    ];
   },
 };
 

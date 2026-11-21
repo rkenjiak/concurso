@@ -86,6 +86,7 @@ erDiagram
   CONCURSO ||--o{ CONCURSO_TAG : ""
   TAG ||--o{ CONCURSO_TAG : ""
   CONCURSO ||--o{ ANEXO : "pós-MVP"
+  CONCURSO ||--o| COMPARTILHAMENTO_CONCURSO : "compartilha"
   USUARIO ||--o{ REGRA_NOTIFICACAO : personaliza
   CONCURSO ||--o{ NOTIFICACAO_ESTADO : "lida/dispensada"
   EVENTO ||--o{ NOTIFICACAO_ESTADO : ""
@@ -139,6 +140,15 @@ obrigatório, garantido por triggers porque a coluna foi adicionada com `ALTER T
   (ambos `CASCADE`), `regra` (`RegraPendencia`), `data_evento`, `ate` (`null` = "não perguntar
   mais"; data = "lembrar depois" até esse dia), `created_at`; PK (`evento_id`, `regra`). Se o
   evento mudar de data, a dispensa deixa de valer. A pendência em si é calculada sob demanda.
+
+**Compartilhamento público (#129, migração `0009_compartilhamento`):**
+- `compartilhamento_concurso`: `concurso_id` (PK e FK → `concurso.id` com `ON DELETE CASCADE`, 1 link
+  ativo por concurso), `token` (`text` NOT NULL UNIQUE, 192 bits aleatórios em `base64url`, 32
+  caracteres) e `created_at` (epoch ms). O token é guardado em texto plano de propósito: quem lê o
+  banco já vê os mesmos dados exibidos pelo link, e ter o valor original permite ao dono copiar o
+  link novamente sem quebrar URLs já enviadas além de invalidar exatamente `/compartilhado/<token>`
+  no ISR ao revogar ou regenerar. Fica fora do backup JSON (`exportacao.ts`) e é apagado em
+  `substituirTudo` (`importacao.ts`) antes de remover os concursos.
 
 ### 3.1 `concurso` (RF01, RF03, RF05)
 
@@ -399,17 +409,18 @@ seguinte, seletor e atalhos), então o filtro se mantém ao trocar de mês.
 | `/` | **Dashboard**: pendências de status no topo, próximos prazos (vencidos/hoje/30 dias) com concluir na linha e painel do evento (#100), próximas provas, contagem por status; ocultar/reexibir prazos pelo painel, `?ocultos=1` mostra os ocultos | MVP |
 | `/concursos` | **Lista** com busca, filtros e ordenação em `searchParams` (URL compartilhável) | MVP |
 | `/concursos/novo` | **Formulário** de cadastro; ao salvar abre o detalhe na aba Eventos (#100) | MVP |
-| `/concursos/[id]` | **Detalhe** em abas: Visão geral · Eventos · Links · Resultados · Histórico; a aba aberta fica em `?aba=` (#77): abas controladas pelo `useSearchParams`, troca gravada com `history.replaceState`, sem ir ao servidor. `?evento=<id>` destaca um evento e `?foco=validade` o card Validade; `de`/`mes`/`concursos` definem o link de volta (allowlist); `?mudar=status` abre "Mudar status". Cabeçalho: Editar, Mudar status e menu Mais ações (.ics, Silenciar, Excluir) (#100) | MVP |
+| `/concursos/[id]` | **Detalhe** em abas: Visão geral · Eventos · Links · Resultados · Histórico; a aba aberta fica em `?aba=` (#77): abas controladas pelo `useSearchParams`, troca gravada com `history.replaceState`, sem ir ao servidor. `?evento=<id>` destaca um evento e `?foco=validade` o card Validade; `de`/`mes`/`concursos` definem o link de volta (allowlist); `?mudar=status` abre "Mudar status". Cabeçalho: Editar, Mudar status, selo discreto "Compartilhado" quando há link ativo (#129) e menu Mais ações (Compartilhar…, .ics, Silenciar, Excluir) (#100) | MVP |
 | `/concursos/[id]/editar` | Formulário de edição | MVP |
 | `/configuracoes` | Seções Avisos (regras de notificação, calendário .ics), Dados (exportar/importar), Integrações (token do MCP), Conta (acesso) e Sobre (versão do app, `#sobre`, com links para a release e o CHANGELOG; #118), com índice de âncoras (#106) | MVP |
 | `/notificacoes` | **Central de notificações** (#65): avisos gerados pelas regras para prazos pendentes, agrupados pela proximidade do prazo — Hoje e amanhã (0–1 dia), Próximos 7 dias (2–7), Mais adiante (8+) —, o mais próximo primeiro em cada grupo (`lib/agrupar-por-prazo.ts`, #104); marcar como lida, marcar todas, dispensar. O dashboard é o "o que fazer agora" | v2.2 |
 | `/login` | Login Google e/ou senha única (só se auth habilitada) | MVP |
-| `/admin` | **Painel admin** (#50, só papel `ADMIN`; 403 para os demais): visão geral com totais de usuários, concursos e eventos, uso (ativos em 7/30 dias, com token do MCP, com feed .ics; #108) e ações recentes | v1.4 |
+| `/admin` | **Painel admin** (#50, só papel `ADMIN`; 403 para os demais): visão geral com totais de usuários, concursos, eventos, compartilhados (#129), uso (ativos em 7/30 dias, com token do MCP, com feed .ics; #108) e ações recentes | v1.4 |
 | `/admin/usuarios` | Usuários (nome, e-mail, papel, cadastro, último acesso real, selos MCP/.ics e "Sem acesso hoje", nº de concursos); promover/rebaixar, bloquear/desbloquear | v1.4 · #108 |
-| `/admin/usuarios/[id]` | Detalhe (#108): origem do acesso, "sem acesso hoje" e motivo, conta Google vinculada, contagens agregadas (concursos, eventos, links, resultados), tokens MCP/.ics com último uso; **Revogar tokens**. ID inválido ou inexistente → 404 (conferido no `layout.tsx` do `[id]`, #110) | #108 |
+| `/admin/usuarios/[id]` | Detalhe (#108): origem do acesso, "sem acesso hoje" e motivo, conta Google vinculada, contagens agregadas (concursos, eventos, links, resultados, compartilhados — #129; nunca o token nem a URL), tokens MCP/.ics com último uso; **Revogar tokens**. ID inválido ou inexistente → 404 (conferido no `layout.tsx` do `[id]`, #110) | #108 |
 | `/admin/acesso` | Allowlist do login Google: e-mails das variáveis (só leitura) e liberados no painel (adicionar/retirar) | v1.4 |
 | `/admin/feedback?status=&tipo=&busca=&pagina=` | **Caixa de entrada de feedback** (#117): abas Novos (padrão, com contador), Exportados, Descartados e Todos; filtro por tipo e texto; 50 por página. Tabela no estilo da auditoria com seleção em massa (checkbox por linha; no cabeçalho, todos os visíveis, indeterminado quando parcial; Shift+clique ou Shift+Espaço para o intervalo, `lib/selecao.ts`), barra de ações fixa só com seleção (Exportar, Descartar, Limpar; em Descartados, Restaurar e Excluir definitivamente), `Esc` limpa, quantidade anunciada (`aria-live`). Exportar abre a prévia nos quatro formatos (`lib/feedback-exportacao.ts`) | #117 |
 | `/admin/auditoria` | Log das ações administrativas (últimas 200) | v1.4 |
+| `/compartilhado/[token]` | **Compartilhamento público** (#129, fora de `(app)/`, sem login): cronograma completo de eventos (ignorando `ocultoDashboard`), próxima prova, fim da validade e linha do tempo de status (sem `observacao`) em leitura somente por token opaco. ISR sob demanda (`revalidate = 300`, `dynamicParams = true`, `generateStaticParams() => []`), sem `loading.tsx` (token inválido/ausente/bloqueado → HTTP 404 real), DTO estrito sem campos privados nem IDs internos (`queries/compartilhamento.ts`), ilha cliente mínima (`CronogramaPublico`) que só calcula datas relativas no navegador via `hojeSP()` (sem `LinkSobDemanda` nem links autenticados), `generateMetadata` leve (`Órgão — Cargo`, sem `opengraph-image`) e cabeçalho `X-Robots-Tag: noindex, nofollow` | #129 |
 | `/concursos?visao=quadro` | Quadro por status (kanban; arrastar ou “Mover para” = transição validada) | v1.1 |
 | `/calendario?mes=AAAA-MM&concursos=1,3` | Visão mensal de eventos (agenda em lista no celular); clique abre o painel do evento (concluir, ocultar, editar, ver no concurso; gaveta no celular, #100); cor/ícone por concurso com legenda (#46); seletor de mês e ano com eventos por mês, atalhos "Próximos eventos" e "Próxima prova", e filtro de concursos pela legenda (#83, §4.6) | v1.1 |
 
@@ -452,9 +463,10 @@ Os ícones são gerados de `assets/logo.svg` por `pnpm icones` (`scripts/gerar-i
 | `responderPendenciaStatus(id, chave, resposta)` | #65, #85 — responde à pendência de status recalculada no servidor (`<regra>-<eventoId>`) |
 | `dispensarPendenciaStatus(id, chave, modo)` | #85 — `"lembrar"` (3 dias) ou `"dispensar"` a pendência |
 | `alternarVisaoAcao(visao)` | #50 — "usuario" ou "admin" (só admins); grava o cookie da visão e leva a `/` ou `/admin` |
-| `definirPapelAcao(id, papel)`, `definirBloqueioAcao(id, bloqueado)` | #50 — admin; protege o último admin ativo e os de `ADMIN_EMAILS` |
-| `adicionarEmailPermitidoAcao(email)`, `removerEmailPermitidoAcao(email)` | #50 — admin; allowlist do painel |
+| `definirPapelAcao(id, papel)`, `definirBloqueioAcao(id, bloqueado)` | #50 — admin; protege o último admin ativo e os de `ADMIN_EMAILS`; invalida links compartilhados em bloqueio/desbloqueio e rebaixamento (#129) |
+| `adicionarEmailPermitidoAcao(email)`, `removerEmailPermitidoAcao(email)` | #50 — admin; allowlist do painel; remover invalida links compartilhados (#129) |
 | `revogarTokensAcao(id)` | #108 — admin; revoga os tokens MCP e .ics sem bloquear, auditado (`REVOGAR_TOKENS`); devolve `{ revogou }` (sem tokens ativos, não muda nada nem audita) |
+| `gerarCompartilhamentoAcao(id)`, `regenerarCompartilhamentoAcao(id)`, `revogarCompartilhamentoAcao(id)` | #129 — ativa link público (idempotente), regenera (invalida o token anterior no cache ISR) ou revoga acesso público (invalida o cache ISR) |
 | `enviarFeedbackAcao({ tipo, mensagem, pagina })` | #117 — qualquer usuário logado, sempre em nome do usuário da sessão (a visão escolhida por um admin não muda o autor; campos extras do cliente são ignorados). Versão e commit vêm de `lib/versao.ts` e o user agent do cabeçalho. Limite de 10 envios por usuário por hora, contado no banco na mesma transação do envio |
 | `exportarFeedbacksAcao(ids, formato, incluirEmail)` | #117 — admin; marca `EXPORTADO` (com quem e quando) e devolve `{ conteudo, exportados }` em `MARKDOWN_ISSUES`, `MARKDOWN_AGRUPADO`, `JSON` ou `GH`; sem e-mail salvo `incluirEmail`; ignora descartados; `@` e `#` da mensagem e do título ganham um espaço de largura zero (sem menções nem referências cruzadas no GitHub); navegador, e-mail e página vão como código inline (nada vira menção, link, HTML nem item de lista). O diálogo copia **o conteúdo devolvido pelo servidor** (`ClipboardItem` com promessa, pedido ainda no clique), então o que foi copiado, o aviso e a auditoria contam os mesmos itens; sem a API ou se a cópia falhar, mostra o conteúdo com um botão "Copiar". Se a ação falhar, nada é copiado. A opção de incluir o e-mail volta a desmarcada sempre que o diálogo fecha |
 | `descartarFeedbacksAcao(ids)`, `desfazerDescarteAcao({ anteriores, descartadoEm })`, `restaurarFeedbacksAcao(ids)`, `excluirFeedbacksAcao(ids)` | #117 — admin; descartar devolve o status anterior de cada item e o instante do descarte (`tratado_em`); o "Desfazer" do aviso só volta os itens que ainda estão **naquele** descarte (mesmo admin e mesmo `tratado_em`, status alegado só `NOVO`/`EXPORTADO`), então um desfazer antigo não reverte o que outro admin (ou o próprio) fez depois; restaurar volta a `NOVO`; excluir apaga só os descartados. Todas em lote (1–200 IDs, sem repetição), numa transação, com um registro de auditoria por lote (lote sem efeito não audita) |
@@ -478,20 +490,31 @@ falhas ao mover ou desfazer no quadro, que não revalidam nada. Criar, editar e 
 terminam com `redirect()` na própria action (fora de `executar`, que engoliria o erro de
 controle): a resposta já traz a página de destino.
 
-`refresh()` e não `revalidatePath` (#124): o app não tem cache no servidor (as páginas chamam
-`connection()`, sem `use cache`), então o `revalidatePath` não invalidava nada lá; o único efeito
-extra era marcar a resposta como `ActionDidRevalidateStaticAndDynamic`, que faz o cliente esvaziar
-**todo** o cache de prefetch e refazer o prefetch de todos os links visíveis (menu incluso) a cada
-mutação. O `refresh()` marca `ActionDidRevalidateDynamicOnly`: re-renderiza a tela atual e limpa o
-histórico de voltar/avançar (bfcache), mas mantém o prefetch. As outras telas são dinâmicas e
-buscam os dados ao navegar; o que fica pré-carregado é só o que vem até o primeiro `loading.tsx`.
-Um layout pré-carregado pode ficar até 5 min (`staleTimes.static`) desatualizado, mas na prática
-isso não aparece: dentro de `(app)` o layout é compartilhado (não vem do prefetch), e de `/admin`
-para `(app)` o único link é o da marca (`layout/marca.tsx`, para `/`), cujo dashboard redireciona
-de volta a `/admin` enquanto a visão admin estiver escolhida. Trocar de visão, entrar e sair gravam
-cookie, o que marca a resposta como `ActionDidRevalidateStaticAndDynamic` e esvazia o cache de
-prefetch. Os Route Handlers (`/api/import`, `/api/mcp`) não aceitam `refresh()` e mantêm o
+`refresh()` e não `revalidatePath` (#124): o app privado não tem cache no servidor (as páginas
+chamam `connection()`, sem `use cache`), então o `revalidatePath` não invalidava nada lá; o único
+efeito extra era marcar a resposta como `ActionDidRevalidateStaticAndDynamic`, que faz o cliente
+esvaziar **todo** o cache de prefetch e refazer o prefetch de todos os links visíveis (menu
+incluso) a cada mutação. O `refresh()` marca `ActionDidRevalidateDynamicOnly`: re-renderiza a tela
+atual e limpa o histórico de voltar/avançar (bfcache), mas mantém o prefetch. As outras telas são
+dinâmicas e buscam os dados ao navegar; o que fica pré-carregado é só o que vem até o primeiro
+`loading.tsx`. Um layout pré-carregado pode ficar até 5 min (`staleTimes.static`) desatualizado, mas
+na prática isso não aparece: dentro de `(app)` o layout é compartilhado (não vem do prefetch), e de
+`/admin` para `(app)` o único link é o da marca (`layout/marca.tsx`, para `/`), cujo dashboard
+redireciona de volta a `/admin` enquanto a visão admin estiver escolhida. Trocar de visão, entrar e
+sair gravam cookie, o que marca a resposta como `ActionDidRevalidateStaticAndDynamic` e esvazia o
+cache de prefetch. Os Route Handlers (`/api/import`, `/api/mcp`) não aceitam `refresh()` e mantêm o
 `revalidatePath`, que ali não afeta nenhum navegador.
+
+Exceções conscientes ao `#124` introduzidas pelo `#129` (por conta do cache ISR de `/compartilhado/[token]`):
+- **Edições normais na UI** (editar concurso, eventos, status) **continuam só com `refresh()`**: o
+  link público reflete as mudanças em até 5 min (TTL do ISR), preservando zero re-prefetch no app;
+- **Invalidação cirúrgica** (`revalidatePath("/compartilhado/<tokenAnterior>")`): só em
+  `revogarCompartilhamentoAcao`, `regenerarCompartilhamentoAcao` e `excluirConcurso` (e **apenas**
+  quando o concurso tinha link ativo), garantindo que o primeiro `GET` seguinte já devolva HTTP 404;
+- **Ações do admin** (`definirBloqueioAcao`, `removerEmailPermitidoAcao` e `definirPapelAcao` ao
+  rebaixar para `USUARIO`): chamam `revalidatePath("/compartilhado/[token]", "page")` para invalidar
+  ou restaurar imediatamente links compartilhados afetados (não há prefetch da área logada dentro da
+  rota pública, e ações do painel são raras).
 
 **Prefetch sob demanda** (#124): listas com um link por item usam `components/ui/link-sob-demanda`
 (`LinkSobDemanda`) em vez do `<Link>`: `prefetch={false}` até o mouse passar, o link receber foco
@@ -599,9 +622,10 @@ Decisões (issue #39):
 ├── public/icons/                   # ícones PNG do PWA (gerados por `pnpm icones`)
 ├── scripts/                        # migrate, seed, backup, mcp (stdio), gerar-icones, env
 ├── src/
-│   ├── app/                        # rotas: (app)/ com navegação, admin/, login/, api/, manifest.ts; (esqueleto)/ = páginas com o loading.tsx genérico (#110)
+│   ├── app/                        # rotas: (app)/ com navegação, admin/, login/, api/, compartilhado/ (#129), manifest.ts; (esqueleto)/ = páginas com o loading.tsx genérico (#110)
 │   ├── components/
 │   │   ├── ui/                     # shadcn/ui
+│   │   ├── compartilhado/          # ilha cliente de cronograma e linha do tempo públicos (#129)
 │   │   ├── concurso/               # formulários, cards, quadro, badges, sugestão de status
 │   │   ├── calendario/             # visão mensal, seletor de mês, filtro (#83)
 │   │   ├── evento/                 # painel do evento, badge de situação, destaque do deep-link (#100)
@@ -631,7 +655,7 @@ Decisões (issue #39):
 │   │   ├── log.ts                  # logger estruturado (§9.4)
 │   │   ├── erro-requisicao.ts      # onRequestError → log (§9.4)
 │   │   └── inicializacao.ts        # checagem do ambiente e migrações ao iniciar
-│   ├── lib/                        # format, tz, normalize, csv, tema, pwa, tags, aba-concurso, atualizar, agrupar-por-prazo, versao (+ versao-build), feedback-exportacao, selecao, schemas Zod
+│   ├── lib/                        # format, tz, normalize, csv, tema, pwa, tags, aba-concurso, atualizar, agrupar-por-prazo, versao (+ versao-build), feedback-exportacao, selecao, compartilhamento, schemas Zod
 │   ├── instrumentation.ts          # inicialização ao subir o servidor e onRequestError (§9.4)
 │   └── proxy.ts
 ├── biome.json  drizzle.config.ts  next.config.ts  vitest.config.ts  playwright.config.ts
@@ -662,9 +686,10 @@ Decisões (issue #39):
 - **Sessão:** cookie **JWT assinado** (`jose`, HS256 com `AUTH_SECRET` ≥ 32 bytes) com o ID do
   usuário e o método de login; `httpOnly`, `Secure` em produção, `SameSite=Lax`, 30 dias. `proxy.ts` confere só
   a assinatura (sem banco) e protege tudo exceto `/login`, `/api/health`, `/api/versao`, `/api/auth/google…`,
-  `/api/mcp`, `/api/calendario.ics` e o manifest e os ícones do PWA (`lib/pwa.ts`); páginas, Server
-  Actions e Route Handlers obtêm o usuário em `auth/acesso.ts`
-  (`exigirUsuarioPagina/Acao/Rota`), que relê o usuário no banco.
+  `/api/mcp`, `/api/calendario.ics`, o manifest e os ícones do PWA (`lib/pwa.ts`) e as páginas
+  públicas `/compartilhado/*` (#129 — excluídas direto no `matcher` do `proxy.ts` para que hits
+  cacheados em ISR não invoquem nenhuma Function); páginas, Server Actions e Route Handlers obtêm o
+  usuário em `auth/acesso.ts` (`exigirUsuarioPagina/Acao/Rota`), que relê o usuário no banco.
 - Em produção (`NODE_ENV=production`) sem login, o app **recusa iniciar** salvo
   `ALLOW_NO_AUTH=true` explícito — evita expor dados por esquecimento.
 - Sem biblioteca de auth completa (NextAuth, Better Auth): um provedor só não justifica a
@@ -690,8 +715,23 @@ Decisões (issue #39):
   conta; quem se rebaixa volta para a visão usuário.
 - **Bloqueio:** `usuario.bloqueado_em`. Barra o login (Google e senha), a sessão existente
   (relida a cada requisição) e os tokens do MCP e do feed de calendário, que são apagados ao
-  bloquear (#96; desbloqueado, o usuário gera outros). Os dados ficam guardados e voltam a valer ao
-  desbloquear. Sem login configurado (uso local), o bloqueio não se aplica.
+  bloquear (#96; desbloqueado, o usuário gera outros). Os dados e os registros em
+  `compartilhamento_concurso` ficam guardados e voltam a valer ao desbloquear (#129); já
+  `revogarTokens` (#108) não toca nos compartilhamentos. Sem login configurado (uso local), o
+  bloqueio não se aplica.
+- **Compartilhamento público (#129):** `obterConcursoCompartilhado` (`queries/compartilhamento.ts`)
+  valida o formato do token antes de consultar o banco (`ehTokenCompartilhamentoValido`: tokens
+  malformados fazem 0 queries) e confere `donoDoTokenAutorizado(db, config, dono)` sem ler
+  `headers()`/`cookies()` nem gravar no banco durante o `GET`. O DTO público expõe apenas dados
+  gerais, `eventos` (com `ocultoDashboard` ignorado), `validade` e `historico` sem `observacao`;
+  dados privados e IDs internos nunca entram no HTML nem no payload RSC.
+  - **Limites aceitos (#129):** (1) alterar a variável de ambiente `ALLOWED_EMAILS` não invalida o
+    cache ISR sob demanda (leva até `revalidate` + SWR para refletir); (2) URLs aleatórias em
+    `/compartilhado/<x>` invocam a Function sem atingir o banco e podem ser mitigadas com regras de
+    rate limit no provedor (ex.: Vercel Firewall); (3) logs de acesso HTTP do provedor registram o
+    caminho completo (logs estruturados da aplicação redigem o token); (4) bloquear conta mantém a
+    linha de compartilhamento no banco (ao contrário de `mcp_token_hash`/`ics_token_hash`, apagados
+    ao bloquear).
 - **Visão admin ↔ visão usuário:** seletor no menu da conta, só para admins, sem novo login. A
   escolha fica no cookie `concurso_visao` (`auth/visao.ts`) e decide o início (`/` redireciona a
   `/admin` na visão admin). A visão usuário é o app comum, sem nenhum item de admin; a visão admin
@@ -722,7 +762,8 @@ Decisões (issue #39):
 **Cabeçalhos de segurança (#95):** `next.config.ts` aplica a todas as rotas os cabeçalhos de
 `src/lib/cabecalhos-seguranca.ts`: CSP, `X-Frame-Options: DENY`, `nosniff`,
 `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy` (recursos não usados
-desligados) e `Cross-Origin-Opener-Policy: same-origin`. A CSP é sem nonce (`script-src 'self'
+desligados) e `Cross-Origin-Opener-Policy: same-origin`; em `/compartilhado/:path*`, acrescenta
+`X-Robots-Tag: noindex, nofollow` sem sobrescrever `Cache-Control` (#129). A CSP é sem nonce (`script-src 'self'
 'unsafe-inline'`): o Next injeta scripts inline e o nonce exigiria renderizar tudo pelo `proxy.ts`,
 que não roda sem login. Ela restringe o resto à própria origem (imagens também de
 `*.googleusercontent.com`, as fotos de perfil), proíbe `<object>`, embutir o app
@@ -785,7 +826,7 @@ do React). O e2e `seguranca.spec.ts` confere os cabeçalhos e a ausência de vio
 | Unitário | Vitest | `domain/*` (transições, prazos, validade, criticidade), `lib/format`, parsers BRL, schemas Zod | meta: cobertura ≥ 90% em `domain/` (medida no CI, sem limite configurado) |
 | Componente | Vitest + happy-dom (`// @vitest-environment happy-dom` no arquivo; o padrão é `node`) | `LinkSobDemanda` (ativação por mouse, foco e toque, composição de handlers, `ref`, indicador pendente) e `NotificacoesLidasProvider` com o clique na central (#124), com um `next/link` falso; o resto dos componentes é testado com `renderToStaticMarkup` | casos principais |
 | Integração | Vitest + libSQL `:memory:` + migrações | repositories/queries (transação de status, tags, filtros, export→import ida e volta); servidor MCP com cliente em memória (`InMemoryTransport`); actions de feedback (permissão, limite por hora e do lote, auditoria por lote, #117) e os comandos `gh` executados num bash real com um `gh` falso (nada da mensagem é expandido) | casos principais |
-| E2E | Playwright (Chromium) | smoke: criar concurso → evento → aparece no dashboard → mudar status → exportar/importar; login, MCP, PWA e lembretes com auth ativa; painel admin com o usuário inicial (sem auth), incluindo selos MCP/.ics, detalhe do usuário e revogar tokens → `/api/mcp` 401 e feed 404 (#108); status HTTP 404 nas rotas `[id]` (inexistente, malformado, de outro usuário), 403 no painel para não admin e esqueleto nas listagens (#110); busca, quadro, calendário (navegação rápida e filtro de concursos no desktop e em 360 px, #83), cor/ícone, ocultar prazos, tema, lembretes (sino, regras, feed .ics), um só ponto de entrada de notificações por layout (barra inferior no celular, sino no desktop) e tema e Configurações pelo menu no celular, sem duplicação (#82, #105); seções, índice e âncoras de Configurações (#106); versão do app no menu da conta, em Configurações → Sobre, no admin e em `/api/versao`, pública mesmo com login (#118); feedback: enviar pelo menu da conta (desktop, teclado e 360 px), selecionar vários com mouse, Shift+clique e Shift+Espaço, Esc, exportar como comandos `gh` (área de transferência), descartar com Desfazer, restaurar e excluir, auditoria por lote (#117); grupos pela proximidade do prazo em Notificações (#104), menu da conta pelo teclado no celular (#105), PWA, aba do detalhe na URL e botão Atualizar com limite de 60 s (#77), deep-link e volta à origem, mutação sem refazer o prefetch do menu e abrir notificação sem refresh extra, com o link pré-carregando só no hover (#124), painel do evento com concluir/Desfazer, cabeçalho do concurso, avisos e alterações não salvas (#100) e layout em 360 px; `/api/mcp` com token → concurso visível no app. Dois servidores (com e sem auth) com bancos temporários em `e2e/.tmp` | poucos fluxos |
+| E2E | Playwright (Chromium) | smoke: criar concurso → evento → aparece no dashboard → mudar status → exportar/importar; login, MCP, PWA e lembretes com auth ativa; painel admin com o usuário inicial (sem auth), incluindo selos MCP/.ics, detalhe do usuário e revogar tokens → `/api/mcp` 401 e feed 404 (#108); status HTTP 404 nas rotas `[id]` (inexistente, malformado, de outro usuário), 403 no painel para não admin e esqueleto nas listagens (#110); busca, quadro, calendário (navegação rápida e filtro de concursos no desktop e em 360 px, #83), cor/ícone, ocultar prazos, tema, lembretes (sino, regras, feed .ics), um só ponto de entrada de notificações por layout (barra inferior no celular, sino no desktop) e tema e Configurações pelo menu no celular, sem duplicação (#82, #105); seções, índice e âncoras de Configurações (#106); versão do app no menu da conta, em Configurações → Sobre, no admin e em `/api/versao`, pública mesmo com login (#118); feedback: enviar pelo menu da conta (desktop, teclado e 360 px), selecionar vários com mouse, Shift+clique e Shift+Espaço, Esc, exportar como comandos `gh` (área de transferência), descartar com Desfazer, restaurar e excluir, auditoria por lote (#117); grupos pela proximidade do prazo em Notificações (#104), menu da conta pelo teclado no celular (#105), PWA, aba do detalhe na URL e botão Atualizar com limite de 60 s (#77), deep-link e volta à origem, mutação sem refazer o prefetch do menu e abrir notificação sem refresh extra, com o link pré-carregando só no hover (#124), painel do evento com concluir/Desfazer, cabeçalho do concurso, avisos e alterações não salvas (#100) e layout em 360 px; compartilhamento público (#129): DTO sem vazamentos no HTML/RSC, ilha cliente em 360 px, 404 real para token inválido/ausente, acesso público com login exigido e invalidação imediata do ISR em revogação, regeneração, exclusão e bloqueio/allowlist/rebaixamento no painel admin; `/api/mcp` com token → concurso visível no app. Três servidores (sem auth, com senha e Google/admin) com bancos temporários em `e2e/.tmp` | poucos fluxos |
 
 Datas sempre fixadas (`vi.setSystemTime` / `hoje` injetado).
 
@@ -913,9 +954,10 @@ Linhas de nível `error` (incluindo `log.fatal`) levam também `versaoApp` e `co
 (#118, §8.4), para cruzar um erro com o deploy que o causou.
 
 **Erros de servidor.** `onRequestError` (`src/instrumentation.ts` → `server/erro-requisicao.ts`)
-registra `requisicao.erro` com método, caminho (só o pathname, mais os **nomes** dos parâmetros
-da query, nunca os valores), `routePath`, `routeType` (`render`/`route`/`action`/`proxy`),
-`renderSource` e `digest` de todo erro que o Next captura.
+registra `requisicao.erro` com método, caminho (só o pathname, com `/compartilhado/<token>`
+redigido para `/compartilhado/[redigido]` (#129), mais os **nomes** dos parâmetros da query, nunca
+os valores), `routePath`, `routeType` (`render`/`route`/`action`/`proxy`), `renderSource` e `digest`
+de todo erro que o Next captura.
 O Next continua imprimindo o erro no formato dele: a linha estruturada é acrescentada, e o `digest`
 liga as duas (é o mesmo exibido ao usuário na página de erro). Erros de controle (`redirect`,
 `notFound`…) são ignorados. O Next chama o hook mais de uma vez para o mesmo erro quando layout e
@@ -946,12 +988,13 @@ O hook só vê o que **escapa** do código: `executar` (Server Actions e MCP), `
 | `health.falhou` | error | `erro` |
 | `inicio.*` | info/warn/fatal | migrações aplicadas ou com falha, auth desligada, config inválida, `MCP_TOKEN` obsoleto |
 
-**Privacidade.** Nunca são registrados senha, tokens (sessão, MCP, `.ics`), cookies, cabeçalhos,
+**Privacidade.** Nunca são registrados senha, tokens (sessão, MCP, `.ics`, compartilhamento), cookies, cabeçalhos,
 corpo da importação nem os argumentos das ferramentas MCP. O logger ainda omite qualquer campo
 cujo nome lembre um segredo (`senha`, `token`, `secret`, `cookie`, `authorization`…) e, em
 qualquer texto (inclusive mensagens e stacks de erro): remove o valor de parâmetros de URL
 sensíveis (`code`, `state` e nomes com `token`, `senha`, `pass`, `secret`, `key`, `auth`, `sess`,
-`email`…) e mascara e-mails (`r***@gmail.com`). O `requisicao.erro` nem chega a registrar valores
+`email`…), redige tokens na rota pública (`/compartilhado/<token>` → `/compartilhado/[redigido]`,
+#129) e mascara e-mails (`r***@gmail.com`). O `requisicao.erro` nem chega a registrar valores
 de query. Das mensagens de erro do Drizzle sai tudo de `params: …` em diante (valores da query, que
 podem ter várias linhas, e-mails e dados do usuário); a SQL fica. Quando há usuário, registra-se o
 `usuarioId`. O `ip` (de `x-forwarded-for`/`x-real-ip`, ou `local`) só
@@ -994,6 +1037,7 @@ Cada item = uma branch `feature/*` a partir de `develop`; cada milestone fecha c
 | **Uso e navegação** → `v2.7.0` | `feature/admin-uso` (#108) · `feature/notfound-404` (#110) · `feature/sqlite-wal` (#112) · `feature/arquitetura-informacao` (#104–#107) | Uso real no painel admin, 404 de verdade, WAL no SQLite local, papel de Notificações, barra do celular e seções de Configurações |
 | **Versão e feedback** → `v2.8.0` | `feature/versao-feedback` (#117, #118) | Versão do app no site, no admin e em `GET /api/versao`; envio de feedback e caixa de entrada no admin com exportação para issues |
 | **Prefetch sob demanda** → `v2.9.0` | `feature/prefetch-sob-demanda` (#124) | Prefetch por intenção nas listas, `refresh()` nas Server Actions e abrir notificação sem refresh extra |
+| **Compartilhamento público** → em desenvolvimento | `feature/compartilhar-concurso` (#129) | Cronograma e linha do tempo públicos somente leitura por link, sem login, com ISR e invalidação imediata |
 | **M7 — Anexos** → `v2.10.0` | `feature/anexos` | RF02 desejável |
 
 ---

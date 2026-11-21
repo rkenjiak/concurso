@@ -41,15 +41,17 @@ function ehErroDeControle(erro: unknown): boolean {
 }
 
 /**
- * Caminho sem os valores da query (só os nomes dos parâmetros): valores podem trazer tokens,
- * e-mails ou outros dados digitados pelo usuário.
+ * Caminho sem os valores da query (só os nomes dos parâmetros) e com o token de compartilhamento
+ * público redigido (#129): valores podem trazer tokens, e-mails ou outros dados do usuário.
  */
 export function caminhoSemValores(path: string): { caminho: string; parametros?: string[] } {
   const interrogacao = path.indexOf("?");
-  if (interrogacao < 0) return { caminho: path };
+  const bruto = interrogacao < 0 ? path : path.slice(0, interrogacao);
+  const caminho = bruto.replace(/^(\/compartilhado\/)[^/]+/, "$1[redigido]");
+  if (interrogacao < 0) return { caminho };
   const nomes = [...new URLSearchParams(path.slice(interrogacao + 1)).keys()];
   return {
-    caminho: path.slice(0, interrogacao),
+    caminho,
     parametros: nomes.length > 0 ? [...new Set(nomes)] : undefined,
   };
 }

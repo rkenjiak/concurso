@@ -229,6 +229,10 @@ describe("privacidade", () => {
     expect(semSegredosNaUrl("/concursos?aba=links&para=/x&concursos=1,2")).toBe(
       "/concursos?aba=links&para=/x&concursos=1,2",
     );
+    expect(semSegredosNaUrl("https://ex.com/compartilhado/segredo-123?x=1")).toBe(
+      "https://ex.com/compartilhado/[redigido]?x=1",
+    );
+    expect(semSegredosNaUrl("/compartilhado/[redigido]")).toBe("/compartilhado/[redigido]");
   });
 
   it("mascararEmail mantém só a inicial e o domínio", () => {

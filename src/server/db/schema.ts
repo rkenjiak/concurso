@@ -377,6 +377,18 @@ export const pendenciaStatusDispensa = sqliteTable(
   ],
 );
 
+// compartilhamento_concurso (#129): link público somente leitura de um concurso (1 por concurso).
+// Token em texto plano (192 bits base64url) para permitir copiar novamente sem quebrar links já
+// enviados e invalidar por URL exata ao revogar/regenerar.
+export const compartilhamentoConcurso = sqliteTable("compartilhamento_concurso", {
+  concursoId: integer("concurso_id")
+    .primaryKey()
+    .references(() => concurso.id, { onDelete: "cascade" }),
+  token: text("token").notNull().unique(),
+  createdAt: criadoEm(),
+});
+
+export type CompartilhamentoConcurso = typeof compartilhamentoConcurso.$inferSelect;
 export type Usuario = typeof usuario.$inferSelect;
 export type NovoUsuario = typeof usuario.$inferInsert;
 export type EmailPermitido = typeof emailPermitido.$inferSelect;

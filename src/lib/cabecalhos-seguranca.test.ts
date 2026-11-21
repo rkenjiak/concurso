@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cabecalhosSeguranca, valorCsp } from "./cabecalhos-seguranca";
+import { CABECALHOS_COMPARTILHADO, cabecalhosSeguranca, valorCsp } from "./cabecalhos-seguranca";
 
 const cabecalho = (dev: boolean, nome: string) =>
   cabecalhosSeguranca(dev).find((c) => c.key === nome)?.value;
@@ -37,5 +37,9 @@ describe("cabeçalhos de segurança (#95)", () => {
     expect(valorCsp(true)).toMatch(/script-src [^;]*'unsafe-eval'/);
     expect(valorCsp(false)).toContain("connect-src 'self';");
     expect(valorCsp(true)).toContain("connect-src 'self' ws: wss:;");
+  });
+
+  it("compartilhamento público bloqueia indexação sem tocar em Cache-Control (#129)", () => {
+    expect(CABECALHOS_COMPARTILHADO).toEqual([{ key: "X-Robots-Tag", value: "noindex, nofollow" }]);
   });
 });

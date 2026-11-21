@@ -25,6 +25,15 @@ const dataHoraSPFmt = new Intl.DateTimeFormat("pt-BR", {
   hourCycle: "h23",
 });
 
+const diaMesHoraSPFmt = new Intl.DateTimeFormat("pt-BR", {
+  timeZone: FUSO_SP,
+  day: "2-digit",
+  month: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+});
+
 /** Centavos → "R$ 1.234,56". `null`/`undefined` → "—". */
 export function formatarBRL(centavos: number | null | undefined): string {
   if (centavos == null || !Number.isFinite(centavos)) return SEM_VALOR;
@@ -86,6 +95,12 @@ export function formatarDataInstante(instante: Date | number | null | undefined)
 export function formatarDataHora(instante: Date | number | null | undefined): string {
   if (instante == null) return SEM_VALOR;
   return dataHoraSPFmt.format(instante).replace(",", "");
+}
+
+/** Instante → "dd/mm HH:mm" no fuso de São Paulo (carimbo discreto de cache ISR). */
+export function formatarDiaMesHora(instante: Date | number | null | undefined): string {
+  if (instante == null) return SEM_VALOR;
+  return diaMesHoraSPFmt.format(instante).replace(",", "");
 }
 
 const numeroEntradaFmt = new Intl.NumberFormat("pt-BR", {

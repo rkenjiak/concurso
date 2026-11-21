@@ -8,6 +8,7 @@ import { criarDb, type Db } from "./client";
 import { aplicarMigracoes, PASTA_MIGRACOES } from "./migrate";
 import {
   anexo,
+  compartilhamentoConcurso,
   concurso,
   concursoTag,
   evento,
@@ -54,6 +55,7 @@ describe("migrações", () => {
     expect(resultado.rows.map((r) => r.name)).toEqual([
       "anexo",
       "auditoria_admin",
+      "compartilhamento_concurso",
       "concurso",
       "concurso_tag",
       "email_permitido",
@@ -205,10 +207,22 @@ describe("schema", () => {
       tamanhoBytes: 1024,
       chaveStorage: "anexos/1/edital.pdf",
     });
+    await db.insert(compartilhamentoConcurso).values({
+      concursoId: id,
+      token: "token-teste-0123456789abcdef01234",
+    });
 
     await db.delete(concurso).where(eq(concurso.id, id));
 
-    for (const tabela of [link, evento, statusHistorico, resultadoFase, concursoTag, anexo]) {
+    for (const tabela of [
+      link,
+      evento,
+      statusHistorico,
+      resultadoFase,
+      concursoTag,
+      anexo,
+      compartilhamentoConcurso,
+    ]) {
       const [r] = await db.select({ n: sql<number>`count(*)` }).from(tabela);
       expect(r?.n).toBe(0);
     }

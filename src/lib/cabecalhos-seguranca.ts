@@ -82,3 +82,8 @@ export function cabecalhosSeguranca(dev: boolean): CabecalhoHttp[] {
     { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
   ];
 }
+
+/** Cabeçalho extra nas páginas públicas de compartilhamento (#129), sem sobrescrever `Cache-Control`. */
+export const CABECALHOS_COMPARTILHADO: CabecalhoHttp[] = [
+  { key: "X-Robots-Tag", value: "noindex, nofollow" },
+];

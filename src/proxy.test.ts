@@ -5,7 +5,7 @@
  */
 import { NextRequest } from "next/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { proxy } from "./proxy";
+import { config, proxy } from "./proxy";
 import { COOKIE_SESSAO, criarTokenSessao } from "./server/auth/sessao";
 
 const SEGREDO = "segredo-somente-para-testes-0123456789";
@@ -68,4 +68,19 @@ describe("proxy (login desligado)", () => {
     vi.stubEnv("AUTH_SECRET", "");
     expect(passou(await proxy(requisicao("/api/export")))).toBe(true);
   });
+});
+
+describe("matcher do proxy (#129)", () => {
+  const regex = new RegExp(`^${config.matcher[0]}$`);
+
+  it.each(["/compartilhado/abc123", "/compartilhado/"])("exclui %s", (caminho) => {
+    expect(regex.test(caminho)).toBe(false);
+  });
+
+  it.each(["/compartilhado-outro", "/compartilhado", "/", "/concursos/1", "/api/export", "/admin"])(
+    "mantém %s protegido",
+    (caminho) => {
+      expect(regex.test(caminho)).toBe(true);
+    },
+  );
 });

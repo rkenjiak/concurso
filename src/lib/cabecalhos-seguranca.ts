@@ -66,7 +66,6 @@ export const RECURSOS_DESLIGADOS = [
   "serial",
   "hid",
   "display-capture",
-  "browsing-topics",
 ] as const;
 
 /** Cabeçalhos de segurança aplicados a todas as rotas. */

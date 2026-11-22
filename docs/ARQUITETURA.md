@@ -1042,8 +1042,8 @@ Cada item = uma branch `feature/*` a partir de `develop`; cada milestone fecha c
 | **Uso e navegação** → `v2.7.0` | `feature/admin-uso` (#108) · `feature/notfound-404` (#110) · `feature/sqlite-wal` (#112) · `feature/arquitetura-informacao` (#104–#107) | Uso real no painel admin, 404 de verdade, WAL no SQLite local, papel de Notificações, barra do celular e seções de Configurações |
 | **Versão e feedback** → `v2.8.0` | `feature/versao-feedback` (#117, #118) | Versão do app no site, no admin e em `GET /api/versao`; envio de feedback e caixa de entrada no admin com exportação para issues |
 | **Prefetch sob demanda** → `v2.9.0` | `feature/prefetch-sob-demanda` (#124) | Prefetch por intenção nas listas, `refresh()` nas Server Actions e abrir notificação sem refresh extra |
-| **Compartilhamento público** → em desenvolvimento | `feature/compartilhar-concurso` (#129) | Cronograma e linha do tempo públicos somente leitura por link, sem login, com ISR e invalidação imediata |
-| **M7 — Anexos** → `v2.10.0` | `feature/anexos` | RF02 desejável |
+| **Compartilhamento público** → `v2.10.0` | `feature/compartilhar-concurso` (#129) | Cronograma e linha do tempo públicos somente leitura por link, sem login, com ISR e invalidação imediata |
+| **M7 — Anexos** → `v2.11.0` | `feature/anexos` | RF02 desejável |
 
 ---
 

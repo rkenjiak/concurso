@@ -7,6 +7,8 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 
 ## [Unreleased]
 
+## [2.10.0] - 2026-11-21
+
 ### Adicionado
 
 - **Compartilhamento público do cronograma e linha do tempo** (#129): nova opção **Compartilhar…**
@@ -40,6 +42,15 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
     concursos compartilhados (nunca token nem URL); `exportacao.ts` ignora compartilhamentos no
     backup JSON e `substituirTudo` remove os antigos antes da importação; `caminhoSemValores` e
     `semSegredosNaUrl` redigem `/compartilhado/<token>` para `/compartilhado/[redigido]` nos logs.
+- **Dependências atualizadas** (Dependabot, PR #131): `@hookform/resolvers` 7.0.7, `jose` 6.2.18,
+  `lucide-react` 1.75.0, `@biomejs/biome` 2.6.8 e `@playwright/test` 1.65.1. Sem mudança de
+  comportamento.
+
+### Corrigido
+
+- **`Permissions-Policy` sem `browsing-topics`**: a diretiva da API Topics, descontinuada, saiu da
+  lista de recursos desligados em `src/lib/cabecalhos-seguranca.ts`, evitando o aviso de recurso
+  não reconhecido no console do navegador.
 
 ## [2.9.0] - 2026-11-16
 
